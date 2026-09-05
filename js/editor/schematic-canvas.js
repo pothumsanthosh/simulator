@@ -1,0 +1,1891 @@
+/**
+ * High-Performance Interactive Schematic Canvas
+ * Professional IEEE/ANSI vector symbols, centroid group rotation,
+ * normalized marquee multi-selection, DPR scaling, subpixel canvas clearing,
+ * and robust wiring hit-testing.
+ */
+
+import { ComponentTypes, ComponentDefinitions, formatValueWithPrefix } from '../engine/components.js';
+
+export class SchematicCanvas {
+  constructor(canvasElement, engine) {
+    this.canvas = canvasElement;
+    this.ctx = this.canvas.getContext('2d');
+    this.engine = engine;
+
+    // Viewport & Transforms
+    this.zoom = 1.0;
+    this.minZoom = 0.25;
+    this.maxZoom = 4.0;
+    this.panX = 120;
+    this.panY = 120;
+    this.gridSize = 20;
+
+    // Schematic Entities
+    this.components = [];
+    this.wires = [];
+
+    // Selection State
+    this.selectedComponent = null;
+    this.selectedComponents = new Set();
+    this.selectedWire = null;
+    this.hoveredPin = null;
+    this.hoveredComponent = null;
+
+    // Interaction Modes
+    this.mode = 'SELECT';
+    this.placementComponentType = null;
+
+    // Wiring State
+    this.wiringStartPin = null;
+    this.wiringCurrentPos = null;
+
+    // Dragging & Panning
+    this.isDragging = false;
+    this.isPanning = false;
+    this.isBoxSelecting = false;
+    this.dragStartX = 0;
+    this.dragStartY = 0;
+    this.boxSelectStart = { x: 0, y: 0 };
+    this.boxSelectCurrent = { x: 0, y: 0 };
+    this.draggedComponent = null;
+    this.compInitialPositions = new Map();
+
+    // Clipboard & Monotonic Counter
+    this.clipboard = null;
+    this.idCounter = 1000;
+
+    // Undo / Redo Stacks
+    this.undoStack = [];
+    this.redoStack = [];
+
+    // Callbacks
+    this.onSelectionChange = null;
+    this.onCircuitModified = null;
+
+    this.initEvents();
+    this.resize();
+  }
+
+  generateUniqueId(prefix) {
+    this.idCounter++;
+    return `${prefix}_${Date.now().toString(36)}_${this.idCounter}`;
+  }
+
+  resize() {
+    if (!this.canvas.parentElement) return;
+    const rect = this.canvas.parentElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      this.displayWidth = this.displayWidth || 800;
+      this.displayHeight = this.displayHeight || 600;
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = Math.round(rect.width * dpr);
+    this.canvas.height = Math.round(rect.height * dpr);
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.scale(dpr, dpr);
+    this.displayWidth = rect.width;
+    this.displayHeight = rect.height;
+    this.render();
+  }
+
+  initEvents() {
+    window.addEventListener('resize', () => this.resize());
+
+    this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+    this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+    this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+    this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+    this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.cancelAction();
+    });
+
+    window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+  }
+
+  // --- Coordinate Transformations ---
+  screenToWorld(screenX, screenY) {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = screenX - rect.left;
+    const mouseY = screenY - rect.top;
+    return {
+      x: (mouseX - this.panX) / this.zoom,
+      y: (mouseY - this.panY) / this.zoom
+    };
+  }
+
+  worldToScreen(worldX, worldY) {
+    return {
+      x: worldX * this.zoom + this.panX,
+      y: worldY * this.zoom + this.panY
+    };
+  }
+
+  snapToGrid(val) {
+    return Math.round(val / this.gridSize) * this.gridSize;
+  }
+
+  snapPos(pos) {
+    return {
+      x: this.snapToGrid(pos.x),
+      y: this.snapToGrid(pos.y)
+    };
+  }
+
+  // --- Component Management ---
+  addComponent(type, worldX, worldY, params = {}, rotation = 0) {
+    this.saveState();
+    const def = ComponentDefinitions[type];
+    if (!def) return null;
+
+    const id = this.generateUniqueId(def.prefix);
+    const comp = {
+      id,
+      name: `${def.prefix}${this.components.filter(c => c.type === type).length + 1}`,
+      type,
+      x: this.snapToGrid(worldX),
+      y: this.snapToGrid(worldY),
+      rotation: rotation || 0,
+      width: def.width,
+      height: def.height,
+      pins: JSON.parse(JSON.stringify(def.pins)),
+      params: { ...(def.params || {}), ...params }
+    };
+
+    this.components.push(comp);
+    this.selectComponent(comp);
+    this.notifyModified();
+    this.render();
+    return comp;
+  }
+
+  removeComponent(comp) {
+    if (!comp) return;
+    this.saveState();
+    this.wires = this.wires.filter(w => !w.fromPin.startsWith(`${comp.id}:`) && !w.toPin.startsWith(`${comp.id}:`));
+    this.components = this.components.filter(c => c.id !== comp.id);
+    this.selectedComponents.delete(comp);
+    if (this.selectedComponent === comp) {
+      this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
+    }
+    this.notifyModified();
+    this.render();
+  }
+
+  removeSelected() {
+    this.saveState();
+    if (this.selectedComponents.size > 0) {
+      const idsToDelete = new Set(Array.from(this.selectedComponents).map(c => c.id));
+      this.wires = this.wires.filter(w => {
+        const fromId = w.fromPin.split(':')[0];
+        const toId = w.toPin.split(':')[0];
+        return !idsToDelete.has(fromId) && !idsToDelete.has(toId);
+      });
+      this.components = this.components.filter(c => !idsToDelete.has(c.id));
+      this.selectedComponents.clear();
+      this.selectedComponent = null;
+    }
+    if (this.selectedWire) {
+      this.wires = this.wires.filter(w => w.id !== this.selectedWire.id);
+      this.selectedWire = null;
+    }
+    this.notifyModified();
+    this.render();
+  }
+
+  // Centroid-Based Group Rotation
+  rotateSelected(direction = 90) {
+    if (this.selectedComponents.size === 0 && !this.selectedComponent) return;
+    this.saveState();
+
+    const targets = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents) : [this.selectedComponent];
+
+    if (targets.length === 1) {
+      // Single component: rotate in place
+      targets[0].rotation = (targets[0].rotation + direction + 360) % 360;
+    } else {
+      // Multiple components: rotate around group bounding centroid
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      targets.forEach(c => {
+        minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x);
+        minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y);
+      });
+      const cX = this.snapToGrid((minX + maxX) / 2);
+      const cY = this.snapToGrid((minY + maxY) / 2);
+
+      const rad = (direction * Math.PI) / 180;
+      const cos = Math.round(Math.cos(rad));
+      const sin = Math.round(Math.sin(rad));
+
+      targets.forEach(c => {
+        const relX = c.x - cX;
+        const relY = c.y - cY;
+        c.x = this.snapToGrid(cX + (relX * cos - relY * sin));
+        c.y = this.snapToGrid(cY + (relX * sin + relY * cos));
+        c.rotation = (c.rotation + direction + 360) % 360;
+      });
+    }
+
+    this.notifyModified();
+    this.render();
+  }
+
+  // --- Pin Positions & Hit Testing ---
+  getPinWorldPos(comp, pin) {
+    const rad = (comp.rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return {
+      x: comp.x + (pin.x * cos - pin.y * sin),
+      y: comp.y + (pin.x * sin + pin.y * cos)
+    };
+  }
+
+  findPinAt(worldX, worldY, radius = 12) {
+    for (const comp of this.components) {
+      if (!comp.pins) continue;
+      for (const pin of comp.pins) {
+        const pinPos = this.getPinWorldPos(comp, pin);
+        const dist = Math.hypot(worldX - pinPos.x, worldY - pinPos.y);
+        if (dist <= radius) {
+          return { comp, pin, pinKey: `${comp.id}:${pin.id}`, pos: pinPos };
+        }
+      }
+    }
+    return null;
+  }
+
+  findComponentAt(worldX, worldY) {
+    for (let i = this.components.length - 1; i >= 0; i--) {
+      const comp = this.components[i];
+      const hw = (comp.width / 2) + 6;
+      const hh = (comp.height / 2) + 6;
+      if (Math.abs(worldX - comp.x) <= hw && Math.abs(worldY - comp.y) <= hh) {
+        return comp;
+      }
+    }
+    return null;
+  }
+
+  findWireAt(worldX, worldY, threshold = 6) {
+    for (const wire of this.wires) {
+      const points = this.getWireWaypoints(wire);
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        if (this.pointToSegmentDistance(worldX, worldY, p1.x, p1.y, p2.x, p2.y) <= threshold) {
+          return wire;
+        }
+      }
+    }
+    return null;
+  }
+
+  pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+    const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+    if (l2 === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+  }
+
+  getWireWaypoints(wire) {
+    const [fromCompId, fromPinId] = wire.fromPin.split(':');
+    const [toCompId, toPinId] = wire.toPin.split(':');
+
+    const fromComp = this.components.find(c => c.id === fromCompId);
+    const toComp = this.components.find(c => c.id === toCompId);
+    if (!fromComp || !toComp) return [];
+
+    const fromPin = fromComp.pins?.find(p => p.id === fromPinId);
+    const toPin = toComp.pins?.find(p => p.id === toPinId);
+    if (!fromPin || !toPin) return [];
+
+    const p1 = this.getPinWorldPos(fromComp, fromPin);
+    const p2 = this.getPinWorldPos(toComp, toPin);
+
+    // Manhattan Orthogonal Routing
+    if (Math.abs(p1.x - p2.x) < 2) {
+      return [p1, p2];
+    }
+    if (Math.abs(p1.y - p2.y) < 2) {
+      return [p1, p2];
+    }
+
+    const midX = Math.round((p1.x + p2.x) / 2 / this.gridSize) * this.gridSize;
+    return [
+      p1,
+      { x: midX, y: p1.y },
+      { x: midX, y: p2.y },
+      p2
+    ];
+  }
+
+  // --- Mouse & Keyboard Handlers ---
+  handleMouseDown(e) {
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+    // Middle-click or Alt+LeftClick: Pan
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      this.isPanning = true;
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
+      return;
+    }
+
+    if (e.button === 0) {
+      // 1. Placement Mode
+      if (this.mode === 'PLACE' && this.placementComponentType) {
+        this.addComponent(this.placementComponentType, worldPos.x, worldPos.y);
+        if (!e.shiftKey) {
+          this.mode = 'SELECT';
+          this.placementComponentType = null;
+        }
+        return;
+      }
+
+      // 2. Wiring Click (Priority over component or wire selection)
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y);
+      if (pinHit) {
+        if (!this.wiringStartPin) {
+          this.wiringStartPin = pinHit;
+          this.wiringCurrentPos = pinHit.pos;
+          this.render();
+          return;
+        } else if (this.wiringStartPin.pinKey !== pinHit.pinKey) {
+          this.saveState();
+          this.wires.push({
+            id: this.generateUniqueId('W'),
+            fromPin: this.wiringStartPin.pinKey,
+            toPin: pinHit.pinKey
+          });
+          this.wiringStartPin = null;
+          this.wiringCurrentPos = null;
+          this.notifyModified();
+          this.render();
+          return;
+        }
+      }
+
+      if (this.wiringStartPin) {
+        this.wiringStartPin = null;
+        this.wiringCurrentPos = null;
+        this.render();
+        return;
+      }
+
+      // 3. Component Click
+      const compHit = this.findComponentAt(worldPos.x, worldPos.y);
+      if (compHit) {
+        // Toggle interactive switch components
+        if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON) {
+          compHit.params.closed = !compHit.params.closed;
+          this.notifyModified();
+          this.render();
+        } else if (compHit.type === ComponentTypes.SPDT_SWITCH) {
+          compHit.params.position = compHit.params.position === 1 ? 2 : 1;
+          this.notifyModified();
+          this.render();
+        }
+
+        if (e.shiftKey) {
+          if (this.selectedComponents.has(compHit)) {
+            this.selectedComponents.delete(compHit);
+            if (this.selectedComponent === compHit) {
+              this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
+            }
+          } else {
+            this.selectedComponents.add(compHit);
+            this.selectedComponent = compHit;
+          }
+        } else {
+          if (!this.selectedComponents.has(compHit)) {
+            this.selectedComponents.clear();
+            this.selectedComponents.add(compHit);
+            this.selectedComponent = compHit;
+          }
+        }
+
+        this.selectWire(null);
+        this.isDragging = true;
+        this.dragStartX = worldPos.x;
+        this.dragStartY = worldPos.y;
+
+        this.compInitialPositions.clear();
+        this.selectedComponents.forEach(c => {
+          this.compInitialPositions.set(c, { x: c.x, y: c.y });
+        });
+
+        if (this.onSelectionChange) {
+          this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
+        }
+        this.render();
+        return;
+      }
+
+      // 4. Wire Click
+      const wireHit = this.findWireAt(worldPos.x, worldPos.y);
+      if (wireHit) {
+        this.selectWire(wireHit);
+        return;
+      }
+
+      // 5. Empty Canvas Click -> Marquee Selection or Pan
+      if (e.shiftKey) {
+        this.isBoxSelecting = true;
+        this.boxSelectStart = worldPos;
+        this.boxSelectCurrent = worldPos;
+      } else {
+        this.selectedComponents.clear();
+        this.selectedComponent = null;
+        this.selectWire(null);
+        this.isPanning = true;
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+      }
+      this.render();
+    }
+  }
+
+  handleMouseMove(e) {
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+    if (this.isPanning) {
+      const dx = e.clientX - this.dragStartX;
+      const dy = e.clientY - this.dragStartY;
+      this.panX += dx;
+      this.panY += dy;
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
+      this.render();
+      return;
+    }
+
+    if (this.isDragging && this.selectedComponents.size > 0) {
+      const dx = worldPos.x - this.dragStartX;
+      const dy = worldPos.y - this.dragStartY;
+      this.selectedComponents.forEach(c => {
+        const initPos = this.compInitialPositions.get(c) || { x: c.x, y: c.y };
+        c.x = this.snapToGrid(initPos.x + dx);
+        c.y = this.snapToGrid(initPos.y + dy);
+      });
+      this.render();
+      return;
+    }
+
+    if (this.isBoxSelecting) {
+      this.boxSelectCurrent = worldPos;
+      this.render();
+      return;
+    }
+
+    if (this.wiringStartPin) {
+      this.wiringCurrentPos = this.snapPos(worldPos);
+      this.render();
+      return;
+    }
+
+    const pinHit = this.findPinAt(worldPos.x, worldPos.y);
+    const compHit = this.findComponentAt(worldPos.x, worldPos.y);
+
+    if (pinHit !== this.hoveredPin || compHit !== this.hoveredComponent) {
+      this.hoveredPin = pinHit;
+      this.hoveredComponent = compHit;
+      this.canvas.style.cursor = pinHit ? 'crosshair' : (compHit ? 'move' : 'default');
+      this.render();
+    }
+  }
+
+  handleMouseUp(e) {
+    if (this.isDragging) {
+      this.isDragging = false;
+      this.saveState();
+      this.notifyModified();
+      this.render();
+    }
+    if (this.isBoxSelecting) {
+      this.isBoxSelecting = false;
+      const minX = Math.min(this.boxSelectStart.x, this.boxSelectCurrent.x);
+      const maxX = Math.max(this.boxSelectStart.x, this.boxSelectCurrent.x);
+      const minY = Math.min(this.boxSelectStart.y, this.boxSelectCurrent.y);
+      const maxY = Math.max(this.boxSelectStart.y, this.boxSelectCurrent.y);
+
+      this.components.forEach(c => {
+        if (c.x >= minX && c.x <= maxX && c.y >= minY && c.y <= maxY) {
+          this.selectedComponents.add(c);
+        }
+      });
+      this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
+      if (this.onSelectionChange) {
+        this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
+      }
+      this.render();
+    }
+    this.isPanning = false;
+  }
+
+  handleWheel(e) {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
+    const newZoom = Math.min(Math.max(this.zoom * zoomFactor, this.minZoom), this.maxZoom);
+
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    this.panX = mouseX - (mouseX - this.panX) * (newZoom / this.zoom);
+    this.panY = mouseY - (mouseY - this.panY) * (newZoom / this.zoom);
+    this.zoom = newZoom;
+
+    this.render();
+  }
+
+  handleDoubleClick(e) {
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+    const comp = this.findComponentAt(worldPos.x, worldPos.y);
+    if (comp) {
+      this.rotateSelected(90);
+    }
+  }
+
+  handleKeyDown(e) {
+    const activeEl = document.activeElement;
+    if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) return;
+
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+    if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      this.rotateSelected(90);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      this.removeSelected();
+    } else if (e.key === 'Escape') {
+      this.cancelAction();
+    } else if (isCtrlOrCmd && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+      e.preventDefault();
+      this.undo();
+    } else if (isCtrlOrCmd && (e.key === 'y' || e.key === 'Y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z')))) {
+      e.preventDefault();
+      this.redo();
+    } else if (isCtrlOrCmd && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      this.copySelection();
+    } else if (isCtrlOrCmd && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault();
+      this.pasteSelection();
+    } else if (isCtrlOrCmd && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      this.copySelection();
+      this.pasteSelection(40, 40);
+    } else if (e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const step = e.shiftKey ? this.gridSize * 5 : this.gridSize;
+      let dx = 0, dy = 0;
+      if (e.key === 'ArrowLeft') dx = -step;
+      if (e.key === 'ArrowRight') dx = step;
+      if (e.key === 'ArrowUp') dy = -step;
+      if (e.key === 'ArrowDown') dy = step;
+
+      if (this.selectedComponents.size > 0) {
+        this.saveState();
+        this.selectedComponents.forEach(c => {
+          c.x += dx; c.y += dy;
+        });
+        this.notifyModified();
+        this.render();
+      }
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      document.getElementById('btnSimToggle')?.click();
+    }
+  }
+
+  copySelection() {
+    if (this.selectedComponents.size === 0) return;
+    this.clipboard = Array.from(this.selectedComponents).map(c => JSON.parse(JSON.stringify(c)));
+  }
+
+  pasteSelection(offsetDx = 40, offsetDy = 40) {
+    if (!this.clipboard || this.clipboard.length === 0) return;
+    this.saveState();
+    this.selectedComponents.clear();
+
+    this.clipboard.forEach(origComp => {
+      const def = ComponentDefinitions[origComp.type];
+      const newId = this.generateUniqueId(def.prefix);
+
+      const newComp = {
+        ...origComp,
+        id: newId,
+        name: `${def.prefix}${this.components.filter(c => c.type === origComp.type).length + 1}`,
+        x: origComp.x + offsetDx,
+        y: origComp.y + offsetDy,
+        pins: JSON.parse(JSON.stringify(origComp.pins))
+      };
+
+      this.components.push(newComp);
+      this.selectedComponents.add(newComp);
+    });
+
+    this.selectedComponent = Array.from(this.selectedComponents)[0];
+    this.notifyModified();
+    this.render();
+  }
+
+  cancelAction() {
+    this.wiringStartPin = null;
+    this.wiringCurrentPos = null;
+    this.mode = 'SELECT';
+    this.placementComponentType = null;
+    this.isBoxSelecting = false;
+    this.render();
+  }
+
+  selectComponent(comp) {
+    this.selectedComponents.clear();
+    if (comp) this.selectedComponents.add(comp);
+    this.selectedComponent = comp;
+    this.selectedWire = null;
+    if (this.onSelectionChange) {
+      this.onSelectionChange({ type: 'component', item: comp, group: comp ? [comp] : [] });
+    }
+    this.render();
+  }
+
+  selectWire(wire) {
+    this.selectedWire = wire;
+    this.selectedComponent = null;
+    this.selectedComponents.clear();
+    if (this.onSelectionChange) this.onSelectionChange({ type: 'wire', item: wire });
+    this.render();
+  }
+
+  saveState() {
+    this.undoStack.push({
+      components: JSON.parse(JSON.stringify(this.components)),
+      wires: JSON.parse(JSON.stringify(this.wires))
+    });
+    if (this.undoStack.length > 50) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  undo() {
+    if (this.undoStack.length === 0) return;
+    this.redoStack.push({
+      components: JSON.parse(JSON.stringify(this.components)),
+      wires: JSON.parse(JSON.stringify(this.wires))
+    });
+    const state = this.undoStack.pop();
+    this.components = state.components;
+    this.wires = state.wires;
+    this.selectedComponents.clear();
+    this.selectedComponent = null;
+    this.notifyModified();
+    this.render();
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    this.undoStack.push({
+      components: JSON.parse(JSON.stringify(this.components)),
+      wires: JSON.parse(JSON.stringify(this.wires))
+    });
+    const state = this.redoStack.pop();
+    this.components = state.components;
+    this.wires = state.wires;
+    this.selectedComponents.clear();
+    this.selectedComponent = null;
+    this.notifyModified();
+    this.render();
+  }
+
+  notifyModified() {
+    if (this.onCircuitModified) this.onCircuitModified(this.components, this.wires);
+  }
+
+  fitToScreen() {
+    const dw = this.displayWidth || 800;
+    const dh = this.displayHeight || 600;
+
+    if (this.components.length === 0) {
+      this.zoom = 1.0;
+      this.panX = dw / 2;
+      this.panY = dh / 2;
+      this.render();
+      return;
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    this.components.forEach(c => {
+      minX = Math.min(minX, c.x - (c.width || 40) / 2);
+      minY = Math.min(minY, c.y - (c.height || 40) / 2);
+      maxX = Math.max(maxX, c.x + (c.width || 40) / 2);
+      maxY = Math.max(maxY, c.y + (c.height || 40) / 2);
+    });
+
+    const padding = 80;
+    const circuitW = Math.max(maxX - minX + padding * 2, 100);
+    const circuitH = Math.max(maxY - minY + padding * 2, 100);
+
+    const zoomX = dw / circuitW;
+    const zoomY = dh / circuitH;
+    this.zoom = Math.min(Math.max(Math.min(zoomX, zoomY), 0.35), 2.0);
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    this.panX = dw / 2 - centerX * this.zoom;
+    this.panY = dh / 2 - centerY * this.zoom;
+
+    this.render();
+  }
+
+  // --- Rendering Pipeline ---
+  render() {
+    const ctx = this.ctx;
+    const w = this.displayWidth;
+    const h = this.displayHeight;
+    if (!w || !h || w <= 0 || h <= 0) return;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // 1. Draw Grid
+    this.renderGrid(ctx, w, h);
+
+    ctx.save();
+    ctx.translate(this.panX, this.panY);
+    ctx.scale(this.zoom, this.zoom);
+
+    // Viewport Culling Bounds
+    const vMin = this.screenToWorld(0, 0);
+    const vMax = this.screenToWorld(w, h);
+    const margin = 100;
+    const vpLeft = vMin.x - margin;
+    const vpTop = vMin.y - margin;
+    const vpRight = vMax.x + margin;
+    const vpBottom = vMax.y + margin;
+
+    // 2. Draw Wires & Junctions
+    this.renderWires(ctx, vpLeft, vpTop, vpRight, vpBottom);
+
+    // 3. Draw Wiring In-Progress Line
+    if (this.wiringStartPin && this.wiringCurrentPos) {
+      ctx.save();
+      ctx.strokeStyle = '#03b585';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      const p1 = this.wiringStartPin.pos;
+      const p2 = this.wiringCurrentPos;
+      const midX = (p1.x + p2.x) / 2;
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(midX, p1.y);
+      ctx.lineTo(midX, p2.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. Draw Components
+    this.components.forEach(comp => {
+      const hw = (comp.width || 40) / 2;
+      const hh = (comp.height || 40) / 2;
+      if (comp.x + hw >= vpLeft && comp.x - hw <= vpRight && comp.y + hh >= vpTop && comp.y - hh <= vpBottom) {
+        this.renderComponent(ctx, comp);
+      }
+    });
+
+    // 5. Draw Pins
+    this.renderPins(ctx, vpLeft, vpTop, vpRight, vpBottom);
+
+    // 6. Draw Marquee Selection Box (Normalized)
+    if (this.isBoxSelecting) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 122, 255, 0.12)';
+      ctx.strokeStyle = '#007aff';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 4]);
+      const bx = Math.min(this.boxSelectStart.x, this.boxSelectCurrent.x);
+      const by = Math.min(this.boxSelectStart.y, this.boxSelectCurrent.y);
+      const bw = Math.abs(this.boxSelectCurrent.x - this.boxSelectStart.x);
+      const bh = Math.abs(this.boxSelectCurrent.y - this.boxSelectStart.y);
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  renderGrid(ctx, w, h) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+
+    const scaledGrid = this.gridSize * this.zoom;
+    if (scaledGrid < 6) return;
+
+    ctx.fillStyle = '#e2e8f0';
+    let startX = this.panX % scaledGrid;
+    if (startX > 0) startX -= scaledGrid;
+    let startY = this.panY % scaledGrid;
+    if (startY > 0) startY -= scaledGrid;
+
+    for (let x = startX; x < w; x += scaledGrid) {
+      for (let y = startY; y < h; y += scaledGrid) {
+        ctx.fillRect(x - 1, y - 1, 2, 2);
+      }
+    }
+
+    const majorGrid = scaledGrid * 5;
+    if (majorGrid >= 30) {
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      let mStartX = this.panX % majorGrid;
+      if (mStartX > 0) mStartX -= majorGrid;
+      let mStartY = this.panY % majorGrid;
+      if (mStartY > 0) mStartY -= majorGrid;
+
+      for (let x = mStartX; x < w; x += majorGrid) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      }
+      for (let y = mStartY; y < h; y += majorGrid) {
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  renderWires(ctx, vpLeft, vpTop, vpRight, vpBottom) {
+    const junctionCounts = new Map();
+
+    this.wires.forEach(wire => {
+      const waypoints = this.getWireWaypoints(wire);
+      if (waypoints.length === 0) return;
+
+      const isSelected = this.selectedWire === wire;
+
+      ctx.save();
+      ctx.strokeStyle = isSelected ? '#007aff' : '#2b2d2f';
+      ctx.lineWidth = isSelected ? 3.5 : 2.0;
+      ctx.beginPath();
+      ctx.moveTo(waypoints[0].x, waypoints[0].y);
+      for (let i = 1; i < waypoints.length; i++) {
+        ctx.lineTo(waypoints[i].x, waypoints[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      waypoints.forEach(pt => {
+        const key = `${Math.round(pt.x)},${Math.round(pt.y)}`;
+        junctionCounts.set(key, (junctionCounts.get(key) || 0) + 1);
+      });
+    });
+
+    ctx.fillStyle = '#2b2d2f';
+    junctionCounts.forEach((count, key) => {
+      if (count >= 3) {
+        const [jx, jy] = key.split(',').map(Number);
+        ctx.beginPath();
+        ctx.arc(jx, jy, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+  }
+
+  renderPins(ctx, vpLeft, vpTop, vpRight, vpBottom) {
+    this.components.forEach(comp => {
+      if (!comp.pins) return;
+      comp.pins.forEach(pin => {
+        const pos = this.getPinWorldPos(comp, pin);
+        if (pos.x < vpLeft || pos.x > vpRight || pos.y < vpTop || pos.y > vpBottom) return;
+
+        const pinKey = `${comp.id}:${pin.id}`;
+        const isHovered = this.hoveredPin && this.hoveredPin.pinKey === pinKey;
+        const isWiringSource = this.wiringStartPin && this.wiringStartPin.pinKey === pinKey;
+
+        ctx.save();
+        if (isWiringSource) {
+          ctx.fillStyle = '#ff9500';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (isHovered) {
+          ctx.fillStyle = '#03b585';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = '#718096';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+    });
+  }
+
+  // --- Professional IEEE / ANSI Vector Symbols ---
+  renderComponent(ctx, comp) {
+    ctx.save();
+    ctx.translate(comp.x, comp.y);
+    ctx.rotate((comp.rotation * Math.PI) / 180);
+
+    const isSelected = this.selectedComponents.has(comp) || this.selectedComponent === comp;
+    const isHovered = this.hoveredComponent === comp;
+
+    if (isSelected) {
+      ctx.strokeStyle = '#007aff';
+      ctx.lineWidth = 1.5;
+      ctx.fillStyle = 'rgba(0, 122, 255, 0.08)';
+      const hw = comp.width / 2 + 5;
+      const hh = comp.height / 2 + 5;
+      ctx.strokeRect(-hw, -hh, comp.width + 10, comp.height + 10);
+      ctx.fillRect(-hw, -hh, comp.width + 10, comp.height + 10);
+    } else if (isHovered) {
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.0;
+      const hw = comp.width / 2 + 4;
+      const hh = comp.height / 2 + 4;
+      ctx.strokeRect(-hw, -hh, comp.width + 8, comp.height + 8);
+    }
+
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2.0;
+    ctx.fillStyle = '#ffffff';
+
+    this.drawSymbol(ctx, comp);
+
+    ctx.restore();
+    this.renderLabels(ctx, comp);
+  }
+
+  drawSymbol(ctx, comp) {
+    const p = comp.params || {};
+
+    switch (comp.type) {
+      case ComponentTypes.GROUND: {
+        ctx.beginPath();
+        ctx.moveTo(0, -15); ctx.lineTo(0, 0);
+        ctx.moveTo(-12, 0); ctx.lineTo(12, 0);
+        ctx.moveTo(-8, 5); ctx.lineTo(8, 5);
+        ctx.moveTo(-4, 10); ctx.lineTo(4, 10);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.POWER_VCC:
+      case ComponentTypes.POWER_5V:
+      case ComponentTypes.POWER_12V:
+      case ComponentTypes.POWER_15V: {
+        ctx.beginPath();
+        ctx.moveTo(0, 15); ctx.lineTo(0, 0);
+        ctx.moveTo(-10, 0); ctx.lineTo(10, 0);
+        ctx.moveTo(0, 0); ctx.lineTo(0, -10);
+        ctx.stroke();
+        ctx.fillStyle = '#e11d48';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        const label = comp.type === ComponentTypes.POWER_VCC ? 'VCC' : comp.type.replace('POWER_', '+');
+        ctx.fillText(label, 0, -12);
+        break;
+      }
+
+      case ComponentTypes.POWER_NEG12V:
+      case ComponentTypes.POWER_NEG15V: {
+        ctx.beginPath();
+        ctx.moveTo(0, -15); ctx.lineTo(0, 0);
+        ctx.moveTo(-10, 0); ctx.lineTo(10, 0);
+        ctx.stroke();
+        ctx.fillStyle = '#0284c7';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.type.replace('POWER_NEG', '-'), 0, 12);
+        break;
+      }
+
+      case ComponentTypes.NET_LABEL: {
+        ctx.beginPath();
+        ctx.moveTo(0, 10); ctx.lineTo(0, 0);
+        ctx.lineTo(20, 0); ctx.lineTo(26, -6); ctx.lineTo(20, -12); ctx.lineTo(0, -12);
+        ctx.closePath();
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 8px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(p.label || 'NET', 3, -4);
+        break;
+      }
+
+      case ComponentTypes.DC_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.stroke();
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#e11d48';
+        ctx.textAlign = 'center';
+        ctx.fillText('+', 0, -5);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText('-', 0, 12);
+        break;
+      }
+
+      case ComponentTypes.AC_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.moveTo(-10, 0);
+        ctx.bezierCurveTo(-5, -10, 0, -10, 0, 0);
+        ctx.bezierCurveTo(0, 10, 5, 10, 10, 0);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.CLOCK_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.moveTo(-10, 5); ctx.lineTo(-10, -5); ctx.lineTo(0, -5); ctx.lineTo(0, 5); ctx.lineTo(10, 5); ctx.lineTo(10, -5);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.TRIANGLE_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.moveTo(-10, 6); ctx.lineTo(0, -8); ctx.lineTo(10, 6);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.SAWTOOTH_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.moveTo(-10, 6); ctx.lineTo(5, -8); ctx.lineTo(5, 6);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.PULSE_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.moveTo(-10, 6); ctx.lineTo(-10, -6); ctx.lineTo(-2, -6); ctx.lineTo(-2, 6); ctx.lineTo(10, 6);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.AM_VOLTAGE:
+      case ComponentTypes.FM_VOLTAGE:
+      case ComponentTypes.NOISE_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.stroke();
+        ctx.font = 'bold 8px sans-serif';
+        ctx.fillStyle = '#0284c7';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.type.replace('_VOLTAGE', ''), 0, 3);
+        break;
+      }
+
+      case ComponentTypes.DC_CURRENT:
+      case ComponentTypes.AC_CURRENT: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.moveTo(0, 8); ctx.lineTo(0, -8);
+        ctx.moveTo(-4, -2); ctx.lineTo(0, -8); ctx.lineTo(4, -2);
+        ctx.stroke();
+        if (comp.type === ComponentTypes.AC_CURRENT) {
+          ctx.font = 'bold 8px sans-serif';
+          ctx.fillStyle = '#0284c7';
+          ctx.fillText('AC', 8, 4);
+        }
+        break;
+      }
+
+      case ComponentTypes.VCVS:
+      case ComponentTypes.VCCS: {
+        ctx.beginPath();
+        ctx.moveTo(0, -20); ctx.lineTo(20, 0); ctx.lineTo(0, 20); ctx.lineTo(-20, 0);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-25, -15); ctx.lineTo(-12, -15);
+        ctx.moveTo(-25, 15); ctx.lineTo(-12, 15);
+        ctx.moveTo(25, -15); ctx.lineTo(12, -15);
+        ctx.moveTo(25, 15); ctx.lineTo(12, 15);
+        ctx.stroke();
+        ctx.font = 'bold 8px sans-serif';
+        ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.type === ComponentTypes.VCVS ? 'E' : 'G', 0, 3);
+        break;
+      }
+
+      case ComponentTypes.BATTERY_CELL: {
+        ctx.beginPath();
+        ctx.moveTo(0, -25); ctx.lineTo(0, -8);
+        ctx.moveTo(0, 8); ctx.lineTo(0, 25);
+        ctx.moveTo(-16, -8); ctx.lineTo(16, -8);
+        ctx.moveTo(-8, 0); ctx.lineTo(8, 0);
+        ctx.moveTo(-16, 8); ctx.lineTo(16, 8);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.RESISTOR: {
+        ctx.beginPath();
+        ctx.moveTo(-30, 0); ctx.lineTo(-20, 0);
+        ctx.lineTo(-16, -8); ctx.lineTo(-8, 8); ctx.lineTo(0, -8); ctx.lineTo(8, 8); ctx.lineTo(16, -8); ctx.lineTo(20, 0);
+        ctx.lineTo(30, 0);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.POTENTIOMETER: {
+        ctx.beginPath();
+        ctx.moveTo(-30, 0); ctx.lineTo(-20, 0);
+        ctx.lineTo(-16, -8); ctx.lineTo(-8, 8); ctx.lineTo(0, -8); ctx.lineTo(8, 8); ctx.lineTo(16, -8); ctx.lineTo(20, 0);
+        ctx.lineTo(30, 0);
+        ctx.moveTo(0, -20); ctx.lineTo(0, -8);
+        ctx.lineTo(-3, -12); ctx.moveTo(0, -8); ctx.lineTo(3, -12);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.CAPACITOR: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-6, 0);
+        ctx.moveTo(6, 0); ctx.lineTo(20, 0);
+        ctx.moveTo(-6, -14); ctx.lineTo(-6, 14);
+        ctx.moveTo(6, -14); ctx.lineTo(6, 14);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.POLARIZED_CAP: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-6, 0);
+        ctx.moveTo(6, 0); ctx.lineTo(20, 0);
+        ctx.moveTo(-6, -14); ctx.lineTo(-6, 14);
+        ctx.moveTo(6, -14); ctx.quadraticCurveTo(2, 0, 6, 14);
+        ctx.stroke();
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#e11d48';
+        ctx.fillText('+', -12, -8);
+        break;
+      }
+
+      case ComponentTypes.TANTALUM_CAP: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-6, 0);
+        ctx.moveTo(6, 0); ctx.lineTo(20, 0);
+        ctx.moveTo(-6, -14); ctx.lineTo(-6, 14);
+        ctx.moveTo(6, -14); ctx.quadraticCurveTo(2, 0, 6, 14);
+        ctx.stroke();
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillText('+Ta', -12, -8);
+        break;
+      }
+
+      case ComponentTypes.COUPLED_INDUCTOR: {
+        ctx.beginPath();
+        ctx.moveTo(-30, -15); ctx.lineTo(-20, -15);
+        for (let i = 0; i < 3; i++) {
+          const startX = -20 + i * 10;
+          ctx.arc(startX + 5, -15, 5, Math.PI, 0, false);
+        }
+        ctx.lineTo(30, -15);
+
+        ctx.moveTo(-30, 15); ctx.lineTo(-20, 15);
+        for (let i = 0; i < 3; i++) {
+          const startX = -20 + i * 10;
+          ctx.arc(startX + 5, 15, 5, Math.PI, 0, false);
+        }
+        ctx.lineTo(30, 15);
+
+        ctx.moveTo(-20, 0); ctx.lineTo(20, 0);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.CRYSTAL: {
+        ctx.beginPath();
+        ctx.moveTo(-25, 0); ctx.lineTo(-10, 0);
+        ctx.moveTo(10, 0); ctx.lineTo(25, 0);
+        ctx.moveTo(-10, -12); ctx.lineTo(-10, 12);
+        ctx.moveTo(10, -12); ctx.lineTo(10, 12);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.rect(-6, -10, 12, 20);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.FUSE: {
+        ctx.beginPath();
+        ctx.moveTo(-25, 0); ctx.lineTo(-15, 0);
+        ctx.moveTo(15, 0); ctx.lineTo(25, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.rect(-15, -6, 30, 12);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-15, 0); ctx.lineTo(15, 0);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.NTC_THERMISTOR: {
+        ctx.beginPath();
+        ctx.moveTo(-25, 0); ctx.lineTo(-15, 0);
+        ctx.lineTo(-10, -6); ctx.lineTo(0, 6); ctx.lineTo(10, -6); ctx.lineTo(15, 0);
+        ctx.lineTo(25, 0);
+        ctx.moveTo(-16, 10); ctx.lineTo(-8, 10); ctx.lineTo(16, -10);
+        ctx.stroke();
+        ctx.font = 'bold 8px sans-serif';
+        ctx.fillStyle = '#0284c7';
+        ctx.fillText('-t°', 12, -12);
+        break;
+      }
+
+      case ComponentTypes.PHOTORESISTOR_LDR: {
+        ctx.beginPath();
+        ctx.moveTo(-25, 0); ctx.lineTo(-15, 0);
+        ctx.lineTo(-10, -6); ctx.lineTo(0, 6); ctx.lineTo(10, -6); ctx.lineTo(15, 0);
+        ctx.lineTo(25, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-10, -18); ctx.lineTo(-2, -10);
+        ctx.moveTo(-4, -18); ctx.lineTo(4, -10);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.INDUCTOR: {
+        ctx.beginPath();
+        ctx.moveTo(-30, 0); ctx.lineTo(-20, 0);
+        for (let i = 0; i < 4; i++) {
+          const startX = -20 + i * 10;
+          ctx.arc(startX + 5, 0, 5, Math.PI, 0, false);
+        }
+        ctx.lineTo(30, 0);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.TRANSFORMER:
+      case ComponentTypes.TRANSFORMER_CENTER_TAP: {
+        ctx.beginPath();
+        ctx.moveTo(-30, -20); ctx.lineTo(-15, -20);
+        for (let i = 0; i < 3; i++) {
+          ctx.arc(-15, -15 + i * 15, 7.5, Math.PI * 1.5, Math.PI * 0.5, false);
+        }
+        ctx.lineTo(-30, 20);
+
+        ctx.moveTo(30, -20); ctx.lineTo(15, -20);
+        for (let i = 0; i < 3; i++) {
+          ctx.arc(15, -15 + i * 15, 7.5, Math.PI * 1.5, Math.PI * 0.5, true);
+        }
+        ctx.lineTo(30, 20);
+
+        if (comp.type === ComponentTypes.TRANSFORMER_CENTER_TAP) {
+          ctx.moveTo(15, 0); ctx.lineTo(30, 0);
+        }
+
+        ctx.moveTo(-2, -22); ctx.lineTo(-2, 22);
+        ctx.moveTo(2, -22); ctx.lineTo(2, 22);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.DIODE:
+      case ComponentTypes.SCHOTTKY:
+      case ComponentTypes.ZENER:
+      case ComponentTypes.LED: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-8, 0);
+        ctx.moveTo(8, 0); ctx.lineTo(20, 0);
+        ctx.moveTo(-8, -12); ctx.lineTo(8, 0); ctx.lineTo(-8, 12);
+        ctx.closePath();
+        ctx.fillStyle = '#e11d48';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        if (comp.type === ComponentTypes.ZENER) {
+          ctx.moveTo(8, -12); ctx.lineTo(8, 12); ctx.lineTo(4, 12); ctx.moveTo(8, -12); ctx.lineTo(12, -12);
+        } else if (comp.type === ComponentTypes.SCHOTTKY) {
+          ctx.moveTo(8, -12); ctx.lineTo(8, 12); ctx.lineTo(5, 12); ctx.lineTo(5, 8); ctx.moveTo(8, -12); ctx.lineTo(11, -12); ctx.lineTo(11, -8);
+        } else {
+          ctx.moveTo(8, -12); ctx.lineTo(8, 12);
+        }
+        ctx.stroke();
+
+        if (comp.type === ComponentTypes.LED) {
+          ctx.beginPath();
+          ctx.moveTo(2, -12); ctx.lineTo(10, -20);
+          ctx.moveTo(8, -12); ctx.lineTo(16, -20);
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case ComponentTypes.BRIDGE_RECTIFIER: {
+        ctx.beginPath();
+        ctx.moveTo(0, -20); ctx.lineTo(20, 0); ctx.lineTo(0, 20); ctx.lineTo(-20, 0);
+        ctx.closePath();
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-25, -15); ctx.lineTo(-10, -10);
+        ctx.moveTo(-25, 15); ctx.lineTo(-10, 10);
+        ctx.moveTo(25, -15); ctx.lineTo(10, -10);
+        ctx.moveTo(25, 15); ctx.lineTo(10, 10);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.BJT_NPN:
+      case ComponentTypes.BJT_PNP: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-6, 0);
+        ctx.moveTo(-6, -14); ctx.lineTo(-6, 14);
+        ctx.moveTo(-6, -6); ctx.lineTo(15, -25);
+        ctx.moveTo(-6, 6); ctx.lineTo(15, 25);
+        ctx.stroke();
+
+        ctx.beginPath();
+        if (comp.type === ComponentTypes.BJT_NPN) {
+          ctx.moveTo(11, 21); ctx.lineTo(15, 25); ctx.lineTo(8, 25);
+        } else {
+          ctx.moveTo(0, 11); ctx.lineTo(-6, 6); ctx.lineTo(-3, 13);
+        }
+        ctx.fillStyle = '#1e293b';
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.NMOS:
+      case ComponentTypes.PMOS: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 10); ctx.lineTo(-8, 10);
+        ctx.moveTo(-8, -14); ctx.lineTo(-8, 14);
+        ctx.moveTo(4, -14); ctx.lineTo(4, 14);
+        ctx.moveTo(4, -14); ctx.lineTo(15, -14); ctx.lineTo(15, -25);
+        ctx.moveTo(4, 14); ctx.lineTo(15, 14); ctx.lineTo(15, 25);
+        ctx.moveTo(4, 0); ctx.lineTo(15, 0); ctx.lineTo(15, 14);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.DARLINGTON_NPN: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-10, 0);
+        ctx.moveTo(-10, -10); ctx.lineTo(-10, 10);
+        ctx.moveTo(0, -14); ctx.lineTo(0, 14);
+        ctx.moveTo(-10, -4); ctx.lineTo(15, -25);
+        ctx.moveTo(-10, 4); ctx.lineTo(0, 0);
+        ctx.moveTo(0, -4); ctx.lineTo(15, -25);
+        ctx.moveTo(0, 6); ctx.lineTo(15, 25);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.NJFET:
+      case ComponentTypes.PJFET: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-20, 10); ctx.lineTo(-4, 10);
+        ctx.moveTo(-4, -14); ctx.lineTo(-4, 14);
+        ctx.moveTo(-4, -10); ctx.lineTo(15, -25);
+        ctx.moveTo(-4, 10); ctx.lineTo(15, 25);
+        ctx.stroke();
+        ctx.beginPath();
+        if (comp.type === ComponentTypes.NJFET) {
+          ctx.moveTo(-12, 10); ctx.lineTo(-6, 7); ctx.lineTo(-6, 13);
+        } else {
+          ctx.moveTo(-4, 10); ctx.lineTo(-10, 7); ctx.lineTo(-10, 13);
+        }
+        ctx.fillStyle = '#1e293b';
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.SCR:
+      case ComponentTypes.TRIAC: {
+        ctx.beginPath();
+        ctx.moveTo(-20, -15); ctx.lineTo(-8, -15);
+        ctx.moveTo(8, -15); ctx.lineTo(20, -15);
+        ctx.moveTo(-8, -25); ctx.lineTo(8, -15); ctx.lineTo(-8, -5);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(8, -25); ctx.lineTo(8, -5);
+        ctx.moveTo(0, -10); ctx.lineTo(0, 15); ctx.lineTo(-10, 25);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.OPAMP:
+      case ComponentTypes.COMPARATOR: {
+        ctx.beginPath();
+        // Lead lines to terminals
+        ctx.moveTo(-30, -15); ctx.lineTo(-20, -15);
+        ctx.moveTo(-30, 15); ctx.lineTo(-20, 15);
+        ctx.moveTo(20, 0); ctx.lineTo(30, 0);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-20, -25); ctx.lineTo(20, 0); ctx.lineTo(-20, 25);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.fillText('-', -12, -10);
+        ctx.fillText('+', -12, 18);
+        break;
+      }
+
+      case ComponentTypes.TIMER555: {
+        ctx.beginPath();
+        ctx.rect(-35, -40, 70, 80);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#03b585';
+        ctx.textAlign = 'center';
+        ctx.fillText('LM555', 0, -5);
+        ctx.font = '8px sans-serif';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('TIMER', 0, 10);
+        break;
+      }
+
+      case ComponentTypes.AND_GATE:
+      case ComponentTypes.NAND_GATE: {
+        ctx.beginPath();
+        ctx.moveTo(-25, -18); ctx.lineTo(0, -18);
+        ctx.arc(0, 0, 18, -Math.PI / 2, Math.PI / 2, false);
+        ctx.lineTo(-25, 18);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        if (comp.type === ComponentTypes.NAND_GATE) {
+          ctx.beginPath();
+          ctx.arc(21, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case ComponentTypes.OR_GATE:
+      case ComponentTypes.NOR_GATE: {
+        ctx.beginPath();
+        ctx.moveTo(-25, -18);
+        ctx.quadraticCurveTo(0, -18, 20, 0);
+        ctx.quadraticCurveTo(0, 18, -25, 18);
+        ctx.quadraticCurveTo(-15, 0, -25, -18);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        if (comp.type === ComponentTypes.NOR_GATE) {
+          ctx.beginPath();
+          ctx.arc(23, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case ComponentTypes.NOT_GATE: {
+        ctx.beginPath();
+        ctx.moveTo(-20, -14); ctx.lineTo(12, 0); ctx.lineTo(-20, 14);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(16, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.XOR_GATE:
+      case ComponentTypes.XNOR_GATE: {
+        ctx.beginPath();
+        ctx.moveTo(-22, -18);
+        ctx.quadraticCurveTo(3, -18, 20, 0);
+        ctx.quadraticCurveTo(3, 18, -22, 18);
+        ctx.quadraticCurveTo(-12, 0, -22, -18);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-27, -18);
+        ctx.quadraticCurveTo(-17, 0, -27, 18);
+        ctx.stroke();
+
+        if (comp.type === ComponentTypes.XNOR_GATE) {
+          ctx.beginPath();
+          ctx.arc(23, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case ComponentTypes.SPST_SWITCH: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-10, 0);
+        ctx.moveTo(10, 0); ctx.lineTo(20, 0);
+        ctx.arc(-10, 0, 2.5, 0, Math.PI * 2);
+        ctx.arc(10, 0, 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        if (p.closed) ctx.lineTo(10, 0);
+        else ctx.lineTo(8, -12);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.SPDT_SWITCH: {
+        ctx.beginPath();
+        ctx.moveTo(-25, 0); ctx.lineTo(-12, 0);
+        ctx.moveTo(12, -15); ctx.lineTo(25, -15);
+        ctx.moveTo(12, 15); ctx.lineTo(25, 15);
+        ctx.arc(-12, 0, 2.5, 0, Math.PI * 2);
+        ctx.arc(12, -15, 2.5, 0, Math.PI * 2);
+        ctx.arc(12, 15, 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        if (p.position === 2) ctx.lineTo(12, 15);
+        else ctx.lineTo(12, -15);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.ANALOG_MULTIPLIER: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-30, -12); ctx.lineTo(-20, -12);
+        ctx.moveTo(-30, 12); ctx.lineTo(-20, 12);
+        ctx.moveTo(20, 0); ctx.lineTo(30, 0);
+        ctx.stroke();
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.fillText('✕', 0, 5);
+        break;
+      }
+
+      case ComponentTypes.LM7805:
+      case ComponentTypes.LM7812:
+      case ComponentTypes.LM7912:
+      case ComponentTypes.LM317: {
+        ctx.beginPath();
+        ctx.rect(-30, -20, 60, 40);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-30, 0); ctx.lineTo(-30, 0);
+        ctx.moveTo(30, 0); ctx.lineTo(30, 0);
+        ctx.moveTo(0, 20); ctx.lineTo(0, 20);
+        ctx.stroke();
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillStyle = '#03b585';
+        ctx.textAlign = 'center';
+        const label = comp.type.replace('LM', '').replace('ComponentTypes.', '');
+        ctx.fillText(label, 0, 4);
+        break;
+      }
+
+      case ComponentTypes.D_FLIPFLOP:
+      case ComponentTypes.JK_FLIPFLOP: {
+        ctx.beginPath();
+        ctx.rect(-25, -30, 50, 60);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        // Clock dynamic triangle symbol
+        ctx.beginPath();
+        ctx.moveTo(-25, (comp.type === ComponentTypes.D_FLIPFLOP ? 10 : -5));
+        ctx.lineTo(-17, (comp.type === ComponentTypes.D_FLIPFLOP ? 15 : 0));
+        ctx.lineTo(-25, (comp.type === ComponentTypes.D_FLIPFLOP ? 20 : 5));
+        ctx.stroke();
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#1e293b';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.type === ComponentTypes.D_FLIPFLOP ? 'D-FF' : 'JK-FF', 0, -5);
+        break;
+      }
+
+      case ComponentTypes.BINARY_COUNTER_4BIT:
+      case ComponentTypes.MUX_4TO1:
+      case ComponentTypes.HALF_ADDER:
+      case ComponentTypes.FULL_ADDER: {
+        ctx.beginPath();
+        ctx.rect(-comp.width / 2, -comp.height / 2, comp.width, comp.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#0284c7';
+        ctx.textAlign = 'center';
+        let nameTag = 'ALU';
+        if (comp.type === ComponentTypes.BINARY_COUNTER_4BIT) nameTag = '74HC161';
+        else if (comp.type === ComponentTypes.MUX_4TO1) nameTag = '4:1 MUX';
+        else if (comp.type === ComponentTypes.HALF_ADDER) nameTag = 'HALF ADD';
+        else if (comp.type === ComponentTypes.FULL_ADDER) nameTag = 'FULL ADD';
+        ctx.fillText(nameTag, 0, 3);
+        break;
+      }
+
+      case ComponentTypes.RELAY_SPDT: {
+        ctx.beginPath();
+        ctx.rect(-30, -30, 60, 60);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        // Coil
+        ctx.moveTo(-30, -15); ctx.lineTo(-15, -15);
+        ctx.moveTo(-30, 15); ctx.lineTo(-15, 15);
+        ctx.rect(-15, -12, 10, 24);
+        // Switch contact
+        ctx.moveTo(30, 0); ctx.lineTo(15, 0);
+        ctx.lineTo(5, -15);
+        ctx.moveTo(30, -20); ctx.lineTo(15, -20);
+        ctx.moveTo(30, 20); ctx.lineTo(15, 20);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.OPTOCOUPLER: {
+        ctx.beginPath();
+        ctx.rect(-30, -25, 60, 50);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        // LED side
+        ctx.beginPath();
+        ctx.moveTo(-18, -10); ctx.lineTo(-6, 0); ctx.lineTo(-18, 10);
+        ctx.closePath();
+        ctx.fillStyle = '#e11d48';
+        ctx.fill();
+        ctx.stroke();
+        // Phototransistor side
+        ctx.beginPath();
+        ctx.moveTo(12, -15); ctx.lineTo(12, 15);
+        ctx.moveTo(12, -8); ctx.lineTo(25, -15);
+        ctx.moveTo(12, 8); ctx.lineTo(25, 15);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.SEVEN_SEGMENT: {
+        ctx.beginPath();
+        ctx.rect(-28, -38, 56, 76);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.stroke();
+
+        const getSegLit = (segKey) => {
+          if (!this.engine || !this.engine.nodeVoltages) return false;
+          const n = this.engine.getNode(comp, segKey);
+          const nG = this.engine.getNode(comp, 'gnd');
+          const v = n !== -1 ? (this.engine.nodeVoltages[n] || 0) : 0;
+          const vg = nG !== -1 ? (this.engine.nodeVoltages[nG] || 0) : 0;
+          return (v - vg) > 1.8;
+        };
+
+        const onColor = p.color || '#ff3b30';
+        const offColor = 'rgba(255, 59, 48, 0.12)';
+
+        const drawSeg = (lit, x1, y1, x2, y2) => {
+          ctx.beginPath();
+          ctx.strokeStyle = lit ? onColor : offColor;
+          ctx.lineWidth = 4.0;
+          ctx.lineCap = 'round';
+          ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+          ctx.stroke();
+        };
+
+        drawSeg(getSegLit('a'), -12, -26, 12, -26); // a
+        drawSeg(getSegLit('b'), 13, -24, 13, -3);   // b
+        drawSeg(getSegLit('c'), 13, 3, 13, 24);    // c
+        drawSeg(getSegLit('d'), -12, 26, 12, 26);   // d
+        drawSeg(getSegLit('e'), -13, 3, -13, 24);  // e
+        drawSeg(getSegLit('f'), -13, -24, -13, -3); // f
+        drawSeg(getSegLit('g'), -12, 0, 12, 0);    // g
+
+        // Decimal Point (DP)
+        ctx.fillStyle = getSegLit('dp') ? onColor : offColor;
+        ctx.beginPath();
+        ctx.arc(20, 26, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
+      case ComponentTypes.PROBE_V:
+      case ComponentTypes.PROBE_I: {
+        ctx.beginPath();
+        ctx.moveTo(0, 20); ctx.lineTo(-12, 0); ctx.lineTo(-12, -18); ctx.lineTo(12, -18); ctx.lineTo(12, 0);
+        ctx.closePath();
+        ctx.fillStyle = p.color || (comp.type === ComponentTypes.PROBE_V ? '#03b585' : '#ff9500');
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.type === ComponentTypes.PROBE_V ? 'V' : 'I', 0, -5);
+        break;
+      }
+
+      case ComponentTypes.VOLTMETER:
+      case ComponentTypes.AMMETER: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-25, 0); ctx.lineTo(-18, 0);
+        ctx.moveTo(18, 0); ctx.lineTo(25, 0);
+        ctx.stroke();
+
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = comp.type === ComponentTypes.VOLTMETER ? '#0284c7' : '#e11d48';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.type === ComponentTypes.VOLTMETER ? 'V' : 'A', 0, 4);
+        break;
+      }
+
+      default: {
+        ctx.beginPath();
+        ctx.rect(-comp.width / 2, -comp.height / 2, comp.width, comp.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#1e293b';
+        ctx.textAlign = 'center';
+        ctx.fillText(comp.name, 0, 3);
+        break;
+      }
+    }
+  }
+
+  renderLabels(ctx, comp) {
+    const pos = this.worldToScreen(comp.x, comp.y);
+    const p = comp.params || {};
+
+    ctx.save();
+    ctx.font = 'bold 11px Lato, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#1e293b';
+
+    ctx.fillText(comp.name, pos.x, pos.y - (comp.height / 2 + 10) * this.zoom);
+
+    let valueStr = '';
+    if (p.resistance) valueStr = formatValueWithPrefix(p.resistance, 'Ω');
+    else if (p.capacitance) valueStr = formatValueWithPrefix(p.capacitance, 'F');
+    else if (p.inductance) valueStr = formatValueWithPrefix(p.inductance, 'H');
+    else if (p.voltage !== undefined) valueStr = formatValueWithPrefix(p.voltage, 'V');
+    else if (p.model) valueStr = p.model;
+    else if (p.label) valueStr = p.label;
+
+    if (valueStr) {
+      ctx.font = '10px Lato, sans-serif';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(valueStr, pos.x, pos.y + (comp.height / 2 + 14) * this.zoom);
+    }
+
+    ctx.restore();
+  }
+}

@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multisim Live Online Circuit Simulator</title>
+  <meta name="description" content="Multisim Live is a free, online circuit simulator that includes SPICE software, which lets you create, learn and share circuits and electronics online." />
+  <link rel="icon" href="https://www.multisim.com/static/images/favicon.ico" type="image/x-icon"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/simulator.css"/>
+</head>
+<body>
+
+  <!-- Top Announcement Notice (Multisim Live EOL / Transition Notice) -->
+  <div class="topbar--announcement">
+    <span>The Future of Multisim is on the Desktop. On September 15, 2026, the Multisim Live online simulator will be shut down. Read more about this transition <a href="https://support.digilent.com/hc/en-us/articles/41178584173979-Multisim-Live-EOL-Letter" target="_blank" rel="noopener noreferrer">here</a></span>
+  </div>
+
+  <!-- Main Website Navigation Bar -->
+  <header class="topbar">
+    <div class="topbar-container">
+      <div class="topbar-left">
+        <a href="#/" class="branding-link" title="Multisim Live Home">
+          <!-- Official Multisim Live SVG Logo -->
+          <svg id="multisim_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 137 38">
+            <style>.logo-st0{fill:#57b685}.logo-st1{fill:#626366}</style>
+            <path class="logo-st0" d="M29.7 11c-.2.4-.7.7-1.2.7-.8 0-1.4-.6-1.4-1.4 0-.8.6-1.4 1.4-1.4.5 0 .9.3 1.2.7h4.4V4H4.5v3.4h18.6c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v8.1h2.6v-5h13.1c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H8.6v3.8h14.6c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v3.8h8.1c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v3.8H14c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v4.5h15.6v-9.2c-.4-.2-.7-.7-.7-1.2 0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4c0 .5-.3.9-.7 1.2v9.2h3.3v-7c-.4-.2-.7-.7-.7-1.2 0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4c0 .5-.3.9-.7 1.2v7h3.3V23.1c-.4-.2-.7-.7-.7-1.2 0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4c0 .5-.3.9-.7 1.2v10.3h3.3V16.2h-3.7c-.2.4-.7.7-1.2.7-.8 0-1.4-.6-1.4-1.4s.6-1.4 1.4-1.4c.5 0 .9.3 1.2.7h3.7v-3.9l-4.5.1z"/>
+            <path class="logo-st1" d="M38.9 12.4h2.5L45 23.3l3.7-10.9h2.5v12.8h-1.7v-7.6-1.3-1.9l-3.7 10.8h-1.7l-3.7-10.8V25.2h-1.7V12.4zM55.2 16v6.2c0 .5.1.9.2 1.2.3.6.8.8 1.5.8 1.1 0 1.8-.5 2.2-1.5.2-.5.3-1.2.3-2.2V16H61v9.4h-1.5V24c-.2.4-.4.7-.7.9-.6.5-1.3.7-2.1.7-1.3 0-2.2-.4-2.7-1.3-.3-.5-.4-1.1-.4-1.9V16h1.6zM63.2 12.6h1.6v12.8h-1.6V12.6zM68.1 13.4h1.6V16h1.5v1.3h-1.5v6.1c0 .3.1.5.3.7.1.1.3.1.6.1h.5v1.2c-.2.1-.4.1-.6.1h-.6c-.7 0-1.2-.2-1.5-.6-.3-.4-.4-.9-.4-1.5v-6.2h-1.3V16H68v-2.6zM73.1 12.6h1.6v1.8h-1.6v-1.8zm0 3.5h1.6v9.3h-1.6v-9.3zM77 22.5c0 .5.2.9.4 1.2.4.5 1.1.8 2.1.8.6 0 1.1-.1 1.6-.4.5-.3.7-.6.7-1.2 0-.4-.2-.7-.5-.9-.2-.1-.7-.3-1.4-.4l-1.3-.3c-.8-.2-1.4-.4-1.8-.7-.7-.4-1-1-1-1.8 0-.9.3-1.6 1-2.2.6-.5 1.5-.8 2.6-.8 1.4 0 2.5.4 3.1 1.2.4.5.6 1.1.6 1.7h-1.5c0-.4-.2-.7-.4-1-.4-.4-1-.6-1.9-.6-.6 0-1.1.1-1.4.3-.3.2-.5.5-.5.9s.2.7.6 1c.2.1.6.3 1.1.4l1.1.3c1.2.3 1.9.5 2.3.8.6.4.9 1 .9 1.9 0 .8-.3 1.6-1 2.2s-1.6.9-2.9.9c-1.4 0-2.4-.3-3-.9-.6-.6-.9-1.4-.9-2.3H77zM85 12.6h1.6v1.8H85v-1.8zm0 3.5h1.6v9.3H85v-9.3zM89 16h1.6v1.3c.4-.5.7-.8 1-1 .5-.4 1.1-.5 1.8-.5s1.3.2 1.8.6c.3.2.5.5.7.9.3-.5.8-.9 1.2-1.1.5-.2 1-.4 1.6-.4 1.3 0 2.1.5 2.6 1.4.2.5.4 1.1.4 2v6.2h-1.6v-6.5c0-.6-.2-1.1-.5-1.3-.3-.2-.7-.3-1.1-.3-.6 0-1.2.2-1.6.6-.4.4-.7 1.1-.7 2.1v5.4h-1.6v-6.1c0-.6-.1-1.1-.2-1.4-.2-.4-.7-.7-1.3-.7-.6 0-1.1.2-1.6.7-.5.5-.7 1.3-.7 2.5v5H89V16z"/>
+            <path class="logo-st0" d="M104.5 12.6h1.7v11.3h6.4v1.5h-8.2V12.6zM113.9 12.6h1.6v1.8h-1.6v-1.8zm0 3.5h1.6v9.3h-1.6v-9.3zM119.4 16l2.5 7.6 2.6-7.6h1.7l-3.5 9.4H121l-3.5-9.4h1.9zM133.2 16.3c.6.3 1.1.7 1.4 1.2.3.5.5 1 .6 1.7.1.4.1 1.1.1 2.1h-6.8c0 1 .3 1.7.7 2.3.4.6 1.1.9 1.9.9.8 0 1.5-.3 2-.8.3-.3.5-.7.6-1.1h1.5c0 .3-.2.7-.4 1.1s-.5.8-.8 1c-.5.5-1.1.8-1.8.9-.4.1-.8.1-1.3.1-1.2 0-2.1-.4-2.9-1.3-.8-.8-1.2-2-1.2-3.6 0-1.5.4-2.7 1.2-3.7.8-.9 1.9-1.4 3.2-1.4.8.1 1.4.3 2 .6zm.6 3.7c-.1-.7-.2-1.2-.4-1.6-.4-.8-1.1-1.1-2.1-1.1-.7 0-1.3.3-1.8.8s-.7 1.2-.8 2h5.1z"/>
+          </svg>
+        </a>
+
+        <nav class="nav">
+          <ul class="nav-list">
+            <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
+            <li class="nav-item"><a href="#/pricing" class="nav-link" id="nav-pricing">Pricing</a></li>
+            <li class="nav-item nav-item--dropdown">
+              <a href="#/discover" class="nav-link" id="nav-circuits">Circuits ▾</a>
+              <div class="nav-dropdown-menu">
+                <a href="#/discover" class="nav-menuitem">Public Circuits</a>
+                <a href="#/discover?filter=featured" class="nav-menuitem">Featured Circuits</a>
+                <a href="#/discover?filter=analog" class="nav-menuitem">Analog Reference</a>
+                <a href="#/discover?filter=digital" class="nav-menuitem">Digital Logic</a>
+              </div>
+            </li>
+            <li class="nav-item"><a href="#" class="nav-link" id="nav-shortcuts">Shortcuts</a></li>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="topbar-right">
+        <a href="#/create" class="btn btn-launch-sim">⚡ Launch Simulator</a>
+        <button class="btn btn-invis" id="btnOpenLogin">Log in</button>
+        <button class="btn btn-primary" id="btnOpenSignup">Sign up</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Views Wrapper -->
+  <div class="view-container">
+
+    <!-- ====================================================================
+         VIEW 1: HOMEPAGE PORTAL
+         ==================================================================== -->
+    <div class="view-page active" id="view-home">
+      <!-- Hero Banner -->
+      <section class="banner--home">
+        <div class="banner-content">
+          <span class="banner-badge">Interactive SPICE In Your Browser</span>
+          <h1 class="banner-title">Discover Electronics</h1>
+          <p class="banner-subtitle">with Online SPICE Simulation</p>
+          <div class="banner-actions">
+            <a href="#/create" class="btn btn-primary btn-xlarge">⚡ Launch Simulator Studio</a>
+            <a href="#/discover" class="btn btn-secondary btn-xlarge">Explore Circuits</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Featured Circuits Showcase -->
+      <section class="featured">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Featured Circuits</h2>
+            <p class="section-subtitle">Click any circuit to open and simulate it live in the browser.</p>
+          </div>
+          <a href="#/discover" class="btn btn-outline">View All Circuits →</a>
+        </div>
+
+        <div class="cards-grid" id="featured-cards-grid">
+          <!-- Card 1: Simple Buck Converter -->
+          <div class="card" data-circuit="buckConverter">
+            <div class="card-thumbnail">
+              <span class="card-badge">Featured</span>
+              <svg viewBox="0 0 100 60" width="140" height="84">
+                <rect x="10" y="20" width="16" height="20" fill="none" stroke="#57b685" stroke-width="2"/>
+                <line x1="26" y1="30" x2="45" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+                <path d="M45,30 Q50,20 55,30 Q60,20 65,30 Q70,20 75,30" fill="none" stroke="#0284c7" stroke-width="2"/>
+                <line x1="75" y1="30" x2="90" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+                <line x1="60" y1="30" x2="60" y2="45" stroke="#2b2d2f" stroke-width="2"/>
+                <polygon points="56,45 64,45 60,37" fill="#ef4444"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-author-row">
+                <div class="card-avatar">OS</div>
+                <div class="card-author-info">
+                  <div class="card-author-name">OStep</div>
+                  <div class="card-author-date">Power Electronics</div>
+                </div>
+              </div>
+              <h3 class="card-title">Simple Buck Converter</h3>
+              <p class="card-desc">Step-down DC-DC switching regulator converting 12V to 5V output with inductive storage.</p>
+              <div class="card-stats">
+                <span class="card-stat-item">★ 108</span>
+                <span class="card-stat-item">⎘ 954</span>
+                <span class="card-stat-item">👁 190.3k</span>
+              </div>
+              <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="buckConverter">Simulate Circuit</button>
+            </div>
+          </div>
+
+          <!-- Card 2: 555 Timer -->
+          <div class="card" data-circuit="timer555">
+            <div class="card-thumbnail">
+              <span class="card-badge">Featured</span>
+              <svg viewBox="0 0 100 60" width="140" height="84">
+                <rect x="25" y="15" width="50" height="30" fill="#f8fafc" stroke="#4588b8" stroke-width="2" rx="4"/>
+                <text x="50" y="33" font-size="9" text-anchor="middle" fill="#1e293b" font-weight="bold">555 TIMER</text>
+                <line x1="10" y1="30" x2="25" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+                <line x1="75" y1="30" x2="90" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-author-row">
+                <div class="card-avatar">GG</div>
+                <div class="card-author-info">
+                  <div class="card-author-name">GGoodwin</div>
+                  <div class="card-author-date">Analog Oscillators</div>
+                </div>
+              </div>
+              <h3 class="card-title">555 Timer Astable Multivibrator</h3>
+              <p class="card-desc">Square wave pulse generator with RC timing network driving an LED flasher.</p>
+              <div class="card-stats">
+                <span class="card-stat-item">★ 124</span>
+                <span class="card-stat-item">⎘ 496</span>
+                <span class="card-stat-item">👁 137.8k</span>
+              </div>
+              <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="timer555">Simulate Circuit</button>
+            </div>
+          </div>
+
+          <!-- Card 3: Op-Amp Amplifier -->
+          <div class="card" data-circuit="opAmpAmplifier">
+            <div class="card-thumbnail">
+              <span class="card-badge">Featured</span>
+              <svg viewBox="0 0 100 60" width="140" height="84">
+                <polygon points="30,15 70,30 30,45" fill="#f8fafc" stroke="#57b685" stroke-width="2"/>
+                <line x1="15" y1="22" x2="30" y2="22" stroke="#2b2d2f" stroke-width="2"/>
+                <line x1="15" y1="38" x2="30" y2="38" stroke="#2b2d2f" stroke-width="2"/>
+                <line x1="70" y1="30" x2="85" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-author-row">
+                <div class="card-avatar">SR</div>
+                <div class="card-author-info">
+                  <div class="card-author-name">SiLRing</div>
+                  <div class="card-author-date">Analog Amplifiers</div>
+                </div>
+              </div>
+              <h3 class="card-title">Non-Inverting Op-Amp Amplifier</h3>
+              <p class="card-desc">Active AC closed-loop amplifier with 11x voltage gain and low harmonic distortion.</p>
+              <div class="card-stats">
+                <span class="card-stat-item">★ 92</span>
+                <span class="card-stat-item">⎘ 380</span>
+                <span class="card-stat-item">👁 98.4k</span>
+              </div>
+              <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="opAmpAmplifier">Simulate Circuit</button>
+            </div>
+          </div>
+
+          <!-- Card 4: Bridge Rectifier -->
+          <div class="card" data-circuit="bridgeRectifier">
+            <div class="card-thumbnail">
+              <span class="card-badge">Featured</span>
+              <svg viewBox="0 0 100 60" width="140" height="84">
+                <polygon points="50,15 70,30 50,45 30,30" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                <line x1="10" y1="30" x2="30" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+                <line x1="70" y1="30" x2="90" y2="30" stroke="#2b2d2f" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-author-row">
+                <div class="card-avatar">GG</div>
+                <div class="card-author-info">
+                  <div class="card-author-name">GGoodwin</div>
+                  <div class="card-author-date">Power Electronics</div>
+                </div>
+              </div>
+              <h3 class="card-title">Full-Wave Bridge Rectifier</h3>
+              <p class="card-desc">AC to DC rectification circuit with smoothing capacitor and load ripple analysis.</p>
+              <div class="card-stats">
+                <span class="card-stat-item">★ 30</span>
+                <span class="card-stat-item">⎘ 397</span>
+                <span class="card-stat-item">👁 60.8k</span>
+              </div>
+              <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="bridgeRectifier">Simulate Circuit</button>
+            </div>
+          </div>
+
+          <!-- Card 5: Class-AB Audio Amplifier -->
+          <div class="card" data-circuit="classABAmplifier">
+            <div class="card-thumbnail">
+              <span class="card-badge">Featured</span>
+              <svg viewBox="0 0 100 60" width="140" height="84">
+                <circle cx="35" cy="22" r="12" fill="none" stroke="#57b685" stroke-width="2"/>
+                <circle cx="35" cy="42" r="12" fill="none" stroke="#0284c7" stroke-width="2"/>
+                <line x1="47" y1="32" x2="70" y2="32" stroke="#2b2d2f" stroke-width="2"/>
+                <polygon points="70,26 82,32 70,38" fill="#f59e0b"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-author-row">
+                <div class="card-avatar">AP</div>
+                <div class="card-author-info">
+                  <div class="card-author-name">AudioProLab</div>
+                  <div class="card-author-date">Audio Electronics</div>
+                </div>
+              </div>
+              <h3 class="card-title">Class-AB Audio Power Amplifier</h3>
+              <p class="card-desc">Complementary NPN/PNP output stage with diode thermal bias and 8Ω speaker load.</p>
+              <div class="card-stats">
+                <span class="card-stat-item">★ 156</span>
+                <span class="card-stat-item">⎘ 620</span>
+                <span class="card-stat-item">👁 184.5k</span>
+              </div>
+              <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="classABAmplifier">Simulate Circuit</button>
+            </div>
+          </div>
+
+          <!-- Card 6: 4-Bit Binary Counter with 7-Segment Display -->
+          <div class="card" data-circuit="binaryCounter7Seg">
+            <div class="card-thumbnail">
+              <span class="card-badge">Featured</span>
+              <svg viewBox="0 0 100 60" width="140" height="84">
+                <rect x="15" y="15" width="30" height="30" fill="#f8fafc" stroke="#2b2d2f" stroke-width="2" rx="3"/>
+                <rect x="58" y="10" width="26" height="40" fill="#0f172a" stroke="#475569" stroke-width="2" rx="3"/>
+                <line x1="64" y1="16" x2="78" y2="16" stroke="#ff3b30" stroke-width="2"/>
+                <line x1="78" y1="18" x2="78" y2="28" stroke="#ff3b30" stroke-width="2"/>
+                <line x1="64" y1="30" x2="78" y2="30" stroke="#ff3b30" stroke-width="2"/>
+                <line x1="64" y1="32" x2="64" y2="44" stroke="#ff3b30" stroke-width="2"/>
+                <line x1="64" y1="44" x2="78" y2="44" stroke="#ff3b30" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-author-row">
+                <div class="card-avatar">DL</div>
+                <div class="card-author-info">
+                  <div class="card-author-name">DigitalLogicX</div>
+                  <div class="card-author-date">Digital & Displays</div>
+                </div>
+              </div>
+              <h3 class="card-title">4-Bit Counter with 7-Segment Display</h3>
+              <p class="card-desc">Synchronous binary pulse counter driving an active glowing 7-segment digital LED readout.</p>
+              <div class="card-stats">
+                <span class="card-stat-item">★ 210</span>
+                <span class="card-stat-item">⎘ 840</span>
+                <span class="card-stat-item">👁 245.0k</span>
+              </div>
+              <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="binaryCounter7Seg">Simulate Circuit</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Platform Benefits -->
+      <section class="howitworks">
+        <div class="howitworks-container">
+          <h2 class="howitworks-heading">Platform Benefits</h2>
+          <div class="howitworks-columns">
+            <div class="howitworks-col">
+              <div class="howitworks-icon">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" fill="#ecfdf5" stroke="#10b981" stroke-width="3"/><path d="M25,40 L35,50 L55,30" fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round"/></svg>
+              </div>
+              <h3 class="howitworks-title">Interactive SPICE Simulation</h3>
+              <p class="howitworks-desc">Simulate both analog, digital, and mixed-signal circuits in real time with high numerical stability directly inside your browser.</p>
+            </div>
+            <div class="howitworks-col">
+              <div class="howitworks-icon">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" fill="#eff6ff" stroke="#3b82f6" stroke-width="3"/><path d="M25,50 C30,25 50,25 55,50" fill="none" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/></svg>
+              </div>
+              <h3 class="howitworks-title">Dual-Trace Live Grapher</h3>
+              <p class="howitworks-desc">Measure voltages and currents with multi-color probes, dual measurement cursors, $\Delta t, \Delta V$, and frequency readouts.</p>
+            </div>
+            <div class="howitworks-col">
+              <div class="howitworks-icon">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" fill="#fef3c7" stroke="#f59e0b" stroke-width="3"/><circle cx="30" cy="35" r="8" fill="#f59e0b"/><circle cx="50" cy="35" r="8" fill="#f59e0b"/><path d="M20,60 C25,48 55,48 60,60" fill="none" stroke="#f59e0b" stroke-width="3"/></svg>
+              </div>
+              <h3 class="howitworks-title">Community & Education</h3>
+              <p class="howitworks-desc">Explore thousands of open circuit schematics, collaborate with classmates, and export waveform data to CSV and PNG.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Call to Action Banner -->
+      <section class="cta">
+        <h2 class="cta-heading">Ready to start simulating?</h2>
+        <p class="cta-sub">Join educators, students, and engineers designing circuits online worldwide.</p>
+        <a href="#/create" class="btn btn-primary btn-large">⚡ Open Circuit Simulator Studio</a>
+      </section>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <div class="footer-container">
+          <div>
+            <p>&copy; 2026 National Instruments Corp. All rights reserved.</p>
+            <div class="footer-links">
+              <a href="#/features">Features</a>
+              <a href="#/pricing">Pricing</a>
+              <a href="#/discover">Public Circuits</a>
+              <a href="https://support.digilent.com" target="_blank" rel="noopener noreferrer">Support</a>
+            </div>
+          </div>
+          <div>
+            <span style="font-weight: bold; color: #57b685;">NI Multisim Live</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 2: SIMULATOR STUDIO WORKSPACE (/create)
+         ==================================================================== -->
+    <div class="view-page" id="view-studio">
+      <div class="studio-wrapper">
+        <!-- Studio Toolbar -->
+        <div class="studio-toolbar">
+          <div class="studio-toolbar-left">
+            <input type="text" class="circuit-title-input" id="circuitNameInput" value="Untitled Circuit" title="Click to rename circuit"/>
+            <div class="toolbar-divider"></div>
+            
+            <button class="btn-sim-run" id="btnSimToggle" title="Run / Pause Simulation (Space)">
+              <span id="simToggleIcon">▶</span>
+              <span id="simToggleText">Run Simulation</span>
+            </button>
+            <button class="tool-btn" id="btnSimReset" title="Reset Simulation Time">⏮</button>
+            <div class="sim-time-indicator" id="simTimeDisplay" title="Simulation Time">t: 0.00 ms</div>
+          </div>
+
+          <div class="studio-toolbar-center">
+            <!-- View Mode Switcher -->
+            <div class="view-mode-group">
+              <button class="view-mode-btn" data-mode="schematic">Schematic</button>
+              <button class="view-mode-btn active" data-mode="split">Split</button>
+              <button class="view-mode-btn" data-mode="grapher">Grapher</button>
+            </div>
+            
+            <div class="toolbar-divider"></div>
+
+            <!-- Circuit Presets Dropdown -->
+            <select class="grapher-select" id="circuitPresetSelect" title="Load Pre-built Circuit">
+              <option value="">-- Load Pre-built Circuit --</option>
+              <optgroup label="Power & Switching">
+                <option value="buckConverter">Simple Buck Converter (DC-DC)</option>
+                <option value="bridgeRectifier">Full-Wave Bridge Rectifier & Filter</option>
+              </optgroup>
+              <optgroup label="Analog & Audio">
+                <option value="classABAmplifier">Class-AB Push-Pull Audio Amplifier</option>
+                <option value="opAmpAmplifier">Non-Inverting Op-Amp Amplifier (11x)</option>
+                <option value="butterworthFilter">4th-Order Butterworth Sallen-Key Filter</option>
+                <option value="rcFilter">RC Low-Pass Passive Filter</option>
+              </optgroup>
+              <optgroup label="Oscillators & RF">
+                <option value="timer555">555 Timer Astable Multivibrator</option>
+                <option value="amTransceiver">AM Modulator & Diode Detector</option>
+              </optgroup>
+              <optgroup label="Digital Logic & Displays">
+                <option value="binaryCounter7Seg">4-Bit Counter with 7-Segment Display</option>
+                <option value="halfAdder">Digital Logic: Half Adder (XOR/AND)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="studio-toolbar-right">
+            <button class="tool-btn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+            <button class="tool-btn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+            <div class="toolbar-divider"></div>
+            <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
+            <button class="tool-btn" id="btnDelete" title="Delete Selected (Del)">🗑</button>
+            <button class="tool-btn" id="btnFitScreen" title="Fit to Screen">⛶</button>
+            <div class="toolbar-divider"></div>
+            <button class="btn btn-outline" id="btnExportMenu" style="padding: 4px 10px; font-size: 12px;">Export ▾</button>
+          </div>
+        </div>
+
+        <!-- Studio Main Workspace -->
+        <div class="studio-main">
+          <!-- Left Palette Sidebar -->
+          <aside class="palette-sidebar">
+            <div class="palette-search">
+              <input type="text" id="paletteSearchInput" placeholder="Search components..."/>
+            </div>
+            <div class="palette-categories" id="paletteContainer">
+              <!-- Dynamically rendered by app.js from ComponentDefinitions -->
+            </div>
+          </aside>
+
+          <!-- Center Canvas & Grapher Split Area -->
+          <div class="studio-center">
+            <!-- Schematic Canvas Panel -->
+            <div class="canvas-panel" id="canvasPanel">
+              <canvas id="schematicCanvas" class="schematic-canvas"></canvas>
+              <div class="canvas-floating-controls">
+                <button class="tool-btn" id="btnZoomIn" title="Zoom In">+</button>
+                <button class="tool-btn" id="btnZoomOut" title="Zoom Out">−</button>
+                <button class="tool-btn" id="btnZoomReset" title="Reset Zoom">1:1</button>
+              </div>
+            </div>
+
+            <!-- Resizable Split Gutter -->
+            <div class="split-gutter" id="splitGutter" title="Drag to resize panels"></div>
+
+            <!-- Grapher Panel -->
+            <div class="grapher-panel" id="grapherPanel">
+              <div class="grapher-toolbar">
+                <div class="grapher-controls-left">
+                  <span style="font-weight: 700; color: #f8fafc;">Grapher / Oscilloscope</span>
+                  <button class="btn-grapher-action" id="btnToggleCursors">Toggle Cursors (C1, C2)</button>
+                  <label>Time/Div: 
+                    <select class="grapher-select" id="timeScaleSelect">
+                      <option value="0.00001">10 µs</option>
+                      <option value="0.0001">100 µs</option>
+                      <option value="0.0005">500 µs</option>
+                      <option value="0.001" selected>1 ms</option>
+                      <option value="0.005">5 ms</option>
+                      <option value="0.01">10 ms</option>
+                      <option value="0.05">50 ms</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="grapher-controls-right">
+                  <button class="btn-grapher-action" id="btnExportCSV">Export CSV</button>
+                  <button class="btn-grapher-action" id="btnExportPlotPNG">Snapshot PNG</button>
+                </div>
+              </div>
+              <div class="grapher-canvas-wrapper">
+                <canvas id="grapherCanvas" class="grapher-canvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Properties Inspector -->
+          <aside class="properties-sidebar" id="propertiesSidebar">
+            <h3 class="properties-header">Configuration Pane</h3>
+            <div id="propertiesContent">
+              <p class="no-selection-msg">Select a component on the schematic to inspect and edit its parameters.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 3: DISCOVER / COMMUNITY CIRCUITS
+         ==================================================================== -->
+    <div class="view-page" id="view-discover">
+      <div class="discover-container">
+        <div class="discover-header">
+          <h1 class="section-title">Discover Public Circuits</h1>
+          <p class="section-subtitle">Search and explore verified circuits, interactive templates, and student projects.</p>
+        </div>
+
+        <div class="discover-controls">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="discoverSearchInput" placeholder="Search by name, tag, or component (e.g. buck, 555, opamp, filter)..."/>
+          </div>
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all">All Circuits</button>
+            <button class="filter-tab" data-filter="analog">Analog</button>
+            <button class="filter-tab" data-filter="digital">Digital Logic</button>
+            <button class="filter-tab" data-filter="power">Power</button>
+            <button class="filter-tab" data-filter="filters">Filters & RF</button>
+          </div>
+        </div>
+
+        <div class="cards-grid" id="discoverCardsGrid">
+          <!-- Filled dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 4: FEATURES PAGE
+         ==================================================================== -->
+    <div class="view-page" id="view-features">
+      <div class="features-container">
+        <div class="features-hero">
+          <h1 class="section-title" style="font-size: 38px; margin-bottom: 12px;">Full-Featured Circuit Simulator</h1>
+          <p class="section-subtitle" style="font-size: 18px;">Industry-grade SPICE engine combined with intuitive drag-and-drop web schematic capture.</p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-box">
+            <div class="feature-box-icon">⚡</div>
+            <h3 class="feature-box-title">Interactive SPICE Simulation</h3>
+            <p class="feature-box-text">Modified Nodal Analysis (MNA) numerical engine capable of solving complex non-linear semiconductor models (Diodes, Zener, BJTs, MOSFETs), reactive LC networks, and integrated circuits in real time.</p>
+          </div>
+          <div class="feature-box">
+            <div class="feature-box-icon">📊</div>
+            <h3 class="feature-box-title">Multi-Channel Grapher</h3>
+            <p class="feature-box-text">High-resolution dual-trace oscilloscope with live cursor measurements ($X_1, X_2, \Delta t, \Delta V$, frequency), timebase division adjustments, and one-click CSV/PNG export.</p>
+          </div>
+          <div class="feature-box">
+            <div class="feature-box-icon">🕹️</div>
+            <h3 class="feature-box-title">Real-Time Interactive Controls</h3>
+            <p class="feature-box-text">Toggle switches and drag potentiometer sliders while the simulation is actively executing to see circuits respond dynamically without re-running.</p>
+          </div>
+          <div class="feature-box">
+            <div class="feature-box-icon">💡</div>
+            <h3 class="feature-box-title">Visual Indicator Feedback</h3>
+            <p class="feature-box-text">LEDs glow with realistic radiant luminescence when forward current passes through, and voltage probes provide instantaneous numerical node feedback.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 5: PRICING PAGE
+         ==================================================================== -->
+    <div class="view-page" id="view-pricing">
+      <div class="pricing-container">
+        <div class="pricing-header">
+          <h1 class="section-title" style="font-size: 38px; margin-bottom: 12px;">Choose Your Multisim Plan</h1>
+          <p class="section-subtitle" style="font-size: 18px;">Empowering students, hobbyists, and university engineering departments.</p>
+        </div>
+
+        <div class="pricing-cards">
+          <div class="pricing-card">
+            <h3 class="plan-name">Free Tier</h3>
+            <div class="plan-price">$0 <span>/ forever</span></div>
+            <p style="font-size: 13px; color: var(--text-muted);">For students & makers learning fundamentals.</p>
+            <ul class="plan-features">
+              <li>Full Browser Schematic Capture</li>
+              <li>Interactive SPICE Simulation</li>
+              <li>Public Community Circuits</li>
+              <li>Basic Grapher & Probes</li>
+            </ul>
+            <a href="#/create" class="btn btn-primary" style="margin-top: auto;">Start for Free</a>
+          </div>
+
+          <div class="pricing-card featured-plan">
+            <span class="plan-badge">Most Popular</span>
+            <h3 class="plan-name">Premium</h3>
+            <div class="plan-price">$6.99 <span>/ month</span></div>
+            <p style="font-size: 13px; color: var(--text-muted);">For electrical engineers & advanced designers.</p>
+            <ul class="plan-features">
+              <li>Unlimited Private Circuit Files</li>
+              <li>Advanced Transient & AC Sweeps</li>
+              <li>High-Resolution Grapher Export</li>
+              <li>Expanded IC & Semiconductor Models</li>
+            </ul>
+            <button class="btn btn-primary" id="btnPlanPremium" style="margin-top: auto;">Get Premium</button>
+          </div>
+
+          <div class="pricing-card">
+            <h3 class="plan-name">Academic Group</h3>
+            <div class="plan-price">$49 <span>/ seat / year</span></div>
+            <p style="font-size: 13px; color: var(--text-muted);">For universities, schools & lab instructors.</p>
+            <ul class="plan-features">
+              <li>Classroom Assignment Management</li>
+              <li>Shared Lab Workspaces</li>
+              <li>LMS & Canvas Integration</li>
+              <li>Priority Educational Support</li>
+            </ul>
+            <button class="btn btn-outline" id="btnPlanAcademic" style="margin-top: auto;">Contact Sales</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ====================================================================
+       MODALS
+       ==================================================================== -->
+  <!-- Login Modal -->
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Log in to Multisim Live</h3>
+        <button class="modal-close" data-close="loginModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="loginForm">
+          <div class="form-group">
+            <label class="form-label" for="loginEmail">Email Address</label>
+            <input type="email" id="loginEmail" class="form-control" placeholder="name@example.com" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required/>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Log in</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sign Up Modal -->
+  <div class="modal-overlay" id="signupModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Free Account</h3>
+        <button class="modal-close" data-close="signupModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="signupForm">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-control" placeholder="Jane Doe" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" placeholder="jane@university.edu" required/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" placeholder="Minimum 8 characters" required/>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Create Account</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shortcuts Modal -->
+  <div class="modal-overlay" id="shortcutsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Keyboard Shortcuts</h3>
+        <button class="modal-close" data-close="shortcutsModal">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size: 13.5px; line-height: 2;">
+        <p><strong>Space:</strong> Run / Pause Circuit Simulation</p>
+        <p><strong>R:</strong> Rotate selected component 90°</p>
+        <p><strong>Delete / Backspace:</strong> Delete selected component or wire</p>
+        <p><strong>Ctrl + Z:</strong> Undo last change</p>
+        <p><strong>Ctrl + Y:</strong> Redo</p>
+        <p><strong>Click Pin:</strong> Start wiring / complete wire</p>
+        <p><strong>Click Switch:</strong> Toggle SPST switch Open / Closed live</p>
+        <p><strong>Scroll Wheel:</strong> Zoom In / Out</p>
+        <p><strong>Middle Click / Drag:</strong> Pan Schematic</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Modal -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Export Circuit</h3>
+        <button class="modal-close" data-close="exportModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px;">Choose export format:</p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="btn btn-outline" id="btnExportJSON">📄 Download Circuit JSON File</button>
+          <button class="btn btn-outline" id="btnExportSchematicPNG">🖼️ Download Schematic Image (PNG)</button>
+          <button class="btn btn-outline" id="btnExportCSVModal">📊 Download Grapher Waveform Data (CSV)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript App Loader -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
