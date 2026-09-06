@@ -79,8 +79,21 @@
 
         <button class="btn btn-outline" id="btnNavInstall" title="Download and install Switcha on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
         <a href="#/create" class="btn btn-launch-sim">⚡ Launch Switcha</a>
-        <button class="btn btn-invis" id="btnOpenLogin">Log in</button>
-        <button class="btn btn-primary" id="btnOpenSignup">Sign up</button>
+
+        <!-- Logged Out Guest Controls -->
+        <div id="authGuestControls" style="display: inline-flex; align-items: center; gap: 8px;">
+          <button class="btn btn-invis" id="btnOpenLogin">Log in</button>
+          <button class="btn btn-primary" id="btnOpenSignup">Sign up</button>
+        </div>
+
+        <!-- Logged In User Profile Controls -->
+        <div id="authUserControls" style="display: none; align-items: center; gap: 8px;">
+          <div class="user-profile-badge" id="userProfileBadge" title="Connected to Firebase Cloud Sync" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(3, 181, 133, 0.1); border: 1px solid #03b585; border-radius: 20px; font-size: 12px; font-weight: 600; color: #0f172a;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #03b585;"></span>
+            <span id="userDisplayName">User</span>
+          </div>
+          <button class="btn btn-outline" id="btnLogout" style="padding: 4px 8px; font-size: 11.5px;">Log out</button>
+        </div>
       </div>
     </div>
   </header>
@@ -822,6 +835,7 @@
         <button class="modal-close" data-close="loginModal">&times;</button>
       </div>
       <div class="modal-body">
+        <div id="loginErrorAlert" style="display: none; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px; font-size: 13px; margin-bottom: 12px;"></div>
         <form id="loginForm">
           <div class="form-group">
             <label class="form-label" for="loginEmail">Email Address</label>
@@ -831,7 +845,7 @@
             <label class="form-label" for="loginPassword">Password</label>
             <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required/>
           </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Log in</button>
+          <button type="submit" id="btnLoginSubmit" class="btn btn-primary" style="width: 100%; margin-top: 10px; font-weight: 700;">Log in</button>
         </form>
       </div>
     </div>
@@ -845,20 +859,21 @@
         <button class="modal-close" data-close="signupModal">&times;</button>
       </div>
       <div class="modal-body">
+        <div id="signupErrorAlert" style="display: none; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px; font-size: 13px; margin-bottom: 12px;"></div>
         <form id="signupForm">
           <div class="form-group">
-            <label class="form-label">Full Name</label>
-            <input type="text" class="form-control" placeholder="Jane Doe" required/>
+            <label class="form-label" for="signupName">Full Name</label>
+            <input type="text" id="signupName" class="form-control" placeholder="Jane Doe" required/>
           </div>
           <div class="form-group">
-            <label class="form-label">Email Address</label>
-            <input type="email" class="form-control" placeholder="jane@university.edu" required/>
+            <label class="form-label" for="signupEmail">Email Address</label>
+            <input type="email" id="signupEmail" class="form-control" placeholder="jane@university.edu" required/>
           </div>
           <div class="form-group">
-            <label class="form-label">Password</label>
-            <input type="password" class="form-control" placeholder="Minimum 8 characters" required/>
+            <label class="form-label" for="signupPassword">Password</label>
+            <input type="password" id="signupPassword" class="form-control" placeholder="Minimum 6 characters" minlength="6" required/>
           </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Create Account</button>
+          <button type="submit" id="btnSignupSubmit" class="btn btn-primary" style="width: 100%; margin-top: 10px; font-weight: 700;">Create Account</button>
         </form>
       </div>
     </div>

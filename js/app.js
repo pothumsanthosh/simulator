@@ -9,6 +9,7 @@ import { CircuitEngine } from './engine/circuit-engine.js';
 import { SchematicCanvas } from './editor/schematic-canvas.js';
 import { CircuitGrapher } from './editor/grapher.js';
 import { CircuitLibrary } from './editor/circuit-library.js';
+import { firebaseService } from './services/firebase-service.js';
 
 class SwitchaApp {
   constructor() {
@@ -71,6 +72,7 @@ class SwitchaApp {
     // 3. Setup UI Event Listeners, PWA, Network Sync, My Circuits & Router
     this.initPWA();
     this.initNetworkSyncMonitor();
+    this.initFirebaseAuth();
     this.initMyCircuitsPage();
     this.initRouter();
     this.initToolbarControls();
@@ -263,6 +265,9 @@ class SwitchaApp {
     this.saveMyCircuits(circuits);
     this.renderMyCircuits();
     this.showToast(`💾 "${name}" saved to My Circuits!`, 'success');
+
+    // Sync to Cloud Firestore if user is authenticated
+    firebaseService.saveCircuit(targetCircuit);
   }
 
   loadCircuitFromMyCircuits(circuitId) {
@@ -307,6 +312,7 @@ class SwitchaApp {
       if (this.activeMyCircuitId === circuitId) this.activeMyCircuitId = null;
       this.saveMyCircuits(circuits);
       this.renderMyCircuits();
+      firebaseService.deleteCircuit(circuitId);
       this.showToast(`🗑️ "${target.name}" deleted`, 'warning');
     }
   }
@@ -2411,19 +2417,114 @@ class SwitchaApp {
       closeModal('exportModal');
       this.showToast('📊 CSV waveform exported', 'info');
     });
+  }
 
-    document.getElementById('loginForm')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      alert('Logged in successfully!');
-      closeModal('loginModal');
-      this.showToast('👋 Welcome back to Switcha!', 'success');
+  // --- Firebase Authentication & Cloud Sync ---
+  initFirebaseAuth() {
+    const guestControls = document.getElementById('authGuestControls');
+    const userControls = document.getElementById('authUserControls');
+    const userDisplayName = document.getElementById('userDisplayName');
+    const loginErrorAlert = document.getElementById('loginErrorAlert');
+    const signupErrorAlert = document.getElementById('signupErrorAlert');
+
+    firebaseService.onAuthStateChange(async (user) => {
+      if (user) {
+        if (guestControls) guestControls.style.display = 'none';
+        if (userControls) userControls.style.display = 'inline-flex';
+        if (userDisplayName) {
+          userDisplayName.textContent = user.displayName || user.email.split('@')[0];
+          userDisplayName.parentElement.title = `Logged in as ${user.email} (Firebase Cloud Synced)`;
+        }
+
+        // Merge and restore circuits from cloud
+        try {
+          const cloudCircuits = await firebaseService.loadUserCircuits();
+          if (cloudCircuits && cloudCircuits.length > 0) {
+            const localCircuits = this.getMyCircuits();
+            const merged = [...cloudCircuits];
+            localCircuits.forEach(lc => {
+              if (!merged.some(mc => mc.id === lc.id)) {
+                merged.push(lc);
+                firebaseService.saveCircuit(lc);
+              }
+            });
+            this.saveMyCircuits(merged);
+            this.renderMyCircuits();
+          }
+        } catch (_) {}
+      } else {
+        if (guestControls) guestControls.style.display = 'inline-flex';
+        if (userControls) userControls.style.display = 'none';
+      }
     });
 
-    document.getElementById('signupForm')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      alert('Welcome to Switcha! Your free account is created.');
-      closeModal('signupModal');
-      this.showToast('🎉 Welcome to Switcha!', 'success');
+    // Login Form Submit (Firebase Auth)
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail')?.value.trim();
+        const password = document.getElementById('loginPassword')?.value;
+        const btnSubmit = document.getElementById('btnLoginSubmit');
+        if (loginErrorAlert) loginErrorAlert.style.display = 'none';
+
+        if (!email || !password) return;
+
+        try {
+          if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Logging in...'; }
+          const user = await firebaseService.signIn(email, password);
+          document.getElementById('loginModal')?.classList.remove('active');
+          loginForm.reset();
+          this.showToast(`👋 Welcome back, ${user.displayName || user.email}!`, 'success');
+        } catch (err) {
+          if (loginErrorAlert) {
+            loginErrorAlert.textContent = err.message.replace('Firebase: ', '');
+            loginErrorAlert.style.display = 'block';
+          } else {
+            alert(err.message);
+          }
+        } finally {
+          if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'Log in'; }
+        }
+      });
+    }
+
+    // Sign Up Form Submit (Firebase Auth)
+    const signupForm = document.getElementById('signupForm');
+    if (signupForm) {
+      signupForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('signupName')?.value.trim();
+        const email = document.getElementById('signupEmail')?.value.trim();
+        const password = document.getElementById('signupPassword')?.value;
+        const btnSubmit = document.getElementById('btnSignupSubmit');
+        if (signupErrorAlert) signupErrorAlert.style.display = 'none';
+
+        if (!email || !password) return;
+
+        try {
+          if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Creating Account...'; }
+          const user = await firebaseService.signUp(email, password, name);
+          document.getElementById('signupModal')?.classList.remove('active');
+          signupForm.reset();
+          this.showToast(`🎉 Account created! Welcome, ${user.displayName || user.email}!`, 'success');
+        } catch (err) {
+          if (signupErrorAlert) {
+            signupErrorAlert.textContent = err.message.replace('Firebase: ', '');
+            signupErrorAlert.style.display = 'block';
+          } else {
+            alert(err.message);
+          }
+        } finally {
+          if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'Create Account'; }
+        }
+      });
+    }
+
+    // Logout Button
+    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+      await firebaseService.signOut();
+      this.showToast('👋 Logged out of ElectroSim', 'info');
     });
   }
 }
