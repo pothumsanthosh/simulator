@@ -1470,35 +1470,23 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(!hasDivergence, `[High Freq] 10MHz RF source simulated for 200 steps with 0 divergence and clean sinusoid amplitude`, g10);
   }
 
-  // 10.13 Drag Threshold Selection Immunity (<5px movement invariant)
+  // 10.13 Direct Component Dragging & Grid Snapping
   {
     const initialPos = { x: 100, y: 100 };
-    let isDragging = false;
-    let dragCandidate = true;
-    const startScreen = { x: 250, y: 300 };
+    const dragStart = { x: 100, y: 100 };
+    const dragMove = { x: 142, y: 128 }; // Drag by dx = 42, dy = 28
+    const gridSize = 10;
+    const snapToGrid = (v) => Math.round(v / gridSize) * gridSize;
 
-    // Small finger/mouse jitter (3px movement during tap/selection)
-    const jitterScreen = { x: 252, y: 302 };
-    const distJitter = Math.hypot(jitterScreen.x - startScreen.x, jitterScreen.y - startScreen.y);
-    if (distJitter >= 5) isDragging = true;
-    let currentPos = { ...initialPos };
-    if (isDragging) {
-      currentPos.x += (jitterScreen.x - startScreen.x);
-      currentPos.y += (jitterScreen.y - startScreen.y);
-    }
-    const immuneToJitter = (currentPos.x === initialPos.x && currentPos.y === initialPos.y && !isDragging);
+    const dx = dragMove.x - dragStart.x;
+    const dy = dragMove.y - dragStart.y;
+    const finalPos = {
+      x: snapToGrid(initialPos.x + dx),
+      y: snapToGrid(initialPos.y + dy)
+    };
 
-    // Intentional drag (25px movement)
-    const dragScreen = { x: 275, y: 300 };
-    const distDrag = Math.hypot(dragScreen.x - startScreen.x, dragScreen.y - startScreen.y);
-    if (distDrag >= 5) isDragging = true;
-    if (isDragging) {
-      currentPos.x += (dragScreen.x - startScreen.x);
-      currentPos.y += (dragScreen.y - startScreen.y);
-    }
-    const dragSuccess = (isDragging && currentPos.x === initialPos.x + 25);
-
-    assert(immuneToJitter && dragSuccess, `[Bare Hands] 5px Drag Threshold: Tap/selection strictly preserves position, intentional drag engages cleanly`, g10);
+    const dragSuccess = (finalPos.x === 140 && finalPos.y === 130);
+    assert(dragSuccess, `[Interaction] Direct Component Dragging: Pointer movement smoothly shifts component with accurate grid snapping (140, 130)`, g10);
   }
 
   // 10.14 Unlimited Manual Scaling Parser on X and Y Axes

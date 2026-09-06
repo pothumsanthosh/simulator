@@ -442,10 +442,9 @@ export class SchematicCanvas {
     this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     // Multi-Touch (Bare Hands Two-Finger Pinch Zoom & Pan)
-    if (this.activePointers.size === 2) {
+    if (this.activePointers.size === 2 && e.pointerType === 'touch') {
       this.isPinching = true;
       this.isDragging = false;
-      this.dragCandidate = false;
       this.isPanning = false;
       this.wiringStartPin = null;
       this.wiringCurrentPos = null;
@@ -458,8 +457,6 @@ export class SchematicCanvas {
       this.render();
       return;
     }
-
-    if (this.activePointers.size !== 1) return;
 
     // Double-tap detection for touchscreens
     const now = Date.now();
@@ -494,8 +491,8 @@ export class SchematicCanvas {
 
       // 2. Wiring in progress: Target pin or wire click
       if (this.wiringStartPin) {
-        // Generous 16px touch grab radius for effortless connection
-        const pinHit = this.findPinAt(worldPos.x, worldPos.y, 16);
+        // Generous 14px target pin grab for effortless connection
+        const pinHit = this.findPinAt(worldPos.x, worldPos.y, 14);
         if (pinHit && pinHit.pinKey !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
           const to = pinHit.pinKey;
@@ -516,7 +513,7 @@ export class SchematicCanvas {
           return;
         }
 
-        const wireHit = this.findWireAt(worldPos.x, worldPos.y, 12);
+        const wireHit = this.findWireAt(worldPos.x, worldPos.y, 10);
         if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
           const to = wireHit.fromPin;
@@ -545,9 +542,8 @@ export class SchematicCanvas {
         return;
       }
 
-      // 3. Pin Click to Start Wiring (Dedicated 14px tolerance)
-      // PIN HIT ALWAYS TAKES STRICT PRECEDENCE OVER COMPONENT DRAGGING
-      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 14);
+      // 3. Pin Click to Start Wiring (Specific 8px pin tip tolerance)
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
       if (pinHit) {
         this.wiringStartPin = pinHit;
         this.wiringCurrentPos = pinHit.pos;
@@ -555,7 +551,7 @@ export class SchematicCanvas {
         return;
       }
 
-      // 4. Component Selection & Drag Candidate
+      // 4. Component Selection & Dragging
       const compHit = this.findComponentAt(worldPos.x, worldPos.y);
       if (compHit) {
         // Toggle interactive switch components
@@ -588,11 +584,9 @@ export class SchematicCanvas {
         }
 
         this.selectWire(null);
-        // Set drag candidate, but DO NOT move until mouse/finger moves >= 5px
-        this.dragCandidate = true;
-        this.isDragging = false;
-        this.dragStartScreen = { x: e.clientX, y: e.clientY };
-        this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
+        this.isDragging = true;
+        this.dragStartX = worldPos.x;
+        this.dragStartY = worldPos.y;
 
         this.compInitialPositions.clear();
         this.selectedComponents.forEach(c => {
@@ -674,16 +668,9 @@ export class SchematicCanvas {
       return;
     }
 
-    if (this.dragCandidate && !this.isDragging && this.selectedComponents.size > 0) {
-      const dist = Math.hypot(e.clientX - this.dragStartScreen.x, e.clientY - this.dragStartScreen.y);
-      if (dist >= 5) {
-        this.isDragging = true;
-      }
-    }
-
     if (this.isDragging && this.selectedComponents.size > 0) {
-      const dx = worldPos.x - this.dragStartWorld.x;
-      const dy = worldPos.y - this.dragStartWorld.y;
+      const dx = worldPos.x - this.dragStartX;
+      const dy = worldPos.y - this.dragStartY;
       this.selectedComponents.forEach(c => {
         const initPos = this.compInitialPositions.get(c) || { x: c.x, y: c.y };
         c.x = this.snapToGrid(initPos.x + dx);
