@@ -239,15 +239,72 @@ export class SchematicCanvas {
     this.render();
   }
 
+  flipSelected(axis = 'x') {
+    if (!this.selectedComponent && this.selectedComponents.size === 0) return;
+    this.saveState();
+    const targets = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents) : [this.selectedComponent];
+
+    if (targets.length === 1) {
+      const c = targets[0];
+      if (axis === 'x') {
+        c.flipX = !c.flipX;
+      } else {
+        c.flipY = !c.flipY;
+      }
+    } else {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      targets.forEach(c => {
+        minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x);
+        minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y);
+      });
+      const cX = this.snapToGrid((minX + maxX) / 2);
+      const cY = this.snapToGrid((minY + maxY) / 2);
+
+      targets.forEach(c => {
+        if (axis === 'x') {
+          c.x = this.snapToGrid(2 * cX - c.x);
+          c.flipX = !c.flipX;
+        } else {
+          c.y = this.snapToGrid(2 * cY - c.y);
+          c.flipY = !c.flipY;
+        }
+      });
+    }
+
+    this.notifyModified();
+    this.render();
+  }
+
   // --- Pin Positions & Hit Testing ---
   getPinWorldPos(comp, pin) {
-    const rad = (comp.rotation * Math.PI) / 180;
+    const px = pin.x * (comp.flipX ? -1 : 1);
+    const py = pin.y * (comp.flipY ? -1 : 1);
+    const rad = ((comp.rotation || 0) * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
     return {
-      x: comp.x + (pin.x * cos - pin.y * sin),
-      y: comp.y + (pin.x * sin + pin.y * cos)
+      x: comp.x + (px * cos - py * sin),
+      y: comp.y + (px * sin + py * cos)
     };
+  }
+
+  getPinEffectiveDir(comp, pin) {
+    if (!pin.dir) return 'right';
+    let dir = pin.dir;
+    if (comp.flipX) {
+      if (dir === 'left') dir = 'right';
+      else if (dir === 'right') dir = 'left';
+    }
+    if (comp.flipY) {
+      if (dir === 'top') dir = 'bottom';
+      else if (dir === 'bottom') dir = 'top';
+    }
+    const rot = ((comp.rotation || 0) % 360 + 360) % 360;
+    const dirs = ['right', 'bottom', 'left', 'top'];
+    const idx = dirs.indexOf(dir);
+    if (idx === -1) return dir;
+    const shift = Math.round(rot / 90) % 4;
+    return dirs[(idx + shift) % 4];
   }
 
   findPinAt(worldX, worldY, radius = 12) {
@@ -321,11 +378,39 @@ export class SchematicCanvas {
     const p2 = this.getPinWorldPos(toComp, toPin);
 
     // Manhattan Orthogonal Routing
-    if (Math.abs(p1.x - p2.x) < 2) {
+    if (Math.abs(p1.x - p2.x) < 2 || Math.abs(p1.y - p2.y) < 2) {
       return [p1, p2];
     }
-    if (Math.abs(p1.y - p2.y) < 2) {
-      return [p1, p2];
+
+    const d1 = this.getPinEffectiveDir(fromComp, fromPin);
+    const d2 = this.getPinEffectiveDir(toComp, toPin);
+    const isVert1 = (d1 === 'top' || d1 === 'bottom');
+    const isVert2 = (d2 === 'top' || d2 === 'bottom');
+
+    if (isVert1 && isVert2) {
+      const midY = Math.round((p1.y + p2.y) / 2 / this.gridSize) * this.gridSize;
+      return [
+        p1,
+        { x: p1.x, y: midY },
+        { x: p2.x, y: midY },
+        p2
+      ];
+    }
+
+    if (isVert1 && !isVert2) {
+      return [
+        p1,
+        { x: p1.x, y: p2.y },
+        p2
+      ];
+    }
+
+    if (!isVert1 && isVert2) {
+      return [
+        p1,
+        { x: p2.x, y: p1.y },
+        p2
+      ];
     }
 
     const midX = Math.round((p1.x + p2.x) / 2 / this.gridSize) * this.gridSize;
@@ -599,6 +684,12 @@ export class SchematicCanvas {
     if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
       this.rotateSelected(90);
+    } else if (!isCtrlOrCmd && (e.key === 'h' || e.key === 'H')) {
+      e.preventDefault();
+      this.flipSelected('x');
+    } else if (!isCtrlOrCmd && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault();
+      this.flipSelected('y');
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       this.removeSelected();
@@ -1031,6 +1122,10 @@ export class SchematicCanvas {
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 2.0;
     ctx.fillStyle = '#ffffff';
+
+    if (comp.flipX || comp.flipY) {
+      ctx.scale(comp.flipX ? -1 : 1, comp.flipY ? -1 : 1);
+    }
 
     this.drawSymbol(ctx, comp);
 

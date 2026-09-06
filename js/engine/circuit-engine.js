@@ -5,7 +5,7 @@
  * adaptive timesteps, partial pivoting, and multi-terminal device formulations.
  */
 
-import { ComponentTypes } from './components.js';
+import { ComponentTypes, ComponentDefinitions } from './components.js';
 
 export class CircuitEngine {
   constructor() {
@@ -51,6 +51,9 @@ export class CircuitEngine {
 
     // 1. Register all component pins
     this.components.forEach(comp => {
+      if (!Array.isArray(comp.pins) && ComponentDefinitions[comp.type]?.pins) {
+        comp.pins = ComponentDefinitions[comp.type].pins.map(p => ({ ...p }));
+      }
       if (Array.isArray(comp.pins)) {
         comp.pins.forEach(pin => {
           const pinKey = `${comp.id}:${pin.id}`;
@@ -300,6 +303,28 @@ export class CircuitEngine {
           A[nNeg - 1][row] = -1;
         }
         Z[row] = vVal;
+      };
+
+      const stampVCVS = (vSrcIdx, nOutPos, nOutNeg, nInPos, nInNeg, gain, offset = 0) => {
+        if (!isFinite(gain) || isNaN(gain)) gain = 1;
+        if (!isFinite(offset) || isNaN(offset)) offset = 0;
+        const row = (numNodes - 1) + vSrcIdx;
+        if (row >= matrixSize) return;
+        if (nOutPos > 0 && nOutPos < numNodes) {
+          A[row][nOutPos - 1] += 1;
+          A[nOutPos - 1][row] += 1;
+        }
+        if (nOutNeg > 0 && nOutNeg < numNodes) {
+          A[row][nOutNeg - 1] -= 1;
+          A[nOutNeg - 1][row] -= 1;
+        }
+        if (nInPos > 0 && nInPos < numNodes) {
+          A[row][nInPos - 1] -= gain;
+        }
+        if (nInNeg > 0 && nInNeg < numNodes) {
+          A[row][nInNeg - 1] += gain;
+        }
+        Z[row] = offset;
       };
 
       const getNodeV = (n) => (n <= 0 || n >= numNodes) ? 0 : solution[n - 1];
@@ -557,8 +582,7 @@ export class CircuitEngine {
             const nOutPos = this.getNode(comp, 'out_pos');
             const nOutNeg = this.getNode(comp, 'out_neg');
             const gain = p.gain ?? 2.0;
-            const vIn = getNodeV(nInPos) - getNodeV(nInNeg);
-            stampVSourceEquation(vSrcEquationIdx++, nOutPos, nOutNeg, gain * vIn);
+            stampVCVS(vSrcEquationIdx++, nOutPos, nOutNeg, nInPos, nInNeg, gain, 0);
             break;
           }
 
@@ -851,14 +875,19 @@ export class CircuitEngine {
             const nNonInv = this.getNode(comp, 'in_noninv');
             const nOut = this.getNode(comp, 'out');
             const aOl = p.openLoopGain || 200000;
-            const vSatP = p.vSatPos || 14;
-            const vSatN = p.vSatNeg || -14;
+            const vSatP = p.vSatPos ?? 14;
+            const vSatN = p.vSatNeg ?? -14;
 
             const vDiff = getNodeV(nNonInv) - getNodeV(nInv);
-            let targetV = aOl * vDiff;
-            targetV = Math.min(Math.max(targetV, vSatN), vSatP);
+            const vLinear = aOl * vDiff;
 
-            stampVSourceEquation(vSrcEquationIdx++, nOut, 0, targetV);
+            if (vLinear > vSatP) {
+              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatP);
+            } else if (vLinear < vSatN) {
+              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatN);
+            } else {
+              stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, 0);
+            }
             break;
           }
 

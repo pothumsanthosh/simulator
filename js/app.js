@@ -267,6 +267,8 @@ class MultisimApp {
     document.getElementById('btnRedo').addEventListener('click', () => this.canvas.redo());
 
     document.getElementById('btnRotate').addEventListener('click', () => this.canvas.rotateSelected(90));
+    document.getElementById('btnFlipH')?.addEventListener('click', () => this.canvas.flipSelected('x'));
+    document.getElementById('btnFlipV')?.addEventListener('click', () => this.canvas.flipSelected('y'));
     document.getElementById('btnDelete').addEventListener('click', () => this.canvas.removeSelected());
     document.getElementById('btnFitScreen').addEventListener('click', () => this.canvas.fitToScreen());
 
@@ -484,9 +486,11 @@ class MultisimApp {
     }
 
     html += `
-      <div style="margin-top: 24px; display: flex; gap: 8px;">
-        <button class="btn btn-outline" id="btnPropRotate" style="flex: 1;">↻ Rotate 90°</button>
-        <button class="btn btn-outline" id="btnPropDelete" style="flex: 1; color: #e11d48;">🗑 Delete</button>
+      <div style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <button class="btn btn-outline" id="btnPropRotate" title="Rotate 90° (R)">↻ Rotate</button>
+        <button class="btn btn-outline" id="btnPropFlipH" title="Flip Horizontal (H)">⇄ Flip H</button>
+        <button class="btn btn-outline" id="btnPropFlipV" title="Flip Vertical (V)">⇅ Flip V</button>
+        <button class="btn btn-outline" id="btnPropDelete" style="color: #e11d48;" title="Delete (Del)">🗑 Delete</button>
       </div>
     `;
 
@@ -521,6 +525,8 @@ class MultisimApp {
     });
 
     document.getElementById('btnPropRotate')?.addEventListener('click', () => this.canvas.rotateSelected(90));
+    document.getElementById('btnPropFlipH')?.addEventListener('click', () => this.canvas.flipSelected('x'));
+    document.getElementById('btnPropFlipV')?.addEventListener('click', () => this.canvas.flipSelected('y'));
     document.getElementById('btnPropDelete')?.addEventListener('click', () => this.canvas.removeComponent(comp));
   }
 
