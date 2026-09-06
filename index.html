@@ -685,6 +685,8 @@
       <div class="modal-body">
         <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px;">Choose export format:</p>
         <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="btn btn-outline" id="btnImportJSON">📂 Open / Import Circuit JSON</button>
+          <input type="file" id="fileInputJSON" accept=".json" style="display: none;"/>
           <button class="btn btn-outline" id="btnExportJSON">📄 Download Circuit JSON File</button>
           <button class="btn btn-outline" id="btnExportSchematicPNG">🖼️ Download Schematic Image (PNG)</button>
           <button class="btn btn-outline" id="btnExportCSVModal">📊 Download Grapher Waveform Data (CSV)</button>

@@ -656,6 +656,43 @@ class MultisimApp {
       });
     });
 
+    // Native JSON Project Import
+    document.getElementById('btnImportJSON')?.addEventListener('click', () => {
+      document.getElementById('fileInputJSON')?.click();
+    });
+
+    document.getElementById('fileInputJSON')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (data.components && Array.isArray(data.components)) {
+            this.canvas.saveState();
+            this.canvas.components = data.components;
+            this.canvas.wires = data.wires || [];
+            if (data.name) {
+              const nameInput = document.getElementById('circuitNameInput');
+              if (nameInput) nameInput.value = data.name;
+              document.title = `${data.name} - Multisim Live`;
+            }
+            this.engine.reset();
+            this.engine.setCircuit(this.canvas.components, this.canvas.wires);
+            this.canvas.fitToScreen();
+            this.canvas.render();
+            this.grapher.render();
+            closeModal('exportModal');
+          } else {
+            alert('Invalid circuit file format: missing components array.');
+          }
+        } catch (err) {
+          alert('Failed to parse circuit JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+
     // Native JSON Project Export
     document.getElementById('btnExportJSON')?.addEventListener('click', () => {
       const data = {
