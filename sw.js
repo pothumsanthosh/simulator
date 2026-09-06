@@ -1,9 +1,9 @@
 /**
- * ElectroSim Service Worker
+ * Switcha Service Worker
  * Enables offline simulation, PWA installation, and ultra-fast asset caching on Laptop, Phone, and Tablet.
  */
 
-const CACHE_NAME = 'electrosim-pwa-v1';
+const CACHE_NAME = 'switcha-pwa-v1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -24,7 +24,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('[ElectroSim SW] Cache addAll warning:', err);
+        console.warn('[Switcha SW] Cache addAll warning:', err);
       });
     }).then(() => self.skipWaiting())
   );

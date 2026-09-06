@@ -462,7 +462,7 @@ export class CircuitGrapher {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `multisim_grapher_data_${Date.now()}.csv`;
+    a.download = `switcha_grapher_data_${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -471,7 +471,7 @@ export class CircuitGrapher {
     const dataUrl = this.canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `multisim_grapher_plot_${Date.now()}.png`;
+    a.download = `switcha_grapher_plot_${Date.now()}.png`;
     a.click();
   }
 

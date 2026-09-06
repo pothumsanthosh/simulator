@@ -4,8 +4,8 @@
   <meta charset="utf-8"/>
   <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ElectroSim - Online Interactive SPICE Circuit Simulator</title>
-  <meta name="description" content="ElectroSim is a free, modern online circuit simulator with interactive SPICE engine, schematic capture, oscilloscope grapher, and PWA download for laptop and phone." />
+  <title>Switcha - Build, Switch & Simulate Circuits</title>
+  <meta name="description" content="Switcha is a modern interactive electronic and digital circuit simulator with live switches, logic gates, SPICE engine, offline mode, and personal My Circuits library." />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml"/>
   <link rel="apple-touch-icon" href="icons/icon.svg"/>
   <link rel="manifest" href="manifest.json"/>
@@ -21,9 +21,9 @@
 </head>
 <body>
 
-  <!-- Top Announcement Notice (ElectroSim Welcome Banner) -->
+  <!-- Top Announcement Notice (Switcha 2.0 Welcome Banner) -->
   <div class="topbar--announcement" id="topAnnouncement">
-    <span>⚡ <strong>Welcome to ElectroSim 2.0</strong> — High-Performance SPICE Circuit Simulator with Schematic Capture & Real-Time Oscilloscope. Ready to install on Laptop, Desktop & Mobile!</span>
+    <span>⚡ <strong>Switcha 2.0</strong> — Design. Switch. Simulate. Build interactive electronic & digital circuits with live switches, offline simulation & cloud sync!</span>
     <button class="announcement-close" id="btnCloseAnnouncement" title="Dismiss announcement">✕</button>
   </div>
 
@@ -31,33 +31,38 @@
   <header class="topbar">
     <div class="topbar-container">
       <div class="topbar-left">
-        <a href="#/" class="branding-link" title="ElectroSim Home">
-          <!-- ElectroSim Modern Vector Logo -->
-          <svg id="electrosim_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 38" height="34" width="auto">
+        <a href="#/" class="branding-link" title="Switcha Home">
+          <!-- Switcha Modern Vector Logo -->
+          <svg id="switcha_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 38" height="34" width="auto">
             <defs>
-              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="switchaLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#03b585"/>
                 <stop offset="100%" stop-color="#0284c7"/>
               </linearGradient>
             </defs>
-            <rect x="2" y="4" width="30" height="30" rx="8" fill="url(#logoGrad)"/>
-            <path d="M7 19 H13 L16 11 L20 27 L23 15 L26 19 H29" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="7" cy="19" r="2" fill="#ffffff"/>
-            <circle cx="29" cy="19" r="2" fill="#ffffff"/>
-            <text x="38" y="25" font-family="'Lato', -apple-system, sans-serif" font-size="20" font-weight="900" fill="#2b2d2f" letter-spacing="-0.5px">Electro<tspan fill="#03b585">Sim</tspan></text>
+            <rect x="2" y="4" width="30" height="30" rx="8" fill="url(#switchaLogoGrad)"/>
+            <!-- Switch Icon -->
+            <line x1="6" y1="19" x2="12" y2="19" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="19" r="2" fill="#ffffff"/>
+            <line x1="13" y1="18" x2="22" y2="11" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="23" cy="19" r="2" fill="#ffffff"/>
+            <line x1="24" y1="19" x2="28" y2="19" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+            <polygon points="18,12 15,20 19,20 16,28 22,18 18,18" fill="#facc15"/>
+            <text x="38" y="25" font-family="'Lato', -apple-system, sans-serif" font-size="21" font-weight="900" fill="#2b2d2f" letter-spacing="-0.5px">Switch<tspan fill="#03b585">a</tspan></text>
           </svg>
         </a>
 
         <nav class="nav">
           <ul class="nav-list">
             <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
+            <li class="nav-item"><a href="#/my-circuits" class="nav-link" id="nav-my-circuits">📁 My Circuits</a></li>
             <li class="nav-item nav-item--dropdown">
-              <a href="#/discover" class="nav-link" id="nav-circuits">Circuits ▾</a>
+              <a href="#/discover" class="nav-link" id="nav-circuits">Discover ▾</a>
               <div class="nav-dropdown-menu">
                 <a href="#/discover" class="nav-menuitem">Public Circuits</a>
                 <a href="#/discover?filter=featured" class="nav-menuitem">Featured Circuits</a>
                 <a href="#/discover?filter=analog" class="nav-menuitem">Analog Reference</a>
-                <a href="#/discover?filter=digital" class="nav-menuitem">Digital Logic</a>
+                <a href="#/discover?filter=digital" class="nav-menuitem">Digital Logic & Switches</a>
               </div>
             </li>
             <li class="nav-item"><a href="#" class="nav-link" id="nav-shortcuts">Shortcuts</a></li>
@@ -66,8 +71,14 @@
       </div>
 
       <div class="topbar-right">
-        <button class="btn btn-outline" id="btnNavInstall" title="Download and install ElectroSim on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
-        <a href="#/create" class="btn btn-launch-sim">⚡ Launch Simulator</a>
+        <!-- Live Online / Offline Network Status Pill -->
+        <div class="network-status-pill online" id="networkStatusPill" title="Network status: Online with auto-sync">
+          <span class="status-indicator-dot"></span>
+          <span id="networkStatusText">Online</span>
+        </div>
+
+        <button class="btn btn-outline" id="btnNavInstall" title="Download and install Switcha on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
+        <a href="#/create" class="btn btn-launch-sim">⚡ Launch Switcha</a>
         <button class="btn btn-invis" id="btnOpenLogin">Log in</button>
         <button class="btn btn-primary" id="btnOpenSignup">Sign up</button>
       </div>
@@ -84,12 +95,12 @@
       <!-- Hero Banner -->
       <section class="banner--home">
         <div class="banner-content">
-          <span class="banner-badge">Interactive SPICE In Your Browser</span>
-          <h1 class="banner-title">ElectroSim Studio</h1>
-          <p class="banner-subtitle">Fast, Interactive SPICE Circuit Simulation on Desktop, Laptop & Mobile</p>
+          <span class="banner-badge">⚡ Build • Connect • Switch • Simulate</span>
+          <h1 class="banner-title">SWITCHA</h1>
+          <p class="banner-subtitle">Design. Switch. Simulate. The modern circuit simulator with interactive switches, digital components & offline auto-sync.</p>
           <div class="banner-actions">
             <a href="#/create" class="btn btn-primary btn-xlarge">⚡ Launch Simulator</a>
-            <a href="#/discover" class="btn btn-secondary btn-xlarge">Explore Circuits</a>
+            <a href="#/my-circuits" class="btn btn-secondary btn-xlarge">📁 My Circuits</a>
             <button class="btn btn-outline btn-xlarge" id="btnHeroInstall" style="color: #ffffff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1);">📲 Download for Laptop & Phone</button>
           </div>
         </div>
@@ -333,16 +344,17 @@
       <footer class="footer">
         <div class="footer-container">
           <div>
-            <p>&copy; 2026 ElectroSim. All rights reserved. Open-source interactive SPICE electronic simulation suite.</p>
+            <p>&copy; 2026 Switcha. All rights reserved. Design. Switch. Simulate. Modern interactive electronic & digital simulation suite.</p>
             <div class="footer-links">
               <a href="#/features">Features</a>
+              <a href="#/my-circuits">My Circuits</a>
               <a href="#/discover">Public Circuits</a>
               <a href="#/create">Simulator Studio</a>
               <a href="#" id="footerInstallLink">📲 Download App</a>
             </div>
           </div>
           <div>
-            <span style="font-weight: bold; color: #03b585; font-size: 15px;">⚡ ElectroSim</span>
+            <span style="font-weight: bold; color: #03b585; font-size: 15px;">⚡ Switcha</span>
           </div>
         </div>
       </footer>
@@ -358,6 +370,7 @@
           <div class="studio-toolbar-left">
             <button class="tool-btn active" id="btnTogglePalette" title="Toggle Components Palette Sidebar (P)" style="font-weight: bold; font-size: 14px;">☰</button>
             <input type="text" class="circuit-title-input" id="circuitNameInput" value="Untitled Circuit" title="Click to rename circuit"/>
+            <button class="btn btn-primary" id="btnSaveMyCircuit" title="Save to My Circuits (Ctrl+S)" style="font-size: 12px; font-weight: 700; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">💾 Save</button>
             <div class="toolbar-divider"></div>
             
             <button class="btn-sim-run" id="btnSimToggle" title="Run / Pause Simulation (Space)">
@@ -404,8 +417,21 @@
 
             <div class="toolbar-divider"></div>
 
-            <!-- Quick Components Bar (Touch & Hands Accessible) -->
+            <!-- Quick Components Bar (Switches, Digital, Analog, Probes) -->
             <div class="studio-quick-components" id="studioQuickComponents" title="Quick Add Components (Touch or Click to Place)">
+              <button class="quick-comp-btn" data-type="SWITCH_SPST" title="Add SPST Toggle Switch" style="border-color: #03b585; font-weight: 700;">🔌 Switch</button>
+              <button class="quick-comp-btn" data-type="PUSH_BUTTON" title="Add Push Button">🔘 Button</button>
+              <button class="quick-comp-btn" data-type="TOGGLE_SWITCH" title="Add SPDT Toggle Switch">🎚️ SPDT</button>
+              <button class="quick-comp-btn" data-type="LAMP" title="Add Light Bulb">💡 Lamp</button>
+              <button class="quick-comp-btn" data-type="LED" title="Add LED (Glowing Indicator)">🔴 LED</button>
+              <button class="quick-comp-btn" data-type="SEVEN_SEG_DISPLAY" title="Add 7-Segment Digital Display">🔢 7-Seg</button>
+              <button class="quick-comp-btn" data-type="BUZZER" title="Add Audio Buzzer">🔊 Buzzer</button>
+              <button class="quick-comp-btn" data-type="DC_MOTOR" title="Add DC Motor">⚙️ Motor</button>
+              <button class="quick-comp-btn" data-type="RELAY_SPDT" title="Add Relay SPDT">🧲 Relay</button>
+              <button class="quick-comp-btn" data-type="AND_GATE" title="Add AND Logic Gate">AND</button>
+              <button class="quick-comp-btn" data-type="OR_GATE" title="Add OR Logic Gate">OR</button>
+              <button class="quick-comp-btn" data-type="NOT_GATE" title="Add NOT Inverter Gate">NOT</button>
+              <button class="quick-comp-btn" data-type="XOR_GATE" title="Add XOR Logic Gate">XOR</button>
               <button class="quick-comp-btn" data-type="GROUND" title="Add Ground (GND)">⏚ GND</button>
               <button class="quick-comp-btn" data-type="DC_VOLTAGE" title="Add DC Voltage Source">⚡ DC</button>
               <button class="quick-comp-btn" data-type="AC_VOLTAGE" title="Add AC Voltage Source">∿ AC</button>
@@ -645,6 +671,38 @@
     </div>
 
     <!-- ====================================================================
+         VIEW: MY CIRCUITS (/my-circuits)
+         ==================================================================== -->
+    <div class="view-page" id="view-my-circuits">
+      <div class="my-circuits-container">
+        <div class="my-circuits-header">
+          <div>
+            <h1 class="section-title">📁 My Circuits</h1>
+            <p class="section-subtitle">Your personal circuit library saved automatically to your device and synced when online.</p>
+          </div>
+          <div class="my-circuits-actions">
+            <button class="btn btn-primary btn-large" id="btnNewMyCircuit">➕ New Circuit</button>
+            <button class="btn btn-outline" id="btnImportMyCircuit">📂 Import JSON</button>
+          </div>
+        </div>
+
+        <div class="my-circuits-toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="myCircuitsSearchInput" placeholder="Search your saved circuits..."/>
+          </div>
+          <div class="my-circuits-stats" id="myCircuitsCount">
+            0 Circuits Saved
+          </div>
+        </div>
+
+        <div class="cards-grid" id="myCircuitsGrid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
          VIEW 3: DISCOVER / COMMUNITY CIRCUITS
          ==================================================================== -->
     <div class="view-page" id="view-discover">
@@ -719,7 +777,7 @@
     <div class="modal-content" style="max-width: 480px;">
       <div class="modal-header">
         <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 20px;">📲</span> Install ElectroSim
+          <span style="font-size: 20px;">📲</span> Install Switcha
         </h3>
         <button class="modal-close" data-close="installModal">&times;</button>
       </div>
@@ -730,7 +788,7 @@
               <path d="M4 16 H10 L13 8 L18 24 L21 12 L24 16 H28" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <h4 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">ElectroSim Web App</h4>
+          <h4 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Switcha Web App</h4>
           <p style="font-size: 13px; color: var(--text-muted);">Install on Windows, Mac, Linux, Android, iPhone or iPad for instant offline simulation!</p>
         </div>
 
@@ -744,7 +802,7 @@
         </div>
 
         <button class="btn btn-primary btn-large" id="btnTriggerInstallPrompt" style="width: 100%; font-weight: 700; font-size: 15px;">
-          ⬇️ Install ElectroSim Now
+          ⬇️ Install Switcha Now
         </button>
       </div>
     </div>
@@ -754,7 +812,7 @@
   <div class="modal-overlay" id="loginModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Log in to ElectroSim</h3>
+        <h3 class="modal-title">Log in to Switcha</h3>
         <button class="modal-close" data-close="loginModal">&times;</button>
       </div>
       <div class="modal-body">
@@ -777,7 +835,7 @@
   <div class="modal-overlay" id="signupModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Create Free Account</h3>
+        <h3 class="modal-title">Create Free Switcha Account</h3>
         <button class="modal-close" data-close="signupModal">&times;</button>
       </div>
       <div class="modal-body">
@@ -809,14 +867,19 @@
       </div>
       <div class="modal-body" style="font-size: 13.5px; line-height: 2;">
         <p><strong>Space:</strong> Run / Pause Circuit Simulation</p>
+        <p><strong>Ctrl + S:</strong> Save Circuit to My Circuits</p>
+        <p><strong>Ctrl + A:</strong> Select All Components & Wires</p>
+        <p><strong>Ctrl + C / V / X:</strong> Copy, Paste, Cut Components</p>
         <p><strong>R:</strong> Rotate selected component 90°</p>
         <p><strong>H:</strong> Flip selected component horizontally</p>
         <p><strong>V:</strong> Flip selected component vertically</p>
+        <p><strong>F:</strong> Fit Circuit to Screen</p>
+        <p><strong>J:</strong> Add Junction Multi-Wire Node</p>
+        <p><strong>N:</strong> Toggle SPICE Node ID Badges</p>
         <p><strong>Delete / Backspace:</strong> Delete selected component or wire</p>
-        <p><strong>Ctrl + Z:</strong> Undo last change</p>
-        <p><strong>Ctrl + Y:</strong> Redo</p>
+        <p><strong>Ctrl + Z / Y:</strong> Undo / Redo</p>
         <p><strong>Click Pin:</strong> Start wiring / complete wire</p>
-        <p><strong>Click Switch:</strong> Toggle SPST switch Open / Closed live</p>
+        <p><strong>Click Switch / Button:</strong> Toggle switch or press trigger pulse live</p>
         <p><strong>Scroll Wheel:</strong> Zoom In / Out</p>
         <p><strong>Middle Click / Drag:</strong> Pan Schematic</p>
       </div>
@@ -842,6 +905,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Switcha Toast Notification -->
+  <div class="switcha-toast" id="switchaToast"></div>
 
   <!-- Main JavaScript App Loader -->
   <script type="module" src="js/app.js"></script>

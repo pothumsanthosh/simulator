@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`⚡ ElectroSim Studio Server running at:`);
+  console.log(`⚡ Switcha Studio Server running at:`);
   console.log(`  > http://localhost:${PORT}/`);
   console.log(`  > http://127.0.0.1:${PORT}/`);
 });

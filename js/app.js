@@ -1,7 +1,7 @@
 /**
- * ElectroSim Main Application Controller
+ * Switcha Main Application Controller
  * Routing, Component Palette, Simulation Loop, Properties Inspector,
- * SPICE Netlist Exporter, JSON Project Persistence, and PWA Offline Suite.
+ * My Circuits Hub, Live Network Auto-Sync, and PWA Offline Suite.
  */
 
 import { ComponentTypes, ComponentDefinitions, ComponentCategory, formatValueWithPrefix, parseEngineeringValue } from './engine/components.js';
@@ -10,7 +10,7 @@ import { SchematicCanvas } from './editor/schematic-canvas.js';
 import { CircuitGrapher } from './editor/grapher.js';
 import { CircuitLibrary } from './editor/circuit-library.js';
 
-class ElectroSimApp {
+class SwitchaApp {
   constructor() {
     this.engine = new CircuitEngine();
     this.canvas = null;
@@ -18,6 +18,8 @@ class ElectroSimApp {
     this.isSimRunning = false;
     this.simAnimFrame = null;
     this.lastTimestamp = 0;
+    this.activeMyCircuitId = null;
+    this._toastTimer = null;
 
     this.currentView = 'home';
     this.currentMode = 'split'; // 'schematic', 'split', 'grapher'
@@ -66,8 +68,10 @@ class ElectroSimApp {
     // 2. Build Component Palette Sidebar
     this.buildPalette();
 
-    // 3. Setup UI Event Listeners, PWA & Router
+    // 3. Setup UI Event Listeners, PWA, Network Sync, My Circuits & Router
     this.initPWA();
+    this.initNetworkSyncMonitor();
+    this.initMyCircuitsPage();
     this.initRouter();
     this.initToolbarControls();
     this.initModals();
@@ -89,6 +93,431 @@ class ElectroSimApp {
     }, 100);
   }
 
+  // --- Toast Notification Helper ---
+  showToast(message, type = 'info', duration = 3000) {
+    const toast = document.getElementById('switchaToast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = `switcha-toast ${type} active`;
+    if (this._toastTimer) clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+      toast.classList.remove('active');
+    }, duration);
+  }
+
+  // --- Network Online / Offline Auto-Sync Monitor ---
+  initNetworkSyncMonitor() {
+    const pill = document.getElementById('networkStatusPill');
+    const statusText = document.getElementById('networkStatusText');
+    if (!pill || !statusText) return;
+
+    const updateNetworkStatus = (isOnline, isInitial = false) => {
+      if (isOnline) {
+        pill.className = 'network-status-pill online';
+        statusText.textContent = 'Online';
+        pill.title = 'Network status: Online — circuits synced';
+        if (!isInitial) {
+          pill.classList.add('syncing');
+          statusText.textContent = 'Syncing...';
+          setTimeout(() => {
+            pill.classList.remove('syncing');
+            statusText.textContent = 'Online';
+            this.showToast('🌐 Connected online — Circuits synced with cloud!', 'success');
+          }, 800);
+        }
+      } else {
+        pill.className = 'network-status-pill offline';
+        statusText.textContent = 'Offline';
+        pill.title = 'Network status: Offline — saving locally';
+        if (!isInitial) {
+          this.showToast('📴 Working offline — All changes saved locally', 'warning');
+        }
+      }
+    };
+
+    window.addEventListener('online', () => updateNetworkStatus(true));
+    window.addEventListener('offline', () => updateNetworkStatus(false));
+    updateNetworkStatus(navigator.onLine, true);
+  }
+
+  // --- My Circuits Hub & Storage Management ---
+  getMyCircuits() {
+    try {
+      const data = localStorage.getItem('switcha_my_circuits');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('[Switcha] Failed to read my circuits from localStorage:', e);
+    }
+
+    // Default starter circuits if none exist
+    const starterCircuits = [
+      {
+        id: 'circuit_starter_1',
+        name: 'Interactive Switch & LED Lamp',
+        description: 'Dual interactive switch setup: SPST toggle switch powering an incandescent light bulb and glowing LED indicator with 9V DC source.',
+        author: 'Switcha Studio',
+        updatedAt: Date.now() - 3600000,
+        presetKey: 'switchSpstLamp',
+        components: [
+          { id: 'v1', type: ComponentTypes.DC_VOLTAGE, x: 120, y: 220, params: { voltage: 9 }, rotation: 0, flipX: false, flipY: false },
+          { id: 'gnd1', type: ComponentTypes.GROUND, x: 120, y: 340, params: {}, rotation: 0, flipX: false, flipY: false },
+          { id: 'sw1', type: ComponentTypes.SWITCH_SPST, x: 260, y: 140, params: { closed: true, name: 'Main Power' }, rotation: 0, flipX: false, flipY: false },
+          { id: 'lamp1', type: ComponentTypes.LAMP, x: 420, y: 140, params: { ratedVoltage: 9, ratedPower: 2 }, rotation: 0, flipX: false, flipY: false },
+          { id: 'r1', type: ComponentTypes.RESISTOR, x: 340, y: 260, params: { resistance: 330 }, rotation: 0, flipX: false, flipY: false },
+          { id: 'led1', type: ComponentTypes.LED, x: 440, y: 260, params: { color: '#ff3b30' }, rotation: 0, flipX: false, flipY: false },
+          { id: 'pr1', type: ComponentTypes.PROBE_V, x: 500, y: 80, params: { color: '#03b585', label: 'V_switched' }, rotation: 0, flipX: false, flipY: false }
+        ],
+        wires: [
+          { id: 'w1', fromPin: 'v1:p_neg', toPin: 'gnd1:p1' },
+          { id: 'w2', fromPin: 'v1:p_pos', toPin: 'sw1:p1' },
+          { id: 'w3', fromPin: 'sw1:p2', toPin: 'lamp1:p1' },
+          { id: 'w4', fromPin: 'sw1:p2', toPin: 'r1:p1' },
+          { id: 'w5', fromPin: 'sw1:p2', toPin: 'pr1:tip' },
+          { id: 'w6', fromPin: 'lamp1:p2', toPin: 'gnd1:p1' },
+          { id: 'w7', fromPin: 'r1:p2', toPin: 'led1:anode' },
+          { id: 'w8', fromPin: 'led1:cathode', toPin: 'gnd1:p1' }
+        ]
+      },
+      {
+        id: 'circuit_starter_2',
+        name: '555 Timer Astable Flasher',
+        description: 'Square wave pulse generator with RC timing network driving an oscillating LED indicator.',
+        author: 'Switcha Studio',
+        updatedAt: Date.now() - 7200000,
+        presetKey: 'timer555',
+        components: [],
+        wires: []
+      },
+      {
+        id: 'circuit_starter_3',
+        name: 'Digital Logic Half Adder',
+        description: 'XOR and AND gates computing binary SUM and CARRY from interactive input logic levels.',
+        author: 'Switcha Studio',
+        updatedAt: Date.now() - 14400000,
+        presetKey: 'halfAdder',
+        components: [],
+        wires: []
+      }
+    ];
+
+    this.saveMyCircuits(starterCircuits);
+    return starterCircuits;
+  }
+
+  saveMyCircuits(circuits) {
+    try {
+      localStorage.setItem('switcha_my_circuits', JSON.stringify(circuits));
+    } catch (e) {
+      console.warn('[Switcha] Failed to write my circuits to localStorage:', e);
+    }
+  }
+
+  saveCurrentCircuitToMyCircuits(customName = null) {
+    const circuits = this.getMyCircuits();
+    const nameInput = document.getElementById('circuitNameInput');
+    const name = customName || (nameInput ? nameInput.value.trim() : 'Untitled Circuit') || 'Untitled Circuit';
+
+    // Clone current components and wires
+    const currentComponents = JSON.parse(JSON.stringify(this.canvas.components));
+    const currentWires = JSON.parse(JSON.stringify(this.canvas.wires));
+
+    // Check if currently editing an existing circuit
+    const existingIndex = this.activeMyCircuitId ? circuits.findIndex(c => c.id === this.activeMyCircuitId) : -1;
+
+    let targetCircuit;
+    if (existingIndex >= 0) {
+      circuits[existingIndex].name = name;
+      circuits[existingIndex].components = currentComponents;
+      circuits[existingIndex].wires = currentWires;
+      circuits[existingIndex].updatedAt = Date.now();
+      targetCircuit = circuits[existingIndex];
+    } else {
+      const newId = 'circuit_' + Date.now();
+      targetCircuit = {
+        id: newId,
+        name: name,
+        description: `Custom electronic circuit with ${currentComponents.length} components and ${currentWires.length} connections.`,
+        author: 'You',
+        updatedAt: Date.now(),
+        components: currentComponents,
+        wires: currentWires
+      };
+      circuits.unshift(targetCircuit);
+      this.activeMyCircuitId = newId;
+    }
+
+    this.saveMyCircuits(circuits);
+    this.renderMyCircuits();
+    this.showToast(`💾 "${name}" saved to My Circuits!`, 'success');
+  }
+
+  loadCircuitFromMyCircuits(circuitId) {
+    const circuits = this.getMyCircuits();
+    const circuit = circuits.find(c => c.id === circuitId);
+    if (!circuit) return;
+
+    this.activeMyCircuitId = circuit.id;
+
+    if (circuit.presetKey && CircuitLibrary[circuit.presetKey] && (!circuit.components || circuit.components.length === 0)) {
+      this.loadCircuitPreset(circuit.presetKey);
+    } else {
+      this.engine.reset();
+      this.canvas.saveState();
+      this.canvas.components = JSON.parse(JSON.stringify(circuit.components || []));
+      this.canvas.wires = JSON.parse(JSON.stringify(circuit.wires || []));
+      this.engine.setCircuit(this.canvas.components, this.canvas.wires);
+
+      const nameInput = document.getElementById('circuitNameInput');
+      if (nameInput) nameInput.value = circuit.name;
+      document.title = `${circuit.name} - Switcha`;
+
+      setTimeout(() => {
+        this.canvas.resize();
+        this.canvas.fitToScreen();
+        this.grapher.resize();
+        this.canvas.render();
+        this.grapher.render();
+      }, 50);
+    }
+
+    window.location.hash = '#/create';
+    this.showToast(`⚡ Opened "${circuit.name}" in Studio`, 'info');
+  }
+
+  deleteCircuit(circuitId) {
+    let circuits = this.getMyCircuits();
+    const target = circuits.find(c => c.id === circuitId);
+    if (!target) return;
+    if (confirm(`Are you sure you want to delete "${target.name}"?`)) {
+      circuits = circuits.filter(c => c.id !== circuitId);
+      if (this.activeMyCircuitId === circuitId) this.activeMyCircuitId = null;
+      this.saveMyCircuits(circuits);
+      this.renderMyCircuits();
+      this.showToast(`🗑️ "${target.name}" deleted`, 'warning');
+    }
+  }
+
+  duplicateCircuit(circuitId) {
+    const circuits = this.getMyCircuits();
+    const target = circuits.find(c => c.id === circuitId);
+    if (!target) return;
+
+    let components = target.components;
+    let wires = target.wires;
+    if (target.presetKey && CircuitLibrary[target.presetKey] && (!components || components.length === 0)) {
+      const tempCanvas = {
+        components: [],
+        wires: [],
+        addComponent(type, x, y, params, rot) {
+          const comp = { id: `c_${this.components.length + 1}`, type, x, y, params: params || {}, rotation: rot || 0, flipX: false, flipY: false };
+          this.components.push(comp);
+          return comp;
+        },
+        fitToScreen() {}
+      };
+      CircuitLibrary[target.presetKey].load(tempCanvas);
+      components = tempCanvas.components;
+      wires = tempCanvas.wires;
+    }
+
+    const newCircuit = {
+      id: 'circuit_' + Date.now(),
+      name: `${target.name} (Copy)`,
+      description: target.description,
+      author: 'You',
+      updatedAt: Date.now(),
+      components: JSON.parse(JSON.stringify(components || [])),
+      wires: JSON.parse(JSON.stringify(wires || []))
+    };
+
+    circuits.unshift(newCircuit);
+    this.saveMyCircuits(circuits);
+    this.renderMyCircuits();
+    this.showToast(`📋 Duplicated "${target.name}"`, 'success');
+  }
+
+  renameCircuit(circuitId) {
+    const circuits = this.getMyCircuits();
+    const target = circuits.find(c => c.id === circuitId);
+    if (!target) return;
+
+    const newName = prompt('Enter new circuit name:', target.name);
+    if (newName && newName.trim()) {
+      target.name = newName.trim();
+      target.updatedAt = Date.now();
+      this.saveMyCircuits(circuits);
+      this.renderMyCircuits();
+      if (this.activeMyCircuitId === circuitId) {
+        const nameInput = document.getElementById('circuitNameInput');
+        if (nameInput) nameInput.value = target.name;
+        document.title = `${target.name} - Switcha`;
+      }
+      this.showToast(`✏️ Renamed to "${target.name}"`, 'info');
+    }
+  }
+
+  exportCircuitFromMyCircuits(circuitId) {
+    const circuits = this.getMyCircuits();
+    const target = circuits.find(c => c.id === circuitId);
+    if (!target) return;
+
+    let components = target.components;
+    let wires = target.wires;
+    if (target.presetKey && CircuitLibrary[target.presetKey] && (!components || components.length === 0)) {
+      this.loadCircuitPreset(target.presetKey);
+      components = this.canvas.components;
+      wires = this.canvas.wires;
+    }
+
+    const data = {
+      name: target.name,
+      description: target.description,
+      author: target.author,
+      updatedAt: target.updatedAt,
+      components: components,
+      wires: wires
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${target.name.replace(/\s+/g, '_').toLowerCase()}.switcha.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  initMyCircuitsPage() {
+    const newBtn = document.getElementById('btnNewMyCircuit');
+    if (newBtn) {
+      newBtn.addEventListener('click', () => {
+        this.activeMyCircuitId = null;
+        this.engine.reset();
+        this.canvas.saveState();
+        this.canvas.components = [];
+        this.canvas.wires = [];
+        this.engine.setCircuit([], []);
+        const nameInput = document.getElementById('circuitNameInput');
+        if (nameInput) nameInput.value = 'Untitled Circuit';
+        document.title = 'Untitled Circuit - Switcha';
+        this.canvas.render();
+        this.grapher.render();
+        window.location.hash = '#/create';
+        this.showToast('✨ Started a new blank circuit', 'info');
+      });
+    }
+
+    const importBtn = document.getElementById('btnImportMyCircuit');
+    if (importBtn) {
+      importBtn.addEventListener('click', () => {
+        document.getElementById('fileInputJSON')?.click();
+      });
+    }
+
+    const searchInput = document.getElementById('myCircuitsSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.renderMyCircuits(e.target.value.toLowerCase().trim());
+      });
+    }
+
+    this.renderMyCircuits();
+  }
+
+  renderMyCircuits(filterQuery = '') {
+    const grid = document.getElementById('myCircuitsGrid');
+    const countEl = document.getElementById('myCircuitsCount');
+    if (!grid) return;
+
+    const circuits = this.getMyCircuits();
+    const filtered = circuits.filter(c => {
+      if (!filterQuery) return true;
+      return (c.name || '').toLowerCase().includes(filterQuery) ||
+             (c.description || '').toLowerCase().includes(filterQuery) ||
+             (c.author || '').toLowerCase().includes(filterQuery);
+    });
+
+    if (countEl) {
+      countEl.textContent = `${circuits.length} Circuit${circuits.length === 1 ? '' : 's'} Saved`;
+    }
+
+    grid.innerHTML = '';
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-circuits-state">
+          <div class="empty-circuits-icon">🔌</div>
+          <h3 class="empty-circuits-title">${filterQuery ? 'No matching circuits found' : 'No saved circuits yet'}</h3>
+          <p class="empty-circuits-desc">${filterQuery ? 'Try another search query.' : 'Build switches, logic gates, and analog circuits and save them to your library.'}</p>
+          <a href="#/create" class="btn btn-primary">⚡ Create Your First Circuit</a>
+        </div>
+      `;
+      return;
+    }
+
+    filtered.forEach(c => {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'card';
+
+      const timeAgo = (timestamp) => {
+        if (!timestamp) return 'Recently';
+        const sec = Math.floor((Date.now() - timestamp) / 1000);
+        if (sec < 60) return 'Just now';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min}m ago`;
+        const hrs = Math.floor(min / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        return `${days}d ago`;
+      };
+
+      const presetKey = c.presetKey || 'custom';
+      const numComps = c.components ? c.components.length : 0;
+      const numWires = c.wires ? c.wires.length : 0;
+
+      cardEl.innerHTML = `
+        ${this.renderCircuitThumbnailSvg(presetKey, 'Saved')}
+        <div class="card-body">
+          <div class="my-circuit-meta">
+            <span>🕒 Edited ${timeAgo(c.updatedAt)}</span>
+            <span>•</span>
+            <span>⚡ ${numComps} comps</span>
+          </div>
+          <h3 class="card-title">${c.name}</h3>
+          <p class="card-desc">${c.description || 'Personal circuit schematic.'}</p>
+          <div class="my-circuit-card-actions">
+            <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12px; font-weight: 700;" data-action="open" data-id="${c.id}">⚡ Open</button>
+            <button class="btn-card-icon" title="Duplicate Circuit" data-action="duplicate" data-id="${c.id}">📋 Copy</button>
+            <button class="btn-card-icon" title="Rename Circuit" data-action="rename" data-id="${c.id}">✏️ Rename</button>
+            <button class="btn-card-icon" title="Export JSON" data-action="export" data-id="${c.id}">📄 JSON</button>
+            <button class="btn-card-icon delete" title="Delete Circuit" data-action="delete" data-id="${c.id}">🗑️</button>
+          </div>
+        </div>
+      `;
+
+      cardEl.querySelector('[data-action="open"]').addEventListener('click', () => {
+        this.loadCircuitFromMyCircuits(c.id);
+      });
+      cardEl.querySelector('[data-action="duplicate"]').addEventListener('click', () => {
+        this.duplicateCircuit(c.id);
+      });
+      cardEl.querySelector('[data-action="rename"]').addEventListener('click', () => {
+        this.renameCircuit(c.id);
+      });
+      cardEl.querySelector('[data-action="export"]').addEventListener('click', () => {
+        this.exportCircuitFromMyCircuits(c.id);
+      });
+      cardEl.querySelector('[data-action="delete"]').addEventListener('click', () => {
+        this.deleteCircuit(c.id);
+      });
+
+      grid.appendChild(cardEl);
+    });
+  }
+
   populatePresetDropdown() {
     const select = document.getElementById('circuitPresetSelect');
     if (!select) return;
@@ -108,6 +537,8 @@ class ElectroSimApp {
       const hash = window.location.hash || '#/';
       if (hash.startsWith('#/create')) {
         this.switchView('studio');
+      } else if (hash.startsWith('#/my-circuits')) {
+        this.switchView('my-circuits');
       } else if (hash.startsWith('#/discover')) {
         this.switchView('discover');
       } else if (hash.startsWith('#/features')) {
@@ -131,7 +562,12 @@ class ElectroSimApp {
     // Update nav links
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     if (viewName === 'features') document.getElementById('nav-features')?.classList.add('active');
+    if (viewName === 'my-circuits') document.getElementById('nav-my-circuits')?.classList.add('active');
     if (viewName === 'discover') document.getElementById('nav-circuits')?.classList.add('active');
+
+    if (viewName === 'my-circuits') {
+      this.renderMyCircuits();
+    }
 
     if (viewName === 'studio') {
       setTimeout(() => {
@@ -755,8 +1191,20 @@ class ElectroSimApp {
     document.getElementById('btnExportCSV').addEventListener('click', () => this.grapher.exportCSV());
     document.getElementById('btnExportPlotPNG').addEventListener('click', () => this.grapher.exportPNG());
 
+    document.getElementById('btnSaveMyCircuit')?.addEventListener('click', () => {
+      this.saveCurrentCircuitToMyCircuits();
+    });
+
     document.getElementById('circuitNameInput').addEventListener('change', (e) => {
-      document.title = `${e.target.value} - Multisim Live`;
+      document.title = `${e.target.value} - Switcha`;
+    });
+
+    // Global keyboard shortcuts (Ctrl+S to Save)
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        this.saveCurrentCircuitToMyCircuits();
+      }
     });
 
     // --- Responsive Sidebar & Topbar Handlers ---
@@ -1227,7 +1675,7 @@ class ElectroSimApp {
     if (nameInput) nameInput.value = preset.name;
     const select = document.getElementById('circuitPresetSelect');
     if (select) select.value = presetKey;
-    document.title = `${preset.name} - ElectroSim`;
+    document.title = `${preset.name} - Switcha`;
 
     setTimeout(() => {
       this.canvas.resize();
@@ -1243,9 +1691,9 @@ class ElectroSimApp {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then((reg) => {
-          console.log('[ElectroSim] Service Worker registered successfully:', reg.scope);
+          console.log('[Switcha] Service Worker registered successfully:', reg.scope);
         }).catch((err) => {
-          console.warn('[ElectroSim] Service Worker registration failed:', err);
+          console.warn('[Switcha] Service Worker registration failed:', err);
         });
       });
     }
@@ -1269,7 +1717,7 @@ class ElectroSimApp {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult) => {
           if (choiceResult.outcome === 'accepted') {
-            console.log('[ElectroSim] User accepted PWA installation');
+            console.log('[Switcha] User accepted PWA installation');
           }
           deferredPrompt = null;
         });
@@ -1288,12 +1736,12 @@ class ElectroSimApp {
       if (deferredPrompt) {
         deferredPrompt.prompt();
       } else {
-        alert('To install ElectroSim on iOS/Safari, tap the Share icon ⎋ and select "Add to Home Screen ⊕". On desktop browsers, click the ⊕ icon in your address bar.');
+        alert('To install Switcha on iOS/Safari, tap the Share icon ⎋ and select "Add to Home Screen ⊕". On desktop browsers, click the ⊕ icon in your address bar.');
       }
     });
 
     window.addEventListener('appinstalled', () => {
-      console.log('[ElectroSim] App was successfully installed!');
+      console.log('[Switcha] App was successfully installed!');
       const installBtn = document.getElementById('btnNavInstall');
       if (installBtn) installBtn.textContent = '✓ App Installed';
     });
@@ -1359,6 +1807,44 @@ class ElectroSimApp {
     let innerContent = '';
 
     switch (key) {
+      case 'switchSpstLamp':
+        innerContent = `
+          <!-- 9V DC Source -->
+          <circle cx="45" cy="80" r="14" fill="#eff6ff" stroke="#0284c7" stroke-width="2"/>
+          <text x="45" y="83" font-size="8.5" text-anchor="middle" font-weight="bold" fill="#0284c7">+9V</text>
+          <line x1="45" y1="66" x2="45" y2="40" stroke="#0284c7" stroke-width="2"/>
+          <line x1="45" y1="40" x2="90" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <!-- SPST Switch -->
+          <circle cx="90" cy="40" r="3" fill="#1e293b"/>
+          <line x1="90" y1="40" x2="125" y2="28" stroke="#03b585" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="130" cy="40" r="3" fill="#1e293b"/>
+          <line x1="130" y1="40" x2="175" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="175" cy="40" r="3" fill="#1e293b"/>
+          <!-- Light Bulb (Lamp) -->
+          <circle cx="215" cy="40" r="14" fill="#fef08a" stroke="#ca8a04" stroke-width="2"/>
+          <line x1="207" y1="32" x2="223" y2="48" stroke="#ca8a04" stroke-width="2"/>
+          <line x1="207" y1="48" x2="223" y2="32" stroke="#ca8a04" stroke-width="2"/>
+          <line x1="175" y1="40" x2="201" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <line x1="229" y1="40" x2="250" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <line x1="250" y1="40" x2="250" y2="120" stroke="#1e293b" stroke-width="2"/>
+          <!-- LED Indicator Branch -->
+          <line x1="175" y1="40" x2="175" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <polyline points="175,75 175,80 170,84 180,89 170,94 180,99 175,103 175,108" fill="none" stroke="#d97706" stroke-width="1.8"/>
+          <polygon points="168,116 182,116 175,126" fill="#ef4444" stroke="#ef4444" stroke-width="1.2"/>
+          <line x1="168" y1="126" x2="182" y2="126" stroke="#ef4444" stroke-width="2"/>
+          <line x1="175" y1="126" x2="175" y2="140" stroke="#1e293b" stroke-width="2"/>
+          <line x1="175" y1="140" x2="250" y2="140" stroke="#1e293b" stroke-width="2"/>
+          <line x1="250" y1="120" x2="250" y2="140" stroke="#1e293b" stroke-width="2"/>
+          <!-- Ground Return -->
+          <line x1="45" y1="94" x2="45" y2="140" stroke="#1e293b" stroke-width="2"/>
+          <line x1="45" y1="140" x2="250" y2="140" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="145" cy="140" r="3" fill="#1e293b"/>
+          <line x1="145" y1="140" x2="145" y2="150" stroke="#1e293b" stroke-width="2"/>
+          <line x1="137" y1="150" x2="153" y2="150" stroke="#1e293b" stroke-width="2"/>
+          <line x1="140" y1="154" x2="150" y2="154" stroke="#1e293b" stroke-width="1.8"/>
+        `;
+        break;
+
       case 'buckConverter':
         innerContent = `
           <!-- DC In (12V) -->
@@ -1808,7 +2294,7 @@ class ElectroSimApp {
             if (data.name) {
               const nameInput = document.getElementById('circuitNameInput');
               if (nameInput) nameInput.value = data.name;
-              document.title = `${data.name} - ElectroSim`;
+              document.title = `${data.name} - Switcha`;
             }
             this.engine.reset();
             this.engine.setCircuit(this.canvas.components, this.canvas.wires);
@@ -1816,6 +2302,7 @@ class ElectroSimApp {
             this.canvas.render();
             this.grapher.render();
             closeModal('exportModal');
+            this.showToast(`📂 Imported "${data.name || 'Circuit'}"`, 'success');
           } else {
             alert('Invalid circuit file format: missing components array.');
           }
@@ -1837,10 +2324,11 @@ class ElectroSimApp {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${data.name.replace(/\s+/g, '_').toLowerCase()}.electrosim.json`;
+      a.download = `${data.name.replace(/\s+/g, '_').toLowerCase()}.switcha.json`;
       a.click();
       URL.revokeObjectURL(url);
       closeModal('exportModal');
+      this.showToast('📄 Circuit JSON exported', 'info');
     });
 
     // Schematic PNG Canvas Export
@@ -1848,32 +2336,36 @@ class ElectroSimApp {
       const dataUrl = this.canvas.canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = dataUrl;
-      a.download = `electrosim_schematic_${Date.now()}.png`;
+      a.download = `switcha_schematic_${Date.now()}.png`;
       a.click();
       closeModal('exportModal');
+      this.showToast('🖼️ Schematic image downloaded', 'info');
     });
 
     // CSV Waveform Export
     document.getElementById('btnExportCSVModal')?.addEventListener('click', () => {
       this.grapher.exportCSV();
       closeModal('exportModal');
+      this.showToast('📊 CSV waveform exported', 'info');
     });
 
     document.getElementById('loginForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
       alert('Logged in successfully!');
       closeModal('loginModal');
+      this.showToast('👋 Welcome back to Switcha!', 'success');
     });
 
     document.getElementById('signupForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('Welcome to ElectroSim! Your free account is created.');
+      alert('Welcome to Switcha! Your free account is created.');
       closeModal('signupModal');
+      this.showToast('🎉 Welcome to Switcha!', 'success');
     });
   }
 }
 
 // Start Application on DOM Load
 window.addEventListener('DOMContentLoaded', () => {
-  window.app = new ElectroSimApp();
+  window.app = new SwitchaApp();
 });

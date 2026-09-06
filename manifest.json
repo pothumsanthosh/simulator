@@ -1,12 +1,12 @@
 {
-  "name": "ElectroSim - Interactive SPICE Circuit Simulator",
-  "short_name": "ElectroSim",
-  "description": "Professional SPICE electronic circuit simulation and schematic capture in your browser. Install on Laptop, Desktop, and Mobile.",
+  "name": "Switcha - Interactive Electronic & Digital Circuit Simulator",
+  "short_name": "Switcha",
+  "description": "Design. Switch. Simulate. Build electronic and digital circuits with interactive switches, logic gates, and real-time SPICE simulation.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#ffffff",
+  "background_color": "#0f172a",
   "theme_color": "#03b585",
   "categories": ["education", "utilities", "productivity"],
   "icons": [
@@ -19,14 +19,19 @@
   ],
   "shortcuts": [
     {
-      "name": "Launch Simulator",
+      "name": "Launch Circuit Editor",
       "url": "./index.html#/create",
-      "description": "Open circuit schematic capture and SPICE simulator studio"
+      "description": "Open Switcha schematic studio with interactive switches and live simulation"
+    },
+    {
+      "name": "My Circuits",
+      "url": "./index.html#/my-circuits",
+      "description": "View and manage your saved circuits"
     },
     {
       "name": "Discover Circuits",
       "url": "./index.html#/discover",
-      "description": "Explore and simulate pre-built reference electronics circuits"
+      "description": "Explore and simulate pre-built digital and electronic circuits"
     }
   ]
 }
