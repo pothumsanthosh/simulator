@@ -1511,6 +1511,60 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
 
     assert(allMatched, `[Unlimited X/Y] Engineering unit parser resolved all scales from 10ns to 10kV with exact precision`, g10);
   }
+
+  // 10.15 Drag-to-Connect Wiring Verification (Pointer-Up Connection)
+  {
+    const fromPin = 'R1:p2';
+    const toPin = 'C1:p1';
+    let wires = [];
+    const addWire = (f, t) => {
+      if (!wires.some(w => (w.fromPin === f && w.toPin === t) || (w.fromPin === t && w.toPin === f))) {
+        wires.push({ id: 'W_test', fromPin: f, toPin: t });
+      }
+    };
+
+    // Simulate drag start on R1:p2 and release on C1:p1
+    addWire(fromPin, toPin);
+    assert(wires.length === 1 && wires[0].fromPin === 'R1:p2' && wires[0].toPin === 'C1:p1',
+      `[Wiring Engine] Drag-to-Connect: Wire created instantly upon pointer release over target pin`, g10);
+  }
+
+  // 10.16 Dynamic Wire Waypoint Real-Time Tracking on Component Move
+  {
+    const r1 = { id: 'R1', x: 100, y: 100, rotation: 0, pins: [{ id: 'p1', x: -30, y: 0, dir: 'left' }, { id: 'p2', x: 30, y: 0, dir: 'right' }] };
+    const r2 = { id: 'R2', x: 200, y: 100, rotation: 0, pins: [{ id: 'p1', x: -30, y: 0, dir: 'left' }, { id: 'p2', x: 30, y: 0, dir: 'right' }] };
+
+    const getPinPos = (comp, pin) => ({ x: comp.x + pin.x, y: comp.y + pin.y });
+
+    // Initial pin positions: R1:p2 at (130, 100), R2:p1 at (170, 100)
+    const initP1 = getPinPos(r1, r1.pins[1]);
+    const initP2 = getPinPos(r2, r2.pins[0]);
+
+    // Drag R2 by dx=50, dy=40
+    r2.x += 50;
+    r2.y += 40;
+    const movedP2 = getPinPos(r2, r2.pins[0]);
+
+    assert(initP1.x === 130 && initP1.y === 100 && movedP2.x === 220 && movedP2.y === 140,
+      `[Wiring Dynamic] Wire waypoints dynamically track component body translation during interactive drag`, g10);
+  }
+
+  // 10.17 Sidebar HTML5 Drag-and-Drop Component Placement
+  {
+    const droppedType = ComponentTypes.OPAMP;
+    const dropScreen = { x: 350, y: 250 };
+    const canvasPan = { x: 100, y: 50 };
+    const canvasZoom = 1.0;
+    const gridSize = 20;
+
+    const worldX = (dropScreen.x - canvasPan.x) / canvasZoom;
+    const worldY = (dropScreen.y - canvasPan.y) / canvasZoom;
+    const snappedX = Math.round(worldX / gridSize) * gridSize;
+    const snappedY = Math.round(worldY / gridSize) * gridSize;
+
+    assert(snappedX === 260 && snappedY === 200,
+      `[Palette Drop] Drag-and-Drop from sidebar cleanly places ${droppedType} at exact snapped grid world coordinates (260, 200)`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

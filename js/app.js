@@ -44,6 +44,20 @@ class MultisimApp {
       this.renderPropertiesInspector(selection);
     };
 
+    // HTML5 Drag-and-Drop from Palette onto Schematic Canvas
+    schematicCanvasEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    schematicCanvasEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const compType = e.dataTransfer?.getData('text/plain');
+      if (compType && ComponentDefinitions[compType]) {
+        const worldPos = this.canvas.screenToWorld(e.clientX, e.clientY);
+        this.canvas.addComponent(compType, worldPos.x, worldPos.y);
+      }
+    });
+
     // 2. Build Component Palette Sidebar
     this.buildPalette();
 
@@ -156,10 +170,18 @@ class MultisimApp {
         itemEl.className = 'palette-item';
         itemEl.title = `Add ${def.name}`;
         itemEl.dataset.type = def.type;
+        itemEl.setAttribute('draggable', 'true');
         itemEl.innerHTML = `
           <div class="palette-item-icon">${this.getComponentMiniIcon(def.type)}</div>
           <div class="palette-item-name">${def.name.split('(')[0].trim()}</div>
         `;
+
+        itemEl.addEventListener('dragstart', (e) => {
+          if (e.dataTransfer) {
+            e.dataTransfer.setData('text/plain', def.type);
+            e.dataTransfer.effectAllowed = 'copy';
+          }
+        });
 
         itemEl.addEventListener('click', () => {
           const centerWorld = this.canvas.screenToWorld(
@@ -879,6 +901,8 @@ class MultisimApp {
 
     document.getElementById('btnOpenLogin')?.addEventListener('click', () => openModal('loginModal'));
     document.getElementById('btnOpenSignup')?.addEventListener('click', () => openModal('signupModal'));
+    document.getElementById('btnPlanPremium')?.addEventListener('click', () => openModal('signupModal'));
+    document.getElementById('btnPlanAcademic')?.addEventListener('click', () => openModal('signupModal'));
     document.getElementById('nav-shortcuts')?.addEventListener('click', (e) => {
       e.preventDefault();
       openModal('shortcutsModal');

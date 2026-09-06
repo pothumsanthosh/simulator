@@ -176,6 +176,12 @@ export class SchematicCanvas {
     return comp;
   }
 
+  setPlacementMode(type) {
+    this.mode = 'PLACE';
+    this.placementComponentType = type;
+    this.canvas.style.cursor = 'crosshair';
+  }
+
   removeComponent(comp) {
     if (!comp) return;
     this.saveState();
@@ -724,6 +730,52 @@ export class SchematicCanvas {
       this.isPanning = false;
     } else if (this.activePointers.size === 1) {
       this.isPinching = false;
+    }
+
+    // Drag-to-Connect Wiring Support (Pin-to-Pin and Pin-to-Wire)
+    if (this.wiringStartPin) {
+      const worldPos = this.screenToWorld(e.clientX, e.clientY);
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 16);
+      if (pinHit && pinHit.pinKey !== this.wiringStartPin.pinKey) {
+        const from = this.wiringStartPin.pinKey;
+        const to = pinHit.pinKey;
+        const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
+        if (!exists) {
+          this.saveState();
+          this.wires.push({
+            id: this.generateUniqueId('W'),
+            fromPin: from,
+            toPin: to
+          });
+        }
+        this.wiringStartPin = null;
+        this.wiringCurrentPos = null;
+        this.hoveredTargetPin = null;
+        this.notifyModified();
+        this.render();
+        return;
+      }
+
+      const wireHit = this.findWireAt(worldPos.x, worldPos.y, 12);
+      if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
+        const from = this.wiringStartPin.pinKey;
+        const to = wireHit.fromPin;
+        const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
+        if (!exists) {
+          this.saveState();
+          this.wires.push({
+            id: this.generateUniqueId('W'),
+            fromPin: from,
+            toPin: to
+          });
+        }
+        this.wiringStartPin = null;
+        this.wiringCurrentPos = null;
+        this.hoveredTargetPin = null;
+        this.notifyModified();
+        this.render();
+        return;
+      }
     }
 
     if (this.isDragging) {
