@@ -920,6 +920,8 @@ export const ComponentDefinitions = {
     pins: [
       { id: 'in_inv', name: 'IN-', x: -30, y: -15, dir: 'left' },
       { id: 'in_noninv', name: 'IN+', x: -30, y: 15, dir: 'left' },
+      { id: 'v_pos', name: 'V+', x: 0, y: -25, dir: 'top' },
+      { id: 'v_neg', name: 'V-', x: 0, y: 25, dir: 'bottom' },
       { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
     ],
     params: { model: 'TL082', openLoopGain: 200000, vSatPos: 14, vSatNeg: -14 },

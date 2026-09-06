@@ -1674,10 +1674,13 @@ export class SchematicCanvas {
       case ComponentTypes.OPAMP:
       case ComponentTypes.COMPARATOR: {
         ctx.beginPath();
-        // Lead lines to terminals
+        // Input and Output Lead lines
         ctx.moveTo(-30, -15); ctx.lineTo(-20, -15);
         ctx.moveTo(-30, 15); ctx.lineTo(-20, 15);
         ctx.moveTo(20, 0); ctx.lineTo(30, 0);
+        // Power rail leads
+        ctx.moveTo(0, -25); ctx.lineTo(0, -12);
+        ctx.moveTo(0, 25); ctx.lineTo(0, 12);
         ctx.stroke();
 
         ctx.beginPath();
@@ -1692,6 +1695,11 @@ export class SchematicCanvas {
         ctx.textAlign = 'center';
         ctx.fillText('-', -12, -10);
         ctx.fillText('+', -12, 18);
+
+        ctx.font = '7.5px sans-serif';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('V+', 0, -4);
+        ctx.fillText('V-', 0, 10);
         break;
       }
 

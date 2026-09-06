@@ -203,29 +203,209 @@ class MultisimApp {
 
   getComponentMiniIcon(type) {
     switch (type) {
+      // 1. Sources
       case ComponentTypes.GROUND:
         return `<svg viewBox="0 0 24 24"><path d="M12,4 L12,12 M6,12 L18,12 M8,15 L16,15 M10,18 L14,18" stroke="#03b585" stroke-width="2" fill="none"/></svg>`;
       case ComponentTypes.DC_VOLTAGE:
-        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><text x="12" y="15" font-size="8" text-anchor="middle" fill="#e11d48" font-weight="bold">DC</text></svg>`;
+      case ComponentTypes.BATTERY_CELL:
+      case ComponentTypes.SOLAR_CELL:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><text x="12" y="15" font-size="7.5" text-anchor="middle" fill="#e11d48" font-weight="bold">DC</text></svg>`;
       case ComponentTypes.AC_VOLTAGE:
-        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M7,12 Q9.5,8 12,12 Q14.5,16 17,12" stroke="#0284c7" stroke-width="1.5" fill="none"/></svg>`;
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M7,12 Q9.5,8 12,12 Q14.5,16 17,12" stroke="#0284c7" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.CLOCK_VOLTAGE:
+      case ComponentTypes.PULSE_VOLTAGE:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M7,14 L7,9 L12,9 L12,15 L17,15 L17,10" stroke="#0284c7" stroke-width="1.5" fill="none"/></svg>`;
+      case ComponentTypes.TRIANGLE_VOLTAGE:
+      case ComponentTypes.SAWTOOTH_VOLTAGE:
+      case ComponentTypes.AM_VOLTAGE:
+      case ComponentTypes.FM_VOLTAGE:
+      case ComponentTypes.CHIRP_VOLTAGE:
+      case ComponentTypes.NOISE_VOLTAGE:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M6,14 L9,9 L12,14 L15,9 L18,14" stroke="#f59e0b" stroke-width="1.5" fill="none"/></svg>`;
+      case ComponentTypes.DC_CURRENT:
+      case ComponentTypes.AC_CURRENT:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#0284c7" stroke-width="2" fill="none"/><path d="M12,17 L12,7 M9,10 L12,7 L15,10" stroke="#0284c7" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.VCVS:
+      case ComponentTypes.VCCS:
+      case ComponentTypes.CCVS:
+      case ComponentTypes.CCCS:
+        return `<svg viewBox="0 0 24 24"><polygon points="12,4 20,12 12,20 4,12" stroke="#0284c7" stroke-width="1.8" fill="none"/><text x="12" y="15" font-size="7" text-anchor="middle" fill="#0284c7" font-weight="bold">E</text></svg>`;
+
+      // 2. Passives
       case ComponentTypes.RESISTOR:
-        return `<svg viewBox="0 0 24 24"><path d="M2,12 L6,12 L8,7 L12,17 L16,7 L18,12 L22,12" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.RESISTOR_ARRAY_SIP:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L5,12 L7,7 L10,17 L14,7 L17,17 L19,12 L22,12" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.POTENTIOMETER:
+      case ComponentTypes.RHEOSTAT:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L6,12 L8,8 L11,16 L14,8 L16,16 L18,12 L22,12" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><path d="M12,4 L12,9 M9,7 L12,9 L15,7" stroke="#e11d48" stroke-width="1.4" fill="none"/></svg>`;
       case ComponentTypes.CAPACITOR:
-        return `<svg viewBox="0 0 24 24"><path d="M3,12 L9,12 M9,6 L9,18 M15,6 L15,18 M15,12 L21,12" stroke="#2b2d2f" stroke-width="2" fill="none"/></svg>`;
+      case ComponentTypes.FILM_CAP:
+      case ComponentTypes.VARIABLE_CAP:
+      case ComponentTypes.SUPERCAPACITOR:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L9,12 M9,5 L9,19 M15,5 L15,19 M15,12 L22,12" stroke="#2b2d2f" stroke-width="2" fill="none"/></svg>`;
+      case ComponentTypes.POLARIZED_CAP:
+      case ComponentTypes.TANTALUM_CAP:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L9,12 M9,5 L9,19 M15,5 Q11,12 15,19 M15,12 L22,12" stroke="#2b2d2f" stroke-width="2" fill="none"/><text x="5" y="8" font-size="7" fill="#e11d48" font-weight="bold">+</text></svg>`;
       case ComponentTypes.INDUCTOR:
-        return `<svg viewBox="0 0 24 24"><path d="M2,12 L5,12 C5,8 9,8 9,12 C9,8 13,8 13,12 C13,8 17,8 17,12 L22,12" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.VARIABLE_INDUCTOR:
+      case ComponentTypes.COUPLED_INDUCTOR:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L5,12 C5,8 8,8 8,12 C8,8 12,8 12,12 C12,8 16,8 16,12 C16,8 19,8 19,12 L22,12" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.TRANSFORMER:
+      case ComponentTypes.TRANSFORMER_CENTER_TAP:
+      case ComponentTypes.AUDIO_TRANSFORMER:
+      case ComponentTypes.PULSE_TRANSFORMER:
+        return `<svg viewBox="0 0 24 24"><path d="M4,4 C4,8 7,8 7,12 C7,16 4,16 4,20 M20,4 C20,8 17,8 17,12 C17,16 20,16 20,20" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><line x1="11" y1="4" x2="11" y2="20" stroke="#64748b" stroke-width="1.2"/><line x1="13" y1="4" x2="13" y2="20" stroke="#64748b" stroke-width="1.2"/></svg>`;
+      case ComponentTypes.CRYSTAL:
+      case ComponentTypes.CERAMIC_RESONATOR:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L8,12 M8,6 L8,18 M16,6 L16,18 M16,12 L22,12" stroke="#2b2d2f" stroke-width="1.8" fill="none"/><rect x="10" y="7" width="4" height="10" fill="#cbd5e1" stroke="#2b2d2f" stroke-width="1.2"/></svg>`;
+      case ComponentTypes.FUSE:
+      case ComponentTypes.POLYFUSE:
+        return `<svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="6" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><line x1="2" y1="12" x2="22" y2="12" stroke="#2b2d2f" stroke-width="1.5"/></svg>`;
+      case ComponentTypes.NTC_THERMISTOR:
+      case ComponentTypes.PTC_THERMISTOR:
+      case ComponentTypes.VARISTOR_MOV:
+      case ComponentTypes.PHOTORESISTOR_LDR:
+        return `<svg viewBox="0 0 24 24"><path d="M2,12 L6,12 L8,8 L11,16 L13,8 L16,16 L18,12 L22,12" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><path d="M6,18 L18,6 M15,6 L18,6" stroke="#0284c7" stroke-width="1.2" fill="none"/></svg>`;
+
+      // 3. Diodes & Rectifiers
       case ComponentTypes.DIODE:
+      case ComponentTypes.SCHOTTKY:
+      case ComponentTypes.PHOTO_DIODE:
+      case ComponentTypes.VARACTOR:
+        return `<svg viewBox="0 0 24 24"><polygon points="6,6 16,12 6,18" fill="#e11d48"/><line x1="16" y1="6" x2="16" y2="18" stroke="#2b2d2f" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="#2b2d2f" stroke-width="1.8"/><line x1="16" y1="12" x2="22" y2="12" stroke="#2b2d2f" stroke-width="1.8"/></svg>`;
+      case ComponentTypes.ZENER:
+        return `<svg viewBox="0 0 24 24"><polygon points="6,6 16,12 6,18" fill="#e11d48"/><path d="M14,6 L16,6 L16,18 L18,18" stroke="#2b2d2f" stroke-width="1.8" fill="none"/><line x1="2" y1="12" x2="6" y2="12" stroke="#2b2d2f" stroke-width="1.8"/><line x1="16" y1="12" x2="22" y2="12" stroke="#2b2d2f" stroke-width="1.8"/></svg>`;
       case ComponentTypes.LED:
-        return `<svg viewBox="0 0 24 24"><polygon points="7,6 17,12 7,18" fill="#e11d48"/><line x1="17" y1="6" x2="17" y2="18" stroke="#2b2d2f" stroke-width="2"/></svg>`;
+        return `<svg viewBox="0 0 24 24"><polygon points="5,7 13,12 5,17" fill="#ff3b30"/><line x1="13" y1="7" x2="13" y2="17" stroke="#2b2d2f" stroke-width="1.8"/><line x1="2" y1="12" x2="5" y2="12" stroke="#2b2d2f" stroke-width="1.5"/><line x1="13" y1="12" x2="20" y2="12" stroke="#2b2d2f" stroke-width="1.5"/><path d="M11,5 L16,2 M14,7 L19,4" stroke="#ff3b30" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+      case ComponentTypes.BRIDGE_RECTIFIER:
+        return `<svg viewBox="0 0 24 24"><polygon points="12,3 21,12 12,21 3,12" stroke="#f59e0b" stroke-width="1.8" fill="none"/><polygon points="9,9 15,12 9,15" fill="#e11d48"/><line x1="15" y1="9" x2="15" y2="15" stroke="#2b2d2f" stroke-width="1.5"/></svg>`;
+
+      // 4. Transistors & MOSFETs
+      case ComponentTypes.BJT_NPN:
+      case ComponentTypes.DARLINGTON_NPN:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><line x1="9" y1="7" x2="9" y2="17" stroke="#2b2d2f" stroke-width="2"/><line x1="3" y1="12" x2="9" y2="12" stroke="#2b2d2f" stroke-width="1.5"/><line x1="9" y1="9" x2="17" y2="5" stroke="#2b2d2f" stroke-width="1.5"/><line x1="9" y1="15" x2="17" y2="19" stroke="#2b2d2f" stroke-width="1.5"/><polygon points="14,16 17,19 13,19" fill="#2b2d2f"/></svg>`;
+      case ComponentTypes.BJT_PNP:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><line x1="9" y1="7" x2="9" y2="17" stroke="#2b2d2f" stroke-width="2"/><line x1="3" y1="12" x2="9" y2="12" stroke="#2b2d2f" stroke-width="1.5"/><line x1="9" y1="9" x2="17" y2="5" stroke="#2b2d2f" stroke-width="1.5"/><line x1="9" y1="15" x2="17" y2="19" stroke="#2b2d2f" stroke-width="1.5"/><polygon points="12,12 10,14 13,15" fill="#2b2d2f"/></svg>`;
+      case ComponentTypes.NMOS:
+      case ComponentTypes.PMOS:
+      case ComponentTypes.NJFET:
+      case ComponentTypes.PJFET:
+        return `<svg viewBox="0 0 24 24"><line x1="3" y1="15" x2="9" y2="15" stroke="#2b2d2f" stroke-width="1.5"/><line x1="9" y1="6" x2="9" y2="18" stroke="#2b2d2f" stroke-width="2"/><path d="M12,6 L18,6 L18,3 M12,18 L18,18 L18,21 M12,12 L18,12" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><polygon points="12,12 16,10 16,14" fill="#0284c7"/></svg>`;
+
+      // 5. Power & Thyristors
+      case ComponentTypes.SCR:
+      case ComponentTypes.TRIAC:
+      case ComponentTypes.DIAC:
+      case ComponentTypes.IGBT:
+        return `<svg viewBox="0 0 24 24"><polygon points="6,6 16,12 6,18" stroke="#2b2d2f" stroke-width="1.5" fill="#f8fafc"/><line x1="16" y1="6" x2="16" y2="18" stroke="#2b2d2f" stroke-width="2"/><path d="M11,15 L16,21" stroke="#e11d48" stroke-width="1.5"/></svg>`;
+      case ComponentTypes.OPTOCOUPLER:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><polygon points="6,9 10,12 6,15" fill="#ff3b30"/><line x1="15" y1="7" x2="15" y2="17" stroke="#2b2d2f" stroke-width="1.5"/></svg>`;
+
+      // 6. Analog & Linear ICs
       case ComponentTypes.OPAMP:
-        return `<svg viewBox="0 0 24 24"><polygon points="4,4 20,12 4,20" fill="none" stroke="#2b2d2f" stroke-width="1.8"/></svg>`;
+        return `<svg viewBox="0 0 24 24"><polygon points="4,3 21,12 4,21" fill="none" stroke="#2b2d2f" stroke-width="1.8"/><line x1="12" y1="1" x2="12" y2="7.5" stroke="#64748b" stroke-width="1.2"/><line x1="12" y1="23" x2="12" y2="16.5" stroke="#64748b" stroke-width="1.2"/><text x="7" y="9" font-size="7" fill="#0f172a" font-weight="bold">-</text><text x="7" y="18" font-size="7" fill="#0f172a" font-weight="bold">+</text></svg>`;
+      case ComponentTypes.COMPARATOR:
+        return `<svg viewBox="0 0 24 24"><polygon points="4,4 20,12 4,20" fill="none" stroke="#0284c7" stroke-width="1.8"/><text x="7" y="10" font-size="6" fill="#0284c7" font-weight="bold">-</text><text x="7" y="17" font-size="6" fill="#0284c7" font-weight="bold">+</text></svg>`;
       case ComponentTypes.TIMER555:
-        return `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="#2b2d2f" stroke-width="1.8"/><text x="12" y="14" font-size="6" text-anchor="middle" font-weight="bold">555</text></svg>`;
+        return `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="#f8fafc" stroke="#2b2d2f" stroke-width="1.6"/><text x="12" y="14" font-size="6.5" text-anchor="middle" font-weight="bold" fill="#0284c7">555</text></svg>`;
+      case ComponentTypes.ANALOG_MULTIPLIER:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#2b2d2f" stroke-width="1.8" fill="none"/><text x="12" y="15" font-size="9" text-anchor="middle" font-weight="bold" fill="#03b585">✕</text></svg>`;
+
+      // 7. Voltage Regulators
+      case ComponentTypes.LM7805:
+      case ComponentTypes.LM7812:
+      case ComponentTypes.LM7912:
+      case ComponentTypes.LM317:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="#eff6ff" stroke="#0284c7" stroke-width="1.5"/><text x="12" y="14" font-size="5.5" text-anchor="middle" font-weight="bold" fill="#0284c7">REG</text></svg>`;
+
+      // 8. Digital Logic Gates
+      case ComponentTypes.AND_GATE:
+      case ComponentTypes.IC_7408:
+        return `<svg viewBox="0 0 24 24"><path d="M4,5 L11,5 C16,5 19,8 19,12 C19,16 16,19 11,19 L4,19 Z" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.NAND_GATE:
+      case ComponentTypes.IC_7400:
+        return `<svg viewBox="0 0 24 24"><path d="M3,5 L9,5 C14,5 17,8 17,12 C17,16 14,19 9,19 L3,19 Z" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><circle cx="19" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.4" fill="none"/></svg>`;
+      case ComponentTypes.OR_GATE:
+      case ComponentTypes.IC_7432:
+        return `<svg viewBox="0 0 24 24"><path d="M3,5 Q10,5 20,12 Q10,19 3,19 Q7,12 3,5 Z" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.NOR_GATE:
+      case ComponentTypes.IC_7402:
+        return `<svg viewBox="0 0 24 24"><path d="M3,5 Q9,5 17,12 Q9,19 3,19 Q6,12 3,5 Z" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><circle cx="19" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.4" fill="none"/></svg>`;
+      case ComponentTypes.XOR_GATE:
+      case ComponentTypes.IC_7486:
+        return `<svg viewBox="0 0 24 24"><path d="M5,5 Q11,5 20,12 Q11,19 5,19 Q9,12 5,5 Z" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><path d="M2,5 Q6,12 2,19" stroke="#2b2d2f" stroke-width="1.6" fill="none"/></svg>`;
+      case ComponentTypes.XNOR_GATE:
+        return `<svg viewBox="0 0 24 24"><path d="M5,5 Q10,5 17,12 Q10,19 5,19 Q8,12 5,5 Z" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><path d="M2,5 Q5,12 2,19" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><circle cx="19" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.3" fill="none"/></svg>`;
+      case ComponentTypes.NOT_GATE:
+      case ComponentTypes.IC_7404:
+      case ComponentTypes.BUFFER_GATE:
+      case ComponentTypes.SCHMITT_TRIGGER:
+        return `<svg viewBox="0 0 24 24"><polygon points="4,5 16,12 4,19" fill="none" stroke="#2b2d2f" stroke-width="1.8"/><circle cx="18" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.5" fill="none"/></svg>`;
+
+      // 9. Digital ICs & Flip-Flops
+      case ComponentTypes.D_FLIP_FLOP:
+      case ComponentTypes.JK_FLIP_FLOP:
+      case ComponentTypes.SR_LATCH:
+      case ComponentTypes.T_FLIP_FLOP:
+      case ComponentTypes.DECODER_BCD_7SEG:
+      case ComponentTypes.BINARY_COUNTER_4BIT:
+      case ComponentTypes.SHIFT_REGISTER_8BIT:
+      case ComponentTypes.HALF_ADDER:
+      case ComponentTypes.FULL_ADDER:
+      case ComponentTypes.ALU_4BIT:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#f8fafc" stroke="#2b2d2f" stroke-width="1.6"/><text x="12" y="14" font-size="6" text-anchor="middle" font-weight="bold" fill="#0284c7">LOGIC</text></svg>`;
+
+      // 10. Switches & Relays
+      case ComponentTypes.SPST_SWITCH:
+      case ComponentTypes.SPDT_SWITCH:
+      case ComponentTypes.PUSH_BUTTON:
+      case ComponentTypes.RELAY_SPDT:
+        return `<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="#2b2d2f"/><circle cx="19" cy="12" r="2" fill="#2b2d2f"/><line x1="5" y1="12" x2="16" y2="6" stroke="#2b2d2f" stroke-width="2"/></svg>`;
+
+      // 11. Electromechanical & Motors
+      case ComponentTypes.DC_MOTOR:
+      case ComponentTypes.STEPPER_MOTOR:
+      case ComponentTypes.BUZZER:
+      case ComponentTypes.SPEAKER:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#2b2d2f" stroke-width="1.8" fill="none"/><text x="12" y="15" font-size="8" text-anchor="middle" font-weight="bold" fill="#e11d48">M</text></svg>`;
+
+      // 12. Opto & Displays
+      case ComponentTypes.SEVEN_SEGMENT:
+      case ComponentTypes.LED_BAR_GRAPH:
+        return `<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="#0f172a" stroke="#475569" stroke-width="1.5"/><text x="12" y="16" font-size="12" text-anchor="middle" font-weight="bold" fill="#ff3b30">8</text></svg>`;
+
+      // 13. Sensors & Controls
+      case ComponentTypes.LM35_TEMP:
+      case ComponentTypes.HALL_EFFECT:
+      case ComponentTypes.LOAD_CELL:
+      case ComponentTypes.PID_CONTROLLER:
+      case ComponentTypes.INTEGRATOR_BLOCK:
+      case ComponentTypes.DIFFERENTIATOR_BLOCK:
+      case ComponentTypes.GAIN_BLOCK:
+      case ComponentTypes.SUMMING_BLOCK:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/><text x="12" y="14" font-size="7" text-anchor="middle" font-weight="bold" fill="#059669">∫</text></svg>`;
+
+      // 14. Power Symbols
+      case ComponentTypes.POWER_VCC:
+      case ComponentTypes.POWER_5V:
+      case ComponentTypes.POWER_12V:
+      case ComponentTypes.POWER_NEG12V:
+      case ComponentTypes.POWER_15V:
+      case ComponentTypes.POWER_NEG15V:
+      case ComponentTypes.NET_LABEL:
+        return `<svg viewBox="0 0 24 24"><path d="M12,18 L12,8 M8,12 L12,6 L16,12" stroke="#e11d48" stroke-width="2" fill="none"/><text x="12" y="22" font-size="5" text-anchor="middle" font-weight="bold" fill="#e11d48">VCC</text></svg>`;
+
+      // 15. Probes & Meters
       case ComponentTypes.PROBE_V:
         return `<svg viewBox="0 0 24 24"><path d="M12,20 L6,10 L6,4 L18,4 L18,10 Z" fill="#03b585"/><text x="12" y="10" font-size="7" fill="#fff" text-anchor="middle" font-weight="bold">V</text></svg>`;
+      case ComponentTypes.PROBE_I:
+        return `<svg viewBox="0 0 24 24"><path d="M12,20 L6,10 L6,4 L18,4 L18,10 Z" fill="#ff9500"/><text x="12" y="10" font-size="7" fill="#fff" text-anchor="middle" font-weight="bold">I</text></svg>`;
+      case ComponentTypes.VOLTMETER:
+      case ComponentTypes.AMMETER:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#0284c7" stroke-width="1.8" fill="#ffffff"/><text x="12" y="15" font-size="8" text-anchor="middle" font-weight="bold" fill="#0284c7">V</text></svg>`;
+
       default:
-        return `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" stroke="#2b2d2f" stroke-width="2" fill="none"/></svg>`;
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#0284c7" stroke-width="1.5" fill="#f8fafc"/><text x="12" y="14" font-size="6" text-anchor="middle" fill="#0284c7" font-weight="bold">IC</text></svg>`;
     }
   }
 

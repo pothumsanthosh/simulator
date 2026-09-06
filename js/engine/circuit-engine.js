@@ -874,9 +874,21 @@ export class CircuitEngine {
             const nInv = this.getNode(comp, 'in_inv');
             const nNonInv = this.getNode(comp, 'in_noninv');
             const nOut = this.getNode(comp, 'out');
+            const nVpos = this.getNode(comp, 'v_pos');
+            const nVneg = this.getNode(comp, 'v_neg');
             const aOl = p.openLoopGain || 200000;
-            const vSatP = p.vSatPos ?? 14;
-            const vSatN = p.vSatNeg ?? -14;
+
+            let vSatP = p.vSatPos ?? 14;
+            let vSatN = p.vSatNeg ?? -14;
+
+            if (nVpos !== -1) {
+              const vRailPos = getNodeV(nVpos);
+              if (vRailPos !== 0) vSatP = vRailPos - 1.0;
+            }
+            if (nVneg !== -1) {
+              const vRailNeg = getNodeV(nVneg);
+              if (vRailNeg !== 0) vSatN = vRailNeg + 1.0;
+            }
 
             const vDiff = getNodeV(nNonInv) - getNodeV(nInv);
             const vLinear = aOl * vDiff;
