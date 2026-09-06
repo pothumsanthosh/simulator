@@ -385,6 +385,23 @@
                 <option value="halfAdder">Digital Logic: Half Adder (XOR/AND)</option>
               </optgroup>
             </select>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Quick Components Bar (Touch & Hands Accessible) -->
+            <div class="studio-quick-components" id="studioQuickComponents" title="Quick Add Components (Touch or Click to Place)">
+              <button class="quick-comp-btn" data-type="GROUND" title="Add Ground (GND)">⏚ GND</button>
+              <button class="quick-comp-btn" data-type="DC_VOLTAGE" title="Add DC Voltage Source">⚡ DC</button>
+              <button class="quick-comp-btn" data-type="AC_VOLTAGE" title="Add AC Voltage Source">∿ AC</button>
+              <button class="quick-comp-btn" data-type="RESISTOR" title="Add Resistor (R)">⟿ Res</button>
+              <button class="quick-comp-btn" data-type="CAPACITOR" title="Add Capacitor (C)">⫞ Cap</button>
+              <button class="quick-comp-btn" data-type="INDUCTOR" title="Add Inductor (L)">∿ Ind</button>
+              <button class="quick-comp-btn" data-type="DIODE" title="Add Diode (D)">▷| Diode</button>
+              <button class="quick-comp-btn" data-type="OPAMP" title="Add Operational Amplifier">⪢ OpAmp</button>
+              <button class="quick-comp-btn" data-type="BJT_NPN" title="Add NPN BJT Transistor">⑆ NPN</button>
+              <button class="quick-comp-btn" data-type="NODE" title="Add Junction Node / Multi-Wire Hub (J)">➕ Node</button>
+              <button class="quick-comp-btn" data-type="VOLTMETER" title="Add Voltage Probe">🔴 Probe</button>
+            </div>
           </div>
 
           <div class="studio-toolbar-right">
@@ -419,6 +436,14 @@
             <!-- Schematic Canvas Panel -->
             <div class="canvas-panel" id="canvasPanel">
               <canvas id="schematicCanvas" class="schematic-canvas"></canvas>
+              
+              <!-- Floating Placement Mode Banner -->
+              <div class="placement-indicator-banner" id="placementBanner" style="display: none;">
+                <span class="placement-indicator-pulse"></span>
+                <span id="placementBannerText">Placing Component...</span>
+                <button class="placement-banner-cancel" id="btnCancelPlacement" title="Cancel Placement (Esc)">✕ Cancel</button>
+              </div>
+
               <div class="canvas-floating-controls">
                 <button class="tool-btn" id="btnAddNode" title="Add Junction Node (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
                 <button class="tool-btn" id="btnZoomIn" title="Zoom In">+</button>

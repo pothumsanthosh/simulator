@@ -44,6 +44,11 @@ class MultisimApp {
       this.renderPropertiesInspector(selection);
     };
 
+    // Placement Mode listener for UI Banner and Quick-Bar Highlighting
+    this.canvas.onPlacementChange = (type) => {
+      this.updatePlacementBanner(type ? ComponentDefinitions[type] : null);
+    };
+
     // HTML5 Drag-and-Drop from Palette onto Schematic Canvas
     schematicCanvasEl.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -176,6 +181,7 @@ class MultisimApp {
           <div class="palette-item-name">${def.name.split('(')[0].trim()}</div>
         `;
 
+        // HTML5 Drag and Drop for Desktop Mouse
         itemEl.addEventListener('dragstart', (e) => {
           if (e.dataTransfer) {
             e.dataTransfer.setData('text/plain', def.type);
@@ -183,17 +189,109 @@ class MultisimApp {
           }
         });
 
-        itemEl.addEventListener('click', () => {
-          const centerWorld = this.canvas.screenToWorld(
-            this.canvas.displayWidth / 2 + (Math.random() * 40 - 20),
-            this.canvas.displayHeight / 2 + (Math.random() * 40 - 20)
-          );
-          this.canvas.addComponent(def.type, centerWorld.x, centerWorld.y);
-          this.switchView('studio');
-          if (window.location.hash !== '#/create') {
-            window.location.hash = '#/create';
-          }
-        });
+        // Unified Touch & Pointer Dragging for Bare Hands, Stylus & Mouse
+        let isTracking = false;
+        let startX = 0;
+        let startY = 0;
+        let touchGhost = null;
+
+        const onPointerDown = (e) => {
+          if (e.button && e.button !== 0) return;
+          isTracking = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          let hasMoved = false;
+
+          const onPointerMove = (moveEv) => {
+            if (!isTracking) return;
+            const dist = Math.hypot(moveEv.clientX - startX, moveEv.clientY - startY);
+            if (!hasMoved && dist > 8) {
+              hasMoved = true;
+              touchGhost = document.createElement('div');
+              touchGhost.className = 'touch-drag-ghost';
+              touchGhost.innerHTML = `
+                <div class="touch-ghost-icon">${this.getComponentMiniIcon(def.type)}</div>
+                <div class="touch-ghost-name">${def.name.split('(')[0].trim()}</div>
+              `;
+              document.body.appendChild(touchGhost);
+            }
+
+            if (hasMoved && touchGhost) {
+              touchGhost.style.left = `${moveEv.clientX}px`;
+              touchGhost.style.top = `${moveEv.clientY}px`;
+
+              const canvasRect = schematicCanvasEl.getBoundingClientRect();
+              if (
+                moveEv.clientX >= canvasRect.left &&
+                moveEv.clientX <= canvasRect.right &&
+                moveEv.clientY >= canvasRect.top &&
+                moveEv.clientY <= canvasRect.bottom
+              ) {
+                const worldPos = this.canvas.screenToWorld(moveEv.clientX, moveEv.clientY);
+                this.canvas.mode = 'PLACE';
+                this.canvas.placementComponentType = def.type;
+                this.canvas.placementHoverPos = worldPos;
+                this.canvas.render();
+              }
+            }
+          };
+
+          const onPointerUp = (upEv) => {
+            if (!isTracking) return;
+            isTracking = false;
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('pointercancel', onPointerUp);
+
+            if (touchGhost) {
+              touchGhost.remove();
+              touchGhost = null;
+            }
+
+            if (hasMoved) {
+              const canvasRect = schematicCanvasEl.getBoundingClientRect();
+              if (
+                upEv.clientX >= canvasRect.left &&
+                upEv.clientX <= canvasRect.right &&
+                upEv.clientY >= canvasRect.top &&
+                upEv.clientY <= canvasRect.bottom
+              ) {
+                const worldPos = this.canvas.screenToWorld(upEv.clientX, upEv.clientY);
+                this.canvas.mode = 'SELECT';
+                this.canvas.placementComponentType = null;
+                this.canvas.placementHoverPos = null;
+                const newComp = this.canvas.addComponent(def.type, worldPos.x, worldPos.y);
+                if (newComp) {
+                  this.canvas.selectComponent(newComp);
+                }
+                this.switchView('studio');
+                this.updatePlacementBanner();
+                return;
+              }
+              this.canvas.mode = 'SELECT';
+              this.canvas.placementComponentType = null;
+              this.canvas.placementHoverPos = null;
+              this.canvas.render();
+              this.updatePlacementBanner();
+              return;
+            }
+
+            // Quick Tap / Click without drag -> Enter Placement Mode
+            if (this.canvas.mode === 'PLACE' && this.canvas.placementComponentType === def.type) {
+              this.canvas.cancelAction();
+            } else {
+              this.canvas.setPlacementMode(def.type);
+            }
+            this.switchView('studio');
+            this.updatePlacementBanner(def);
+          };
+
+          window.addEventListener('pointermove', onPointerMove);
+          window.addEventListener('pointerup', onPointerUp);
+          window.addEventListener('pointercancel', onPointerUp);
+        };
+
+        itemEl.addEventListener('pointerdown', onPointerDown);
 
         itemsGrid.appendChild(itemEl);
       });
@@ -516,6 +614,28 @@ class MultisimApp {
       this.canvas.setPlacementMode(ComponentTypes.NODE);
     });
 
+    // Quick Component Ribbon Buttons (Touch & Mouse Placement Mode)
+    document.querySelectorAll('.quick-comp-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const type = btn.dataset.type;
+        if (type && ComponentDefinitions[type]) {
+          if (this.canvas.mode === 'PLACE' && this.canvas.placementComponentType === type) {
+            this.canvas.cancelAction();
+          } else {
+            this.canvas.setPlacementMode(type);
+          }
+          this.updatePlacementBanner(ComponentDefinitions[type]);
+        }
+      });
+    });
+
+    // Placement Mode Banner Cancel Button
+    document.getElementById('btnCancelPlacement')?.addEventListener('click', () => {
+      this.canvas.cancelAction();
+      this.updatePlacementBanner();
+    });
+
     document.getElementById('btnUndo').addEventListener('click', () => this.canvas.undo());
     document.getElementById('btnRedo').addEventListener('click', () => this.canvas.redo());
 
@@ -633,6 +753,25 @@ class MultisimApp {
       this.canvas.resize();
       this.grapher.resize();
     }, 50);
+  }
+
+  updatePlacementBanner(def = null) {
+    const banner = document.getElementById('placementBanner');
+    const textEl = document.getElementById('placementBannerText');
+    if (!banner) return;
+    if (this.canvas.mode === 'PLACE' && this.canvas.placementComponentType) {
+      const type = this.canvas.placementComponentType;
+      const compDef = def || ComponentDefinitions[type];
+      const name = compDef ? compDef.name.split('(')[0].trim() : type;
+      if (textEl) textEl.textContent = `Placing ${name} — Tap or click anywhere on canvas to place (or drag to position)`;
+      banner.style.display = 'flex';
+      document.querySelectorAll('.quick-comp-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.type === type);
+      });
+    } else {
+      banner.style.display = 'none';
+      document.querySelectorAll('.quick-comp-btn').forEach(b => b.classList.remove('active'));
+    }
   }
 
   initSplitGutter() {

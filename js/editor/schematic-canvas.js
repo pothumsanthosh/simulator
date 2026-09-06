@@ -105,10 +105,22 @@ export class SchematicCanvas {
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
+    // Native Touch Event Trapping (Prevents mobile/tablet gesture cancellations on canvas)
+    const preventTouchGestures = (e) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    this.canvas.addEventListener('touchstart', preventTouchGestures, { passive: false });
+    this.canvas.addEventListener('touchmove', preventTouchGestures, { passive: false });
+    this.canvas.addEventListener('touchend', preventTouchGestures, { passive: false });
+    this.canvas.addEventListener('touchcancel', preventTouchGestures, { passive: false });
+
     // Pointer Events (Unified Touchscreen "Bare Hands", Stylus & Mouse)
     this.canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
+    this.canvas.addEventListener('pointermove', (e) => this.handlePointerMove(e));
     window.addEventListener('pointermove', (e) => this.handlePointerMove(e));
+    this.canvas.addEventListener('pointerup', (e) => this.handlePointerUp(e));
     window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
+    this.canvas.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
     window.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
     window.addEventListener('blur', () => {
       this.activePointers.clear();
@@ -187,7 +199,10 @@ export class SchematicCanvas {
   setPlacementMode(type) {
     this.mode = 'PLACE';
     this.placementComponentType = type;
+    this.placementHoverPos = null;
     this.canvas.style.cursor = 'crosshair';
+    if (this.onPlacementChange) this.onPlacementChange(type);
+    this.render();
   }
 
   startWiringFromComponent(comp) {
@@ -369,7 +384,7 @@ export class SchematicCanvas {
     return null;
   }
 
-  findComponentAt(worldX, worldY) {
+  findComponentAt(worldX, worldY, padding = 16) {
     for (let i = this.components.length - 1; i >= 0; i--) {
       const comp = this.components[i];
       const rad = -((comp.rotation || 0) * Math.PI) / 180;
@@ -379,8 +394,8 @@ export class SchematicCanvas {
       const dy = worldY - comp.y;
       const localX = dx * cos - dy * sin;
       const localY = dx * sin + dy * cos;
-      const hw = Math.max(((comp.width || 40) / 2) + 12, 20);
-      const hh = Math.max(((comp.height || 40) / 2) + 12, 20);
+      const hw = Math.max(((comp.width || 40) / 2) + padding, 22);
+      const hh = Math.max(((comp.height || 40) / 2) + padding, 22);
       if (Math.abs(localX) <= hw && Math.abs(localY) <= hh) {
         return comp;
       }
@@ -472,8 +487,14 @@ export class SchematicCanvas {
 
   // --- Unified Pointer & Multi-Touch Gesture Handlers (Bare Hands & Mouse) ---
   handlePointerDown(e) {
+    if (e.cancelable) e.preventDefault();
     try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
     this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Single touch resets pinch state
+    if (this.activePointers.size === 1) {
+      this.isPinching = false;
+    }
 
     // Multi-Touch (Bare Hands Two-Finger Pinch Zoom & Pan)
     if (this.activePointers.size === 2 && e.pointerType === 'touch') {
@@ -512,7 +533,7 @@ export class SchematicCanvas {
       return;
     }
 
-    if (e.button === 0 || e.pointerType === 'touch' || e.pointerType === 'pen') {
+    if (e.button === 0 || e.pointerType === 'touch' || e.pointerType === 'pen' || e.button === undefined) {
       // 1. Placement Mode
       if (this.mode === 'PLACE' && this.placementComponentType) {
         const sx = this.snapToGrid(worldPos.x);
@@ -534,7 +555,9 @@ export class SchematicCanvas {
             if (!e.shiftKey) {
               this.mode = 'SELECT';
               this.placementComponentType = null;
+              this.placementHoverPos = null;
               this.canvas.style.cursor = 'default';
+              if (this.onPlacementChange) this.onPlacementChange(null);
             }
             this.notifyModified();
             this.render();
@@ -546,7 +569,9 @@ export class SchematicCanvas {
         if (!e.shiftKey) {
           this.mode = 'SELECT';
           this.placementComponentType = null;
+          this.placementHoverPos = null;
           this.canvas.style.cursor = 'default';
+          if (this.onPlacementChange) this.onPlacementChange(null);
         }
         if (newComp) {
           this.isDragging = true;
@@ -618,8 +643,8 @@ export class SchematicCanvas {
         return;
       }
 
-      // 3. Component Selection & Direct Dragging (Priority over pin click)
-      const compHit = this.findComponentAt(worldPos.x, worldPos.y);
+      // 3. Component Selection & Direct Dragging (Priority over pin click, generous 20px hit radius)
+      const compHit = this.findComponentAt(worldPos.x, worldPos.y, 20);
       if (compHit) {
         this.isPanning = false;
         this.isBoxSelecting = false;
@@ -720,6 +745,7 @@ export class SchematicCanvas {
   }
 
   handlePointerMove(e) {
+    if (e.cancelable) e.preventDefault();
     if (this.activePointers.has(e.pointerId)) {
       this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
@@ -744,6 +770,13 @@ export class SchematicCanvas {
     }
 
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+    // Placement Mode Hover Ghost Tracking
+    if (this.mode === 'PLACE' && this.placementComponentType) {
+      this.placementHoverPos = worldPos;
+      this.render();
+      return;
+    }
 
     // Direct Dragging Priority: Move selected components with mouse or touch
     if (this.isDragging && this.selectedComponents.size > 0) {
@@ -1032,11 +1065,14 @@ export class SchematicCanvas {
     this.hoveredTargetPin = null;
     this.mode = 'SELECT';
     this.placementComponentType = null;
+    this.placementHoverPos = null;
     this.isDragging = false;
     this.dragCandidate = false;
     this.isPanning = false;
     this.isPinching = false;
     this.isBoxSelecting = false;
+    this.canvas.style.cursor = 'default';
+    if (this.onPlacementChange) this.onPlacementChange(null);
     this.render();
   }
 
@@ -1227,6 +1263,42 @@ export class SchematicCanvas {
 
     // 5. Draw Pins
     this.renderPins(ctx, vpLeft, vpTop, vpRight, vpBottom);
+
+    // 5.5 Draw Placement Mode Ghost Preview (Follows Bare Hands / Mouse Cursor)
+    if (this.mode === 'PLACE' && this.placementComponentType && this.placementHoverPos) {
+      const def = ComponentDefinitions[this.placementComponentType];
+      if (def) {
+        const sx = this.snapToGrid(this.placementHoverPos.x);
+        const sy = this.snapToGrid(this.placementHoverPos.y);
+        ctx.save();
+        ctx.globalAlpha = 0.65;
+        // Snap target halo
+        ctx.beginPath();
+        const r = Math.max((def.width || 40) / 2, (def.height || 40) / 2) + 8;
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(2, 132, 199, 0.15)';
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.fill();
+        ctx.stroke();
+
+        // Temporary component ghost
+        const tempComp = {
+          id: '__preview__',
+          type: this.placementComponentType,
+          x: sx,
+          y: sy,
+          rotation: 0,
+          width: def.width,
+          height: def.height,
+          pins: def.pins,
+          params: def.params || {}
+        };
+        this.renderComponent(ctx, tempComp);
+        ctx.restore();
+      }
+    }
 
     // 6. Draw Marquee Selection Box (Normalized)
     if (this.isBoxSelecting) {
