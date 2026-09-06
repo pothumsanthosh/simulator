@@ -4,7 +4,7 @@
  * SPICE Netlist Exporter, JSON Project Persistence, and UI Bindings.
  */
 
-import { ComponentTypes, ComponentDefinitions, ComponentCategory, formatValueWithPrefix } from './engine/components.js';
+import { ComponentTypes, ComponentDefinitions, ComponentCategory, formatValueWithPrefix, parseEngineeringValue } from './engine/components.js';
 import { CircuitEngine } from './engine/circuit-engine.js';
 import { SchematicCanvas } from './editor/schematic-canvas.js';
 import { CircuitGrapher } from './editor/grapher.js';
@@ -270,18 +270,9 @@ class MultisimApp {
     document.getElementById('btnDelete').addEventListener('click', () => this.canvas.removeSelected());
     document.getElementById('btnFitScreen').addEventListener('click', () => this.canvas.fitToScreen());
 
-    document.getElementById('btnZoomIn').addEventListener('click', () => {
-      this.canvas.zoom = Math.min(this.canvas.zoom * 1.2, this.canvas.maxZoom);
-      this.canvas.render();
-    });
-    document.getElementById('btnZoomOut').addEventListener('click', () => {
-      this.canvas.zoom = Math.max(this.canvas.zoom / 1.2, this.canvas.minZoom);
-      this.canvas.render();
-    });
-    document.getElementById('btnZoomReset').addEventListener('click', () => {
-      this.canvas.zoom = 1.0;
-      this.canvas.render();
-    });
+    document.getElementById('btnZoomIn').addEventListener('click', () => this.canvas.zoomIn());
+    document.getElementById('btnZoomOut').addEventListener('click', () => this.canvas.zoomOut());
+    document.getElementById('btnZoomReset').addEventListener('click', () => this.canvas.resetZoom());
 
     document.querySelectorAll('.view-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -293,6 +284,11 @@ class MultisimApp {
 
     document.getElementById('btnToggleCursors').addEventListener('click', () => this.grapher.toggleCursors());
     document.getElementById('timeScaleSelect').addEventListener('change', (e) => this.grapher.setTimeScale(parseFloat(e.target.value)));
+    document.getElementById('voltScaleSelect')?.addEventListener('change', (e) => this.grapher.setVoltScale(e.target.value));
+    document.getElementById('btnGraphTheme')?.addEventListener('click', (e) => {
+      const newTheme = this.grapher.toggleTheme();
+      e.target.textContent = `Theme: ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)}`;
+    });
     document.getElementById('btnExportCSV').addEventListener('click', () => this.grapher.exportCSV());
     document.getElementById('btnExportPlotPNG').addEventListener('click', () => this.grapher.exportPNG());
 
@@ -498,6 +494,7 @@ class MultisimApp {
 
     document.getElementById('propNameInput').addEventListener('input', (e) => {
       comp.name = e.target.value;
+      this.canvas.notifyModified();
       this.canvas.render();
     });
 
@@ -505,9 +502,14 @@ class MultisimApp {
       const key = input.dataset.key;
       input.addEventListener('input', () => {
         let val;
-        if (input.type === 'checkbox') val = input.checked;
-        else if (input.type === 'number' || input.type === 'range') val = parseFloat(input.value);
-        else val = input.value;
+        if (input.type === 'checkbox') {
+          val = input.checked;
+        } else if (input.type === 'number' || input.type === 'range') {
+          val = parseFloat(input.value);
+        } else {
+          const isNum = typeof comp.params[key] === 'number';
+          val = isNum ? parseEngineeringValue(input.value) : input.value;
+        }
 
         comp.params[key] = val;
         const displayLabel = document.getElementById(`val_${key}`);

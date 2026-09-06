@@ -171,6 +171,9 @@ export class SchematicCanvas {
     if (this.selectedComponent === comp) {
       this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
     }
+    if (this.onSelectionChange) {
+      this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
+    }
     this.notifyModified();
     this.render();
   }
@@ -191,6 +194,9 @@ export class SchematicCanvas {
     if (this.selectedWire) {
       this.wires = this.wires.filter(w => w.id !== this.selectedWire.id);
       this.selectedWire = null;
+    }
+    if (this.onSelectionChange) {
+      this.onSelectionChange({ type: 'component', item: null, group: [] });
     }
     this.notifyModified();
     this.render();
@@ -261,9 +267,16 @@ export class SchematicCanvas {
   findComponentAt(worldX, worldY) {
     for (let i = this.components.length - 1; i >= 0; i--) {
       const comp = this.components[i];
-      const hw = (comp.width / 2) + 6;
-      const hh = (comp.height / 2) + 6;
-      if (Math.abs(worldX - comp.x) <= hw && Math.abs(worldY - comp.y) <= hh) {
+      const rad = -((comp.rotation || 0) * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const dx = worldX - comp.x;
+      const dy = worldY - comp.y;
+      const localX = dx * cos - dy * sin;
+      const localY = dx * sin + dy * cos;
+      const hw = ((comp.width || 40) / 2) + 6;
+      const hh = ((comp.height || 40) / 2) + 6;
+      if (Math.abs(localX) <= hw && Math.abs(localY) <= hh) {
         return comp;
       }
     }
@@ -356,12 +369,17 @@ export class SchematicCanvas {
           this.render();
           return;
         } else if (this.wiringStartPin.pinKey !== pinHit.pinKey) {
-          this.saveState();
-          this.wires.push({
-            id: this.generateUniqueId('W'),
-            fromPin: this.wiringStartPin.pinKey,
-            toPin: pinHit.pinKey
-          });
+          const from = this.wiringStartPin.pinKey;
+          const to = pinHit.pinKey;
+          const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
+          if (!exists) {
+            this.saveState();
+            this.wires.push({
+              id: this.generateUniqueId('W'),
+              fromPin: from,
+              toPin: to
+            });
+          }
           this.wiringStartPin = null;
           this.wiringCurrentPos = null;
           this.notifyModified();
@@ -370,7 +388,28 @@ export class SchematicCanvas {
         }
       }
 
+      // 2b. T-Junction Wire Tap: If wiring is active and user clicks on an existing wire
       if (this.wiringStartPin) {
+        const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
+        if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
+          const from = this.wiringStartPin.pinKey;
+          const to = wireHit.fromPin;
+          const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
+          if (!exists) {
+            this.saveState();
+            this.wires.push({
+              id: this.generateUniqueId('W'),
+              fromPin: from,
+              toPin: to
+            });
+          }
+          this.wiringStartPin = null;
+          this.wiringCurrentPos = null;
+          this.notifyModified();
+          this.render();
+          return;
+        }
+
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
         this.render();
@@ -684,6 +723,9 @@ export class SchematicCanvas {
     this.wires = state.wires;
     this.selectedComponents.clear();
     this.selectedComponent = null;
+    if (this.onSelectionChange) {
+      this.onSelectionChange({ type: 'component', item: null, group: [] });
+    }
     this.notifyModified();
     this.render();
   }
@@ -699,6 +741,9 @@ export class SchematicCanvas {
     this.wires = state.wires;
     this.selectedComponents.clear();
     this.selectedComponent = null;
+    if (this.onSelectionChange) {
+      this.onSelectionChange({ type: 'component', item: null, group: [] });
+    }
     this.notifyModified();
     this.render();
   }
@@ -740,6 +785,33 @@ export class SchematicCanvas {
     this.panX = dw / 2 - centerX * this.zoom;
     this.panY = dh / 2 - centerY * this.zoom;
 
+    this.render();
+  }
+
+  zoomIn(factor = 1.2) {
+    this.zoomBy(factor);
+  }
+
+  zoomOut(factor = 1.2) {
+    this.zoomBy(1 / factor);
+  }
+
+  zoomBy(factor, screenX = (this.displayWidth || 800) / 2, screenY = (this.displayHeight || 600) / 2) {
+    const oldZoom = this.zoom;
+    const newZoom = Math.min(Math.max(oldZoom * factor, this.minZoom), this.maxZoom);
+    if (newZoom === oldZoom) return;
+    this.panX = screenX - (screenX - this.panX) * (newZoom / oldZoom);
+    this.panY = screenY - (screenY - this.panY) * (newZoom / oldZoom);
+    this.zoom = newZoom;
+    this.render();
+  }
+
+  resetZoom(screenX = (this.displayWidth || 800) / 2, screenY = (this.displayHeight || 600) / 2) {
+    const oldZoom = this.zoom;
+    const newZoom = 1.0;
+    this.panX = screenX - (screenX - this.panX) * (newZoom / oldZoom);
+    this.panY = screenY - (screenY - this.panY) * (newZoom / oldZoom);
+    this.zoom = newZoom;
     this.render();
   }
 
@@ -791,9 +863,8 @@ export class SchematicCanvas {
 
     // 4. Draw Components
     this.components.forEach(comp => {
-      const hw = (comp.width || 40) / 2;
-      const hh = (comp.height || 40) / 2;
-      if (comp.x + hw >= vpLeft && comp.x - hw <= vpRight && comp.y + hh >= vpTop && comp.y - hh <= vpBottom) {
+      const maxDim = Math.max(comp.width || 40, comp.height || 40) / 2;
+      if (comp.x + maxDim >= vpLeft && comp.x - maxDim <= vpRight && comp.y + maxDim >= vpTop && comp.y - maxDim <= vpBottom) {
         this.renderComponent(ctx, comp);
       }
     });
@@ -1862,28 +1933,30 @@ export class SchematicCanvas {
   }
 
   renderLabels(ctx, comp) {
-    const pos = this.worldToScreen(comp.x, comp.y);
     const p = comp.params || {};
+    const effHeight = ((comp.rotation || 0) % 180 !== 0) ? (comp.width || 40) : (comp.height || 40);
 
     ctx.save();
     ctx.font = 'bold 11px Lato, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#1e293b';
 
-    ctx.fillText(comp.name, pos.x, pos.y - (comp.height / 2 + 10) * this.zoom);
+    ctx.fillText(comp.name, comp.x, comp.y - (effHeight / 2 + 8));
 
     let valueStr = '';
     if (p.resistance) valueStr = formatValueWithPrefix(p.resistance, 'Ω');
     else if (p.capacitance) valueStr = formatValueWithPrefix(p.capacitance, 'F');
     else if (p.inductance) valueStr = formatValueWithPrefix(p.inductance, 'H');
     else if (p.voltage !== undefined) valueStr = formatValueWithPrefix(p.voltage, 'V');
+    else if (p.amplitude !== undefined) valueStr = `${formatValueWithPrefix(p.amplitude, 'V')}${p.frequency ? ` @ ${formatValueWithPrefix(p.frequency, 'Hz')}` : ''}`;
+    else if (p.frequency !== undefined) valueStr = formatValueWithPrefix(p.frequency, 'Hz');
     else if (p.model) valueStr = p.model;
     else if (p.label) valueStr = p.label;
 
     if (valueStr) {
       ctx.font = '10px Lato, sans-serif';
       ctx.fillStyle = '#64748b';
-      ctx.fillText(valueStr, pos.x, pos.y + (comp.height / 2 + 14) * this.zoom);
+      ctx.fillText(valueStr, comp.x, comp.y + (effHeight / 2 + 14));
     }
 
     ctx.restore();

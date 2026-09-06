@@ -12,7 +12,7 @@
  *  8. Pre-built Reference Circuits & System Benchmarks (All 12 Library Circuits)
  */
 
-import { ComponentDefinitions, ComponentTypes, ComponentCategory, formatValueWithPrefix } from '../js/engine/components.js';
+import { ComponentDefinitions, ComponentTypes, ComponentCategory, formatValueWithPrefix, parseEngineeringValue } from '../js/engine/components.js';
 import { CircuitEngine } from '../js/engine/circuit-engine.js';
 import { CircuitModel } from '../js/engine/circuit-model.js';
 import { CircuitLibrary } from '../js/editor/circuit-library.js';
@@ -444,6 +444,54 @@ const g4 = startGroup('Group 4: Coordinate Transforms, DPR & Zoom-Invariant Hit 
   const dEnd = pointToSegmentDistance(105, 20, 0, 20, 100, 20);
 
   assert(dOn === 0 && dOff === 5 && dEnd === 5, `Wire segment distance math: On-segment=0px, Off-segment=5px, Past-endpoint=5px`, g4);
+
+  // 4.4 Rotated Component Inverse Hit-Testing
+  function isPointInRotatedComponent(px, py, comp) {
+    const r = -((comp.rotation || 0) * Math.PI) / 180;
+    const c = Math.cos(r);
+    const s = Math.sin(r);
+    const dx = px - comp.x;
+    const dy = py - comp.y;
+    const lx = dx * c - dy * s;
+    const ly = dx * s + dy * c;
+    const hw = ((comp.width || 40) / 2) + 6;
+    const hh = ((comp.height || 40) / 2) + 6;
+    return Math.abs(lx) <= hw && Math.abs(ly) <= hh;
+  }
+
+  const tallComp = { x: 200, y: 200, width: 40, height: 100, rotation: 90 };
+  const hitRotatedWing = isPointInRotatedComponent(245, 200, tallComp);
+  const hitRotatedEmpty = isPointInRotatedComponent(200, 245, tallComp);
+  assert(hitRotatedWing && !hitRotatedEmpty, `Rotated 90° component (40x100) hit-testing inverse transform: Wing=true, Empty Space=false`, g4);
+
+  // 4.5 Center-Preserving Zoom Math Invariance
+  let panX = 0, panY = 0, zoom = 1.0;
+  const screenCenterX = 400, screenCenterY = 300;
+  const worldX_before = (screenCenterX - panX) / zoom;
+  const worldY_before = (screenCenterY - panY) / zoom;
+
+  const newZoom = 1.5;
+  panX = screenCenterX - (screenCenterX - panX) * (newZoom / zoom);
+  panY = screenCenterY - (screenCenterY - panY) * (newZoom / zoom);
+  zoom = newZoom;
+
+  const worldX_after = (screenCenterX - panX) / zoom;
+  const worldY_after = (screenCenterY - panY) / zoom;
+  assert(Math.abs(worldX_before - worldX_after) < 1e-9 && Math.abs(worldY_before - worldY_after) < 1e-9, `Center-preserving zoom invariant math: Viewport center pinned at (${worldX_before}, ${worldY_before})`, g4);
+
+  // 4.6 Engineering Notation Parsing Verification
+  const parsed10k = parseEngineeringValue('10k');
+  const parsed4u7 = parseEngineeringValue('4.7u');
+  const parsed100n = parseEngineeringValue('100n');
+  const parsed1M5 = parseEngineeringValue('1.5M');
+  assert(
+    parsed10k === 10000 &&
+    Math.abs(parsed4u7 - 4.7e-6) < 1e-12 &&
+    Math.abs(parsed100n - 1e-7) < 1e-14 &&
+    parsed1M5 === 1500000,
+    `Engineering notation parsing: 10k=10kΩ, 4.7u=4.7µF, 100n=100nF, 1.5M=1.5MΩ`,
+    g4
+  );
 }
 
 // ----------------------------------------------------------------------

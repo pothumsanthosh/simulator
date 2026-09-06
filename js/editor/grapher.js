@@ -18,6 +18,7 @@ export class CircuitGrapher {
     this.timePerDiv = 0.001; // 1 ms/div (10 divisions = 10ms window)
     this.voltsPerDiv = 2.0;  // 2 V/div (8 vertical divisions)
     this.autoScale = true;
+    this.theme = 'dark'; // 'dark' or 'light'
 
     // Measurement Cursors
     this.showCursors = true;
@@ -83,13 +84,29 @@ export class CircuitGrapher {
   }
 
   setTimeScale(scale) {
-    this.timePerDiv = Math.max(scale, 1e-6);
+    this.timePerDiv = Math.max(parseFloat(scale) || 0.001, 1e-6);
     this.render();
   }
 
   setVoltScale(scale) {
-    this.voltsPerDiv = Math.max(scale, 0.01);
+    if (scale === 'auto') {
+      this.autoScale = true;
+    } else {
+      this.autoScale = false;
+      this.voltsPerDiv = Math.max(parseFloat(scale) || 1.0, 0.01);
+    }
     this.render();
+  }
+
+  setTheme(theme) {
+    this.theme = theme === 'light' ? 'light' : 'dark';
+    this.render();
+  }
+
+  toggleTheme() {
+    this.theme = this.theme === 'light' ? 'dark' : 'light';
+    this.render();
+    return this.theme;
   }
 
   toggleCursors() {
@@ -146,13 +163,15 @@ export class CircuitGrapher {
     const h = this.height;
     if (!w || !h || w <= 0 || h <= 0) return;
 
-    // Dark Background (Multisim Live Dark Theme Grapher)
-    ctx.fillStyle = '#111827';
+    const isLight = this.theme === 'light';
+
+    // Background
+    ctx.fillStyle = isLight ? '#f8fafc' : '#111827';
     ctx.fillRect(0, 0, w, h);
 
     const history = this.engine.history;
     if (!history || history.length === 0) {
-      this.drawGrid(ctx, w, h);
+      this.drawGrid(ctx, w, h, isLight);
       this.drawEmptyMessage(ctx, w, h);
       return;
     }
@@ -162,7 +181,7 @@ export class CircuitGrapher {
     const latestTime = history[history.length - 1].time;
     const startTime = Math.max(0, latestTime - totalTimeSpan);
 
-    // Auto-scale vertical range if enabled
+    // Auto-scale vertical range only if explicitly set to auto
     if (this.autoScale && history.length > 5) {
       let minV = -1, maxV = 1;
       const recentPoints = history.slice(-400);
@@ -179,24 +198,24 @@ export class CircuitGrapher {
     // Calculate automated measurements
     this.calculateMeasurements(history, startTime);
 
-    this.drawGrid(ctx, w, h);
+    this.drawGrid(ctx, w, h, isLight);
     this.drawTraces(ctx, w, h, startTime, totalTimeSpan);
 
     if (this.showCursors) {
-      this.drawCursors(ctx, w, h, startTime, totalTimeSpan);
+      this.drawCursors(ctx, w, h, startTime, totalTimeSpan, isLight);
     }
 
-    this.drawLegendAndMeasurements(ctx, w, h);
+    this.drawLegendAndMeasurements(ctx, w, h, isLight);
   }
 
-  drawGrid(ctx, w, h) {
+  drawGrid(ctx, w, h, isLight = false) {
     const numDivX = 10;
     const numDivY = 8;
     const stepX = w / numDivX;
     const stepY = h / numDivY;
     if (stepX <= 0 || stepY <= 0) return;
 
-    ctx.strokeStyle = '#1f2937';
+    ctx.strokeStyle = isLight ? '#e2e8f0' : '#1f2937';
     ctx.lineWidth = 1.0;
 
     // Vertical grid lines
@@ -211,7 +230,7 @@ export class CircuitGrapher {
     ctx.stroke();
 
     // Center axes (dashed)
-    ctx.strokeStyle = '#374151';
+    ctx.strokeStyle = isLight ? '#94a3b8' : '#374151';
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
     ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
@@ -319,7 +338,7 @@ export class CircuitGrapher {
     });
   }
 
-  drawCursors(ctx, w, h, startTime, totalTimeSpan) {
+  drawCursors(ctx, w, h, startTime, totalTimeSpan, isLight = false) {
     const x1 = this.cursor1 * w;
     const x2 = this.cursor2 * w;
     const t1 = startTime + this.cursor1 * totalTimeSpan;
@@ -331,42 +350,45 @@ export class CircuitGrapher {
     ctx.lineWidth = 1.5;
 
     // Cursor 1 (Cyan)
-    ctx.strokeStyle = '#06b6d4';
+    ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     ctx.moveTo(x1, 0); ctx.lineTo(x1, h);
     ctx.stroke();
 
     // Cursor 2 (Amber)
-    ctx.strokeStyle = '#f59e0b';
+    ctx.strokeStyle = isLight ? '#d97706' : '#f59e0b';
     ctx.beginPath();
     ctx.moveTo(x2, 0); ctx.lineTo(x2, h);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Measurement HUD Overlay Box
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-    ctx.fillRect(12, 12, 380, 52);
-    ctx.strokeStyle = '#334155';
+    // Measurement HUD Overlay Box (Responsive)
+    const boxW = Math.max(160, Math.min(320, w - 24));
+    const col2X = boxW > 240 ? 160 : Math.floor(boxW / 2) + 10;
+
+    ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.92)';
+    ctx.fillRect(12, 12, boxW, 52);
+    ctx.strokeStyle = isLight ? '#cbd5e1' : '#334155';
     ctx.lineWidth = 1;
-    ctx.strokeRect(12, 12, 380, 52);
+    ctx.strokeRect(12, 12, boxW, 52);
 
     ctx.font = '11px Roboto Mono, monospace';
-    ctx.fillStyle = '#06b6d4';
+    ctx.fillStyle = isLight ? '#0284c7' : '#06b6d4';
     ctx.textAlign = 'left';
-    ctx.fillText(`C1: ${formatValueWithPrefix(t1, 's')}`, 22, 32);
+    ctx.fillText(`C1: ${formatValueWithPrefix(t1, 's')}`, 20, 32);
 
-    ctx.fillStyle = '#f59e0b';
-    ctx.fillText(`C2: ${formatValueWithPrefix(t2, 's')}`, 150, 32);
+    ctx.fillStyle = isLight ? '#d97706' : '#f59e0b';
+    ctx.fillText(`C2: ${formatValueWithPrefix(t2, 's')}`, col2X, 32);
 
-    ctx.fillStyle = '#10b981';
-    ctx.fillText(`Δt: ${formatValueWithPrefix(dt, 's')}`, 22, 52);
-    ctx.fillText(`Freq: ${formatValueWithPrefix(freq, 'Hz')}`, 150, 52);
+    ctx.fillStyle = isLight ? '#059669' : '#10b981';
+    ctx.fillText(`Δt: ${formatValueWithPrefix(dt, 's')}`, 20, 52);
+    ctx.fillText(`Freq: ${formatValueWithPrefix(freq, 'Hz')}`, col2X, 52);
 
     ctx.restore();
   }
 
-  drawLegendAndMeasurements(ctx, w, h) {
+  drawLegendAndMeasurements(ctx, w, h, isLight = false) {
     const history = this.engine.history;
     if (history.length === 0) return;
 
@@ -383,14 +405,14 @@ export class CircuitGrapher {
 
       ctx.fillStyle = m.color || '#03b585';
       ctx.fillRect(offsetX - ctx.measureText(text).width - 16, 15, 10, 10);
-      ctx.fillStyle = '#f8fafc';
+      ctx.fillStyle = isLight ? '#0f172a' : '#f8fafc';
       ctx.fillText(text, offsetX, 24);
       offsetX -= ctx.measureText(text).width + 30;
     });
 
     // Scale info at bottom left
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = isLight ? '#475569' : '#94a3b8';
     ctx.font = '11px Lato, sans-serif';
     ctx.fillText(`Time: ${formatValueWithPrefix(this.timePerDiv, 's')}/div  |  Voltage: ${formatValueWithPrefix(this.voltsPerDiv, 'V')}/div`, 15, h - 12);
 
