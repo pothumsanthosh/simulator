@@ -210,14 +210,54 @@ class MultisimApp {
       container.appendChild(groupEl);
     });
 
-    // Palette Search Filter
+    // Palette Search Filter (Auto-expands matching categories and searches aliases)
     const searchInput = document.getElementById('paletteSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        document.querySelectorAll('.palette-item').forEach(item => {
-          const name = item.textContent.toLowerCase();
-          item.style.display = name.includes(query) ? 'flex' : 'none';
+        const query = e.target.value.toLowerCase().trim();
+        const groups = document.querySelectorAll('.palette-group');
+
+        groups.forEach(group => {
+          const items = group.querySelectorAll('.palette-item');
+          const grid = group.querySelector('.palette-items-grid');
+          const arrow = group.querySelector('.palette-group-header span:last-child');
+          let matchCount = 0;
+
+          items.forEach(item => {
+            const type = (item.dataset.type || '').toLowerCase();
+            const text = (item.textContent || '').toLowerCase();
+            const def = ComponentDefinitions[item.dataset.type];
+            const fullName = (def?.name || '').toLowerCase();
+            const category = (def?.category || '').toLowerCase();
+            const prefix = (def?.prefix || '').toLowerCase();
+
+            // Check if query matches text, type, name, category, or aliases
+            let isMatch = !query || text.includes(query) || type.includes(query) || fullName.includes(query) || category.includes(query) || prefix.includes(query);
+            
+            // Aliases for Node / Junction
+            if (!isMatch && (type === 'node' || type === 'junction')) {
+              if ('node'.includes(query) || 'junction'.includes(query) || 'wire'.includes(query) || 'hub'.includes(query) || 'connection'.includes(query) || 'dot'.includes(query) || 'tie'.includes(query)) {
+                isMatch = true;
+              }
+            }
+
+            item.style.display = isMatch ? 'flex' : 'none';
+            if (isMatch) matchCount++;
+          });
+
+          if (query) {
+            if (matchCount > 0) {
+              group.style.display = 'block';
+              if (grid) grid.style.display = 'grid';
+              if (arrow) arrow.textContent = '▾';
+            } else {
+              group.style.display = 'none';
+            }
+          } else {
+            group.style.display = 'block';
+            if (grid) grid.style.display = 'grid';
+            if (arrow) arrow.textContent = '▾';
+          }
         });
       });
     }

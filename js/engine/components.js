@@ -1397,9 +1397,9 @@ export const ComponentDefinitions = {
     paramSchema: [{ key: 'label', label: 'Net Name', type: 'string', default: 'NET1' }]
   },
   [ComponentTypes.NODE]: {
-    name: 'Junction Node (Multi-Wire Hub)',
+    name: 'Node (Junction / Multi-Wire Hub)',
     type: ComponentTypes.NODE,
-    category: ComponentCategory.POWER_SYMBOLS,
+    category: ComponentCategory.PASSIVES,
     prefix: 'NODE',
     width: 14, height: 14,
     pins: [
@@ -1411,9 +1411,9 @@ export const ComponentDefinitions = {
     ]
   },
   [ComponentTypes.JUNCTION]: {
-    name: 'Junction / Tie Point',
+    name: 'Junction Node (Tie Point)',
     type: ComponentTypes.JUNCTION,
-    category: ComponentCategory.POWER_SYMBOLS,
+    category: ComponentCategory.PASSIVES,
     prefix: 'J',
     width: 14, height: 14,
     pins: [
