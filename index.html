@@ -460,8 +460,14 @@
             <div class="grapher-panel" id="grapherPanel">
               <div class="grapher-toolbar">
                 <div class="grapher-controls-left">
-                  <span style="font-weight: 700; color: #f8fafc;">Grapher / Oscilloscope</span>
+                  <span style="font-weight: 700; color: #f8fafc;">CRO / Grapher</span>
                   <button class="btn-grapher-action" id="btnToggleCursors" title="Toggle measurement cursors">Cursors (C1, C2)</button>
+                  <select class="grapher-select" id="cursorModeSelect" title="Cursor Measurement Mode">
+                    <option value="TIME">Time (X1, X2)</option>
+                    <option value="VOLTAGE">Voltage (Y1, Y2)</option>
+                    <option value="DUAL">Dual (X & Y)</option>
+                  </select>
+                  <button class="btn-grapher-action" id="btnQuickParams" title="Toggle CRO Quick Parameters Panel" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #ffffff; font-weight: 600; border-color: #38bdf8;">📊 Quick Panel</button>
                   <label style="display: inline-flex; align-items: center; gap: 4px;">Time/Div: 
                     <input type="text" class="grapher-input" id="timeScaleInput" value="1 ms" title="Manual Time/Div (e.g. 10ns, 1us, 1ms, 5s)"/>
                     <select class="grapher-select" id="timeScaleSelect" title="Time/Div Presets">
@@ -506,6 +512,88 @@
               </div>
               <div class="grapher-canvas-wrapper">
                 <canvas id="grapherCanvas" class="grapher-canvas"></canvas>
+
+                <!-- CRO Quick Parameters Panel (Hardware Oscilloscope Metrics) -->
+                <div class="cro-quick-panel" id="croQuickPanel" style="display: none;">
+                  <div class="cro-quick-header">
+                    <div class="cro-quick-title">
+                      <span class="cro-live-dot"></span>
+                      <span>CRO Signal Parameters & Cursors</span>
+                    </div>
+                    <div class="cro-quick-tabs" id="croChannelTabs">
+                      <button class="cro-tab-btn active" data-channel="ALL">All Channels</button>
+                    </div>
+                    <button class="cro-quick-close" id="btnCloseQuickPanel" title="Close Panel">✕</button>
+                  </div>
+                  
+                  <div class="cro-quick-body">
+                    <!-- Key Parameters Grid -->
+                    <div class="cro-param-grid">
+                      <div class="cro-param-card" title="Signal Frequency (f = 1/T)">
+                        <span class="cro-param-label">Frequency (f)</span>
+                        <span class="cro-param-value" id="croValFreq">-- Hz</span>
+                      </div>
+                      <div class="cro-param-card" title="Time Period (T = 1/f)">
+                        <span class="cro-param-label">Time Period (T)</span>
+                        <span class="cro-param-value" id="croValPeriod">-- s</span>
+                      </div>
+                      <div class="cro-param-card" title="Signal Amplitude (Vamp = Vpp / 2)">
+                        <span class="cro-param-label">Amplitude (V<sub>amp</sub>)</span>
+                        <span class="cro-param-value" id="croValAmp">-- V</span>
+                      </div>
+                      <div class="cro-param-card" title="Peak-to-Peak Voltage (Vmax - Vmin)">
+                        <span class="cro-param-label">Peak-to-Peak (V<sub>pp</sub>)</span>
+                        <span class="cro-param-value" id="croValVpp">-- V</span>
+                      </div>
+                      <div class="cro-param-card" title="Maximum Voltage Peak">
+                        <span class="cro-param-label">Max Voltage (V<sub>max</sub>)</span>
+                        <span class="cro-param-value" id="croValVmax">-- V</span>
+                      </div>
+                      <div class="cro-param-card" title="Minimum Voltage Valley">
+                        <span class="cro-param-label">Min Voltage (V<sub>min</sub>)</span>
+                        <span class="cro-param-value" id="croValVmin">-- V</span>
+                      </div>
+                      <div class="cro-param-card" title="True Root Mean Square Voltage">
+                        <span class="cro-param-label">RMS Voltage (V<sub>rms</sub>)</span>
+                        <span class="cro-param-value" id="croValVrms">-- V</span>
+                      </div>
+                      <div class="cro-param-card" title="DC Average / Mean Voltage Offset">
+                        <span class="cro-param-label">DC Mean (V<sub>avg</sub>)</span>
+                        <span class="cro-param-value" id="croValVmean">-- V</span>
+                      </div>
+                    </div>
+
+                    <!-- Cursor Live Exact Voltage Tracking Section -->
+                    <div class="cro-cursor-section">
+                      <div class="cro-cursor-header">
+                        <span style="font-weight: 600; color: #cbd5e1;">📍 Interactive Cursor Exact Voltage Readouts</span>
+                        <div class="cro-cursor-actions">
+                          <button class="cro-btn-xs" id="btnSnapCursorPeak" title="Snap Cursor 1 to Max Voltage Peak">Snap C1 Peak</button>
+                          <button class="cro-btn-xs" id="btnSnapCursorValley" title="Snap Cursor 2 to Min Voltage Valley">Snap C2 Valley</button>
+                          <button class="cro-btn-xs" id="btnSnapCursorPeriod" title="Position C1 & C2 to 1 Full Cycle (T)">Snap 1 Period</button>
+                        </div>
+                      </div>
+                      <div class="cro-cursor-readouts">
+                        <div class="cro-cursor-item cursor-1">
+                          <span class="cro-badge-c1">C1</span>
+                          <span class="cro-cursor-time" id="croCursor1Time">t₁ = -- s</span>
+                          <span class="cro-cursor-volt" id="croCursor1Volt">V₁ = -- V</span>
+                        </div>
+                        <div class="cro-cursor-item cursor-2">
+                          <span class="cro-badge-c2">C2</span>
+                          <span class="cro-cursor-time" id="croCursor2Time">t₂ = -- s</span>
+                          <span class="cro-cursor-volt" id="croCursor2Volt">V₂ = -- V</span>
+                        </div>
+                        <div class="cro-cursor-item cursor-delta">
+                          <span class="cro-badge-delta">Δ</span>
+                          <span class="cro-cursor-time" id="croCursorDeltaTime">Δt = -- s</span>
+                          <span class="cro-cursor-volt" id="croCursorDeltaVolt">ΔV = -- V</span>
+                          <span class="cro-cursor-freq" id="croCursorDeltaFreq">1/Δt = -- Hz</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

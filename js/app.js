@@ -667,7 +667,34 @@ class MultisimApp {
       });
     });
 
-    document.getElementById('btnToggleCursors').addEventListener('click', () => this.grapher.toggleCursors());
+    document.getElementById('btnToggleCursors').addEventListener('click', () => {
+      const isShown = this.grapher.toggleCursors();
+      const btn = document.getElementById('btnToggleCursors');
+      if (btn) btn.classList.toggle('active', isShown);
+    });
+
+    // Cursor Mode Select (Time, Voltage, Dual)
+    const cursorModeSelect = document.getElementById('cursorModeSelect');
+    if (cursorModeSelect) {
+      cursorModeSelect.addEventListener('change', (e) => {
+        this.grapher.setCursorMode(e.target.value);
+        const btn = document.getElementById('btnToggleCursors');
+        if (btn) btn.classList.add('active');
+      });
+    }
+
+    // CRO Quick Parameters Panel Toggle
+    document.getElementById('btnQuickParams')?.addEventListener('click', () => {
+      this.grapher.toggleQuickPanel();
+    });
+    document.getElementById('btnCloseQuickPanel')?.addEventListener('click', () => {
+      this.grapher.toggleQuickPanel();
+    });
+
+    // Quick Snap Cursors to Waveform Peaks & Cycle
+    document.getElementById('btnSnapCursorPeak')?.addEventListener('click', () => this.grapher.snapCursorToPeak());
+    document.getElementById('btnSnapCursorValley')?.addEventListener('click', () => this.grapher.snapCursorToValley());
+    document.getElementById('btnSnapCursorPeriod')?.addEventListener('click', () => this.grapher.snapCursorToPeriod());
     
     // Time/Div Manual Text Input and Preset Selector
     const timeInput = document.getElementById('timeScaleInput');

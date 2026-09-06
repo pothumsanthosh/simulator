@@ -22,11 +22,18 @@ export class CircuitGrapher {
     this.autoScale = true;
     this.theme = 'dark';     // 'dark' or 'light'
 
-    // Measurement Cursors (Draggable by touch / mouse)
+    // Measurement Cursors (Interactive Time & Voltage Cursors)
     this.showCursors = true;
-    this.cursor1 = 0.25; // X position ratio (0.0 to 1.0)
-    this.cursor2 = 0.75;
-    this.activeCursor = null;
+    this.cursorMode = 'TIME'; // 'TIME' | 'VOLTAGE' | 'DUAL'
+    this.cursor1 = 0.25;      // X1 position ratio (0.0 to 1.0)
+    this.cursor2 = 0.75;      // X2 position ratio (0.0 to 1.0)
+    this.cursorY1 = 0.35;     // Y1 position ratio (0.0 to 1.0, top to bottom)
+    this.cursorY2 = 0.65;     // Y2 position ratio (0.0 to 1.0, top to bottom)
+    this.activeCursor = null; // 'X1' | 'X2' | 'Y1' | 'Y2' | null
+
+    // Quick Parameters Panel State
+    this.isQuickPanelOpen = false;
+    this.selectedChannel = 'ALL';
 
     // Trigger Settings
     this.triggerEnabled = true;
@@ -35,6 +42,12 @@ export class CircuitGrapher {
 
     // Automated Measurements Cache
     this.measurements = new Map();
+    this.cursorMeasurements = {
+      t1: 0, t2: 0, dt: 0, freq: 0,
+      v1: 0, v2: 0, dv: 0,
+      y1Volt: 0, y2Volt: 0, dyVolt: 0,
+      probes: {}
+    };
 
     // Touch & Pointer Gesture Tracking (Bare Hands & Mouse)
     this.activePointers = new Map();
@@ -81,13 +94,34 @@ export class CircuitGrapher {
       if (this.activePointers.size === 1) {
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = (e.clientX - rect.left) / this.width;
+        const mouseY = (e.clientY - rect.top) / this.height;
 
-        // Generous cursor hit testing (35px) for fingertip touches
-        if (Math.abs(mouseX - this.cursor1) < 0.04) {
-          this.activeCursor = 1;
-        } else if (Math.abs(mouseX - this.cursor2) < 0.04) {
-          this.activeCursor = 2;
-        } else {
+        let hit = false;
+        if (this.showCursors) {
+          // Check Time Cursors (X1, X2)
+          if (this.cursorMode === 'TIME' || this.cursorMode === 'DUAL') {
+            if (Math.abs(mouseX - this.cursor1) < 0.04) {
+              this.activeCursor = 'X1';
+              hit = true;
+            } else if (Math.abs(mouseX - this.cursor2) < 0.04) {
+              this.activeCursor = 'X2';
+              hit = true;
+            }
+          }
+
+          // Check Voltage Cursors (Y1, Y2)
+          if (!hit && (this.cursorMode === 'VOLTAGE' || this.cursorMode === 'DUAL')) {
+            if (Math.abs(mouseY - this.cursorY1) < 0.05) {
+              this.activeCursor = 'Y1';
+              hit = true;
+            } else if (Math.abs(mouseY - this.cursorY2) < 0.05) {
+              this.activeCursor = 'Y2';
+              hit = true;
+            }
+          }
+        }
+
+        if (!hit) {
           this.isPanning = true;
           this.panStartX = e.clientX;
           this.panStartY = e.clientY;
@@ -122,12 +156,17 @@ export class CircuitGrapher {
         return;
       }
 
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = Math.max(0.005, Math.min(0.995, (e.clientX - rect.left) / this.width));
+      const mouseY = Math.max(0.005, Math.min(0.995, (e.clientY - rect.top) / this.height));
+
       if (this.activeCursor) {
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = Math.max(0.01, Math.min(0.99, (e.clientX - rect.left) / this.width));
-        if (this.activeCursor === 1) this.cursor1 = mouseX;
-        else if (this.activeCursor === 2) this.cursor2 = mouseX;
+        if (this.activeCursor === 'X1' || this.activeCursor === 1) this.cursor1 = mouseX;
+        else if (this.activeCursor === 'X2' || this.activeCursor === 2) this.cursor2 = mouseX;
+        else if (this.activeCursor === 'Y1') this.cursorY1 = mouseY;
+        else if (this.activeCursor === 'Y2') this.cursorY2 = mouseY;
         this.render();
+        this.updateQuickPanelDOM();
         return;
       }
 
@@ -174,6 +213,51 @@ export class CircuitGrapher {
       this.syncInputs();
       this.render();
     }, { passive: false });
+  }
+
+  // --- Exact Voltage & Coordinate Interpolation ---
+  getVoltageAtTime(probeId, targetTime) {
+    const history = this.engine.history;
+    if (!history || history.length === 0) return 0;
+    if (targetTime <= history[0].time) return history[0].probes[probeId]?.value ?? 0;
+    if (targetTime >= history[history.length - 1].time) return history[history.length - 1].probes[probeId]?.value ?? 0;
+
+    let low = 0;
+    let high = history.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (history[mid].time < targetTime) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    const idx0 = Math.max(0, high);
+    const idx1 = Math.min(history.length - 1, low);
+    const pt0 = history[idx0];
+    const pt1 = history[idx1];
+
+    const v0 = pt0.probes[probeId]?.value ?? 0;
+    const v1 = pt1.probes[probeId]?.value ?? 0;
+
+    if (pt1.time === pt0.time) return v0;
+    const frac = (targetTime - pt0.time) / (pt1.time - pt0.time);
+    return v0 + frac * (v1 - v0);
+  }
+
+  getVoltageFromYRatio(yRatio) {
+    const y = yRatio * this.height;
+    const yPixelsPerVolt = (this.height / 8) / this.voltsPerDiv;
+    const centerY = (this.height / 2) + (this.voltOffset || 0) * yPixelsPerVolt;
+    return (centerY - y) / yPixelsPerVolt;
+  }
+
+  getYRatioFromVoltage(volt) {
+    const yPixelsPerVolt = (this.height / 8) / this.voltsPerDiv;
+    const centerY = (this.height / 2) + (this.voltOffset || 0) * yPixelsPerVolt;
+    const y = centerY - volt * yPixelsPerVolt;
+    return Math.max(0, Math.min(1, y / this.height));
   }
 
   // --- Unlimited Manual Variations Scaling ---
@@ -242,6 +326,111 @@ export class CircuitGrapher {
   toggleCursors() {
     this.showCursors = !this.showCursors;
     this.render();
+    return this.showCursors;
+  }
+
+  setCursorMode(mode) {
+    if (['TIME', 'VOLTAGE', 'DUAL'].includes(mode)) {
+      this.cursorMode = mode;
+      this.showCursors = true;
+      this.render();
+      this.updateQuickPanelDOM();
+    }
+  }
+
+  // --- Quick Parameters Panel Controls ---
+  toggleQuickPanel() {
+    this.isQuickPanelOpen = !this.isQuickPanelOpen;
+    const panel = document.getElementById('croQuickPanel');
+    const btn = document.getElementById('btnQuickParams');
+    if (panel) {
+      panel.style.display = this.isQuickPanelOpen ? 'flex' : 'none';
+    }
+    if (btn) {
+      btn.classList.toggle('active', this.isQuickPanelOpen);
+    }
+    if (this.isQuickPanelOpen) {
+      this.updateQuickPanelDOM();
+    }
+    return this.isQuickPanelOpen;
+  }
+
+  setChannelFocus(channelId) {
+    this.selectedChannel = channelId;
+    this.updateQuickPanelDOM();
+  }
+
+  snapCursorToPeak() {
+    const history = this.engine.history;
+    if (!history || history.length === 0) return;
+    const totalTimeSpan = Math.max(this.timePerDiv * 10, 1e-12);
+    const latestTime = history[history.length - 1].time;
+    const startTime = Math.max(0, latestTime - totalTimeSpan) + (this.timeOffset || 0);
+    const sample = history[history.length - 1];
+    const probeIds = Object.keys(sample.probes);
+    const targetProbe = (this.selectedChannel !== 'ALL' && probeIds.includes(this.selectedChannel)) ? this.selectedChannel : probeIds[0];
+    if (!targetProbe) return;
+
+    let maxVal = -Infinity;
+    let maxTime = startTime;
+    for (const pt of history) {
+      if (pt.time >= startTime && pt.time <= startTime + totalTimeSpan) {
+        const v = pt.probes[targetProbe]?.value;
+        if (v !== undefined && v > maxVal) {
+          maxVal = v;
+          maxTime = pt.time;
+        }
+      }
+    }
+    this.cursor1 = Math.max(0.01, Math.min(0.99, (maxTime - startTime) / totalTimeSpan));
+    this.render();
+    this.updateQuickPanelDOM();
+  }
+
+  snapCursorToValley() {
+    const history = this.engine.history;
+    if (!history || history.length === 0) return;
+    const totalTimeSpan = Math.max(this.timePerDiv * 10, 1e-12);
+    const latestTime = history[history.length - 1].time;
+    const startTime = Math.max(0, latestTime - totalTimeSpan) + (this.timeOffset || 0);
+    const sample = history[history.length - 1];
+    const probeIds = Object.keys(sample.probes);
+    const targetProbe = (this.selectedChannel !== 'ALL' && probeIds.includes(this.selectedChannel)) ? this.selectedChannel : probeIds[0];
+    if (!targetProbe) return;
+
+    let minVal = Infinity;
+    let minTime = startTime;
+    for (const pt of history) {
+      if (pt.time >= startTime && pt.time <= startTime + totalTimeSpan) {
+        const v = pt.probes[targetProbe]?.value;
+        if (v !== undefined && v < minVal) {
+          minVal = v;
+          minTime = pt.time;
+        }
+      }
+    }
+    this.cursor2 = Math.max(0.01, Math.min(0.99, (minTime - startTime) / totalTimeSpan));
+    this.render();
+    this.updateQuickPanelDOM();
+  }
+
+  snapCursorToPeriod() {
+    const history = this.engine.history;
+    if (!history || history.length === 0) return;
+    const totalTimeSpan = Math.max(this.timePerDiv * 10, 1e-12);
+    const latestTime = history[history.length - 1].time;
+    const startTime = Math.max(0, latestTime - totalTimeSpan) + (this.timeOffset || 0);
+    const sample = history[history.length - 1];
+    const probeIds = Object.keys(sample.probes);
+    const targetProbe = (this.selectedChannel !== 'ALL' && probeIds.includes(this.selectedChannel)) ? this.selectedChannel : probeIds[0];
+    const m = this.measurements.get(targetProbe);
+    if (!m || !m.period || m.period <= 0) return;
+
+    const t1 = startTime + this.cursor1 * totalTimeSpan;
+    const t2 = t1 + m.period;
+    this.cursor2 = Math.max(0.01, Math.min(0.99, (t2 - startTime) / totalTimeSpan));
+    this.render();
+    this.updateQuickPanelDOM();
   }
 
   exportCSV() {
@@ -303,6 +492,7 @@ export class CircuitGrapher {
     if (!history || history.length === 0) {
       this.drawGrid(ctx, w, h, isLight);
       this.drawEmptyMessage(ctx, w, h);
+      this.updateQuickPanelDOM();
       return;
     }
 
@@ -326,8 +516,8 @@ export class CircuitGrapher {
       this.voltsPerDiv = Math.max(maxSpan / 4, 0.05);
     }
 
-    // Calculate automated measurements
-    this.calculateMeasurements(history, startTime);
+    // Calculate automated measurements & exact cursor values
+    this.calculateMeasurements(history, startTime, totalTimeSpan);
 
     this.drawGrid(ctx, w, h, isLight);
     this.drawTraces(ctx, w, h, startTime, totalTimeSpan);
@@ -337,6 +527,10 @@ export class CircuitGrapher {
     }
 
     this.drawLegendAndMeasurements(ctx, w, h, isLight);
+
+    if (this.isQuickPanelOpen) {
+      this.updateQuickPanelDOM();
+    }
   }
 
   drawGrid(ctx, w, h, isLight = false) {
@@ -437,12 +631,26 @@ export class CircuitGrapher {
     });
   }
 
-  calculateMeasurements(history, startTime) {
+  calculateMeasurements(history, startTime, totalTimeSpan) {
     this.measurements.clear();
     if (history.length === 0) return;
 
     const sample = history[history.length - 1];
     const probeIds = Object.keys(sample.probes);
+    const t1 = startTime + this.cursor1 * totalTimeSpan;
+    const t2 = startTime + this.cursor2 * totalTimeSpan;
+    const dt = Math.abs(t2 - t1);
+    const freqCursor = dt > 0 ? (1 / dt) : 0;
+
+    const y1Volt = this.getVoltageFromYRatio(this.cursorY1);
+    const y2Volt = this.getVoltageFromYRatio(this.cursorY2);
+    const dyVolt = Math.abs(y2Volt - y1Volt);
+
+    this.cursorMeasurements = {
+      t1, t2, dt, freq: freqCursor,
+      y1Volt, y2Volt, dyVolt,
+      probes: {}
+    };
 
     probeIds.forEach(id => {
       const vals = [];
@@ -469,6 +677,7 @@ export class CircuitGrapher {
         const mean = sum / count;
         const rms = Math.sqrt(sumSq / count);
         const vpp = max - min;
+        const amp = vpp / 2;
 
         // Enhanced zero-crossing frequency detection with noise hysteresis
         let crossings = 0;
@@ -487,62 +696,201 @@ export class CircuitGrapher {
         }
         const timeSpan = vals[count - 1].t - vals[0].t;
         const freq = timeSpan > 0 ? (crossings / (2 * timeSpan)) : 0;
+        const period = freq > 0 ? (1 / freq) : 0;
 
-        this.measurements.set(id, {
+        // Exact interpolated voltages at Cursor 1 and Cursor 2
+        const vCursor1 = this.getVoltageAtTime(id, t1);
+        const vCursor2 = this.getVoltageAtTime(id, t2);
+        const dvCursor = vCursor2 - vCursor1;
+
+        const measData = {
           name: sample.probes[id]?.name || 'Probe',
           color: sample.probes[id]?.color || '#03b585',
-          vpp, max, min, mean, rms, freq
-        });
+          vpp, amp, max, min, mean, rms, freq, period,
+          vCursor1, vCursor2, dvCursor
+        };
+
+        this.measurements.set(id, measData);
+        this.cursorMeasurements.probes[id] = measData;
       }
     });
   }
 
   drawCursors(ctx, w, h, startTime, totalTimeSpan, isLight = false) {
-    const x1 = this.cursor1 * w;
-    const x2 = this.cursor2 * w;
-    const t1 = startTime + this.cursor1 * totalTimeSpan;
-    const t2 = startTime + this.cursor2 * totalTimeSpan;
-    const dt = Math.abs(t2 - t1);
-    const freq = dt > 0 ? (1 / dt) : 0;
+    const yPixelsPerVolt = (h / 8) / this.voltsPerDiv;
+    const centerY = (h / 2) + (this.voltOffset || 0) * yPixelsPerVolt;
 
+    // --- 1. Draw Time Cursors (X1, X2) ---
+    if (this.cursorMode === 'TIME' || this.cursorMode === 'DUAL') {
+      const x1 = this.cursor1 * w;
+      const x2 = this.cursor2 * w;
+
+      ctx.save();
+      ctx.lineWidth = 1.5;
+
+      // Cursor 1 (Cyan)
+      ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1, 0); ctx.lineTo(x1, h);
+      ctx.stroke();
+
+      // C1 Top Flag
+      ctx.fillStyle = isLight ? '#0284c7' : '#06b6d4';
+      ctx.fillRect(x1 - 14, 0, 28, 16);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('C1', x1, 12);
+
+      // Cursor 2 (Amber)
+      ctx.strokeStyle = isLight ? '#d97706' : '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(x2, 0); ctx.lineTo(x2, h);
+      ctx.stroke();
+
+      // C2 Top Flag
+      ctx.fillStyle = isLight ? '#d97706' : '#f59e0b';
+      ctx.fillRect(x2 - 14, 0, 28, 16);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('C2', x2, 12);
+      ctx.setLineDash([]);
+
+      // --- Draw Waveform Intersection Nodes & Exact Voltage Badges ---
+      this.measurements.forEach((m) => {
+        const y1 = centerY - m.vCursor1 * yPixelsPerVolt;
+        const y2 = centerY - m.vCursor2 * yPixelsPerVolt;
+
+        // C1 Node & Voltage Badge
+        ctx.fillStyle = m.color || '#00d2ff';
+        ctx.beginPath();
+        ctx.arc(x1, y1, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Exact Voltage Tag for C1
+        const label1 = `${m.name}: ${formatValueWithPrefix(m.vCursor1, 'V')}`;
+        ctx.font = 'bold 9.5px Roboto Mono, monospace';
+        const tag1W = ctx.measureText(label1).width + 8;
+        ctx.fillStyle = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.9)';
+        ctx.fillRect(x1 + 6, Math.max(16, Math.min(h - 20, y1 - 8)), tag1W, 16);
+        ctx.strokeStyle = m.color || '#00d2ff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x1 + 6, Math.max(16, Math.min(h - 20, y1 - 8)), tag1W, 16);
+        ctx.fillStyle = m.color || '#00d2ff';
+        ctx.textAlign = 'left';
+        ctx.fillText(label1, x1 + 10, Math.max(28, Math.min(h - 8, y1 + 4)));
+
+        // C2 Node & Voltage Badge
+        ctx.fillStyle = m.color || '#00d2ff';
+        ctx.beginPath();
+        ctx.arc(x2, y2, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        // Exact Voltage Tag for C2
+        const label2 = `${m.name}: ${formatValueWithPrefix(m.vCursor2, 'V')}`;
+        const tag2W = ctx.measureText(label2).width + 8;
+        ctx.fillStyle = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.9)';
+        ctx.fillRect(x2 + 6, Math.max(16, Math.min(h - 20, y2 - 8)), tag2W, 16);
+        ctx.strokeStyle = m.color || '#00d2ff';
+        ctx.strokeRect(x2 + 6, Math.max(16, Math.min(h - 20, y2 - 8)), tag2W, 16);
+        ctx.fillStyle = m.color || '#00d2ff';
+        ctx.fillText(label2, x2 + 10, Math.max(28, Math.min(h - 8, y2 + 4)));
+      });
+
+      ctx.restore();
+    }
+
+    // --- 2. Draw Voltage Cursors (Y1, Y2) ---
+    if (this.cursorMode === 'VOLTAGE' || this.cursorMode === 'DUAL') {
+      const y1 = this.cursorY1 * h;
+      const y2 = this.cursorY2 * h;
+      const v1 = this.getVoltageFromYRatio(this.cursorY1);
+      const v2 = this.getVoltageFromYRatio(this.cursorY2);
+
+      ctx.save();
+      ctx.lineWidth = 1.5;
+
+      // Voltage Cursor 1 (Emerald)
+      ctx.strokeStyle = isLight ? '#059669' : '#10b981';
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(0, y1); ctx.lineTo(w, y1);
+      ctx.stroke();
+
+      // Y1 Left Flag
+      const tagY1 = `Y1: ${formatValueWithPrefix(v1, 'V')}`;
+      ctx.font = 'bold 9.5px Roboto Mono, monospace';
+      const wY1 = ctx.measureText(tagY1).width + 8;
+      ctx.fillStyle = isLight ? '#059669' : '#10b981';
+      ctx.fillRect(w - wY1 - 8, y1 - 8, wY1, 16);
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.fillText(tagY1, w - wY1 - 4, y1 + 4);
+
+      // Voltage Cursor 2 (Purple)
+      ctx.strokeStyle = isLight ? '#9333ea' : '#a855f7';
+      ctx.beginPath();
+      ctx.moveTo(0, y2); ctx.lineTo(w, y2);
+      ctx.stroke();
+
+      // Y2 Left Flag
+      const tagY2 = `Y2: ${formatValueWithPrefix(v2, 'V')}`;
+      const wY2 = ctx.measureText(tagY2).width + 8;
+      ctx.fillStyle = isLight ? '#9333ea' : '#a855f7';
+      ctx.fillRect(w - wY2 - 8, y2 - 8, wY2, 16);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(tagY2, w - wY2 - 4, y2 + 4);
+
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // --- 3. Compact HUD Readout Bar (Top Left) ---
+    this.drawHUD(ctx, w, h, isLight);
+  }
+
+  drawHUD(ctx, w, h, isLight = false) {
+    const cm = this.cursorMeasurements;
+    const firstProbeMeas = Array.from(this.measurements.values())[0];
+
+    const boxW = Math.max(180, Math.min(360, w - 24));
     ctx.save();
-    ctx.lineWidth = 1.5;
-
-    // Cursor 1 (Cyan)
-    ctx.strokeStyle = isLight ? '#0284c7' : '#06b6d4';
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath();
-    ctx.moveTo(x1, 0); ctx.lineTo(x1, h);
-    ctx.stroke();
-
-    // Cursor 2 (Amber)
-    ctx.strokeStyle = isLight ? '#d97706' : '#f59e0b';
-    ctx.beginPath();
-    ctx.moveTo(x2, 0); ctx.lineTo(x2, h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Measurement HUD Overlay Box (Responsive)
-    const boxW = Math.max(160, Math.min(320, w - 24));
-    const col2X = boxW > 240 ? 160 : Math.floor(boxW / 2) + 10;
-
-    ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.92)';
-    ctx.fillRect(12, 12, boxW, 52);
+    ctx.fillStyle = isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(15, 23, 42, 0.94)';
+    ctx.fillRect(12, 12, boxW, 56);
     ctx.strokeStyle = isLight ? '#cbd5e1' : '#334155';
     ctx.lineWidth = 1;
-    ctx.strokeRect(12, 12, boxW, 52);
+    ctx.strokeRect(12, 12, boxW, 56);
 
-    ctx.font = '11px Roboto Mono, monospace';
-    ctx.fillStyle = isLight ? '#0284c7' : '#06b6d4';
-    ctx.textAlign = 'left';
-    ctx.fillText(`C1: ${formatValueWithPrefix(t1, 's')}`, 20, 32);
+    ctx.font = '10.5px Roboto Mono, monospace';
+    const col2X = boxW > 260 ? 180 : Math.floor(boxW / 2) + 6;
 
-    ctx.fillStyle = isLight ? '#d97706' : '#f59e0b';
-    ctx.fillText(`C2: ${formatValueWithPrefix(t2, 's')}`, col2X, 32);
+    if (this.cursorMode === 'VOLTAGE') {
+      ctx.fillStyle = isLight ? '#059669' : '#10b981';
+      ctx.fillText(`Y1: ${formatValueWithPrefix(cm.y1Volt, 'V')}`, 20, 30);
+      ctx.fillStyle = isLight ? '#9333ea' : '#a855f7';
+      ctx.fillText(`Y2: ${formatValueWithPrefix(cm.y2Volt, 'V')}`, col2X, 30);
+      ctx.fillStyle = isLight ? '#0284c7' : '#38bdf8';
+      ctx.fillText(`ΔV: ${formatValueWithPrefix(cm.dyVolt, 'V')}`, 20, 52);
+    } else {
+      const v1Str = firstProbeMeas ? ` (${formatValueWithPrefix(firstProbeMeas.vCursor1, 'V')})` : '';
+      const v2Str = firstProbeMeas ? ` (${formatValueWithPrefix(firstProbeMeas.vCursor2, 'V')})` : '';
+      const dvStr = firstProbeMeas ? ` | ΔV: ${formatValueWithPrefix(Math.abs(firstProbeMeas.dvCursor), 'V')}` : '';
 
-    ctx.fillStyle = isLight ? '#059669' : '#10b981';
-    ctx.fillText(`Δt: ${formatValueWithPrefix(dt, 's')}`, 20, 52);
-    ctx.fillText(`Freq: ${formatValueWithPrefix(freq, 'Hz')}`, col2X, 52);
+      ctx.fillStyle = isLight ? '#0284c7' : '#06b6d4';
+      ctx.fillText(`C1: ${formatValueWithPrefix(cm.t1, 's')}${v1Str}`, 20, 30);
+
+      ctx.fillStyle = isLight ? '#d97706' : '#f59e0b';
+      ctx.fillText(`C2: ${formatValueWithPrefix(cm.t2, 's')}${v2Str}`, col2X, 30);
+
+      ctx.fillStyle = isLight ? '#059669' : '#10b981';
+      ctx.fillText(`Δt: ${formatValueWithPrefix(cm.dt, 's')}${dvStr}`, 20, 52);
+      ctx.fillText(`1/Δt: ${formatValueWithPrefix(cm.freq, 'Hz')}`, col2X, 52);
+    }
 
     ctx.restore();
   }
@@ -557,7 +905,7 @@ export class CircuitGrapher {
     ctx.textAlign = 'right';
     ctx.font = 'bold 11px Lato, sans-serif';
 
-    this.measurements.forEach((m, id) => {
+    this.measurements.forEach((m) => {
       const vppStr = formatValueWithPrefix(m.vpp, 'Vpp');
       const rmsStr = formatValueWithPrefix(m.rms, 'Vrms');
       const text = `${m.name}: ${vppStr} (${rmsStr})`;
@@ -576,5 +924,81 @@ export class CircuitGrapher {
     ctx.fillText(`Time: ${formatValueWithPrefix(this.timePerDiv, 's')}/div  |  Voltage: ${formatValueWithPrefix(this.voltsPerDiv, 'V')}/div`, 15, h - 12);
 
     ctx.restore();
+  }
+
+  // --- Real-Time Quick Parameters Panel DOM Updater ---
+  updateQuickPanelDOM() {
+    const panel = document.getElementById('croQuickPanel');
+    if (!panel || panel.style.display === 'none') return;
+
+    const tabsContainer = document.getElementById('croChannelTabs');
+    const probeIds = Array.from(this.measurements.keys());
+
+    // Render channel tabs if changed
+    if (tabsContainer) {
+      let tabsHtml = `<button class="cro-tab-btn ${this.selectedChannel === 'ALL' ? 'active' : ''}" data-channel="ALL">All Channels</button>`;
+      probeIds.forEach(id => {
+        const m = this.measurements.get(id);
+        const isActive = this.selectedChannel === id;
+        tabsHtml += `<button class="cro-tab-btn ${isActive ? 'active' : ''}" data-channel="${id}" style="color: ${m.color || '#00d2ff'};">${m.name}</button>`;
+      });
+      tabsContainer.innerHTML = tabsHtml;
+
+      tabsContainer.querySelectorAll('.cro-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.setChannelFocus(btn.dataset.channel);
+        });
+      });
+    }
+
+    // Determine target measurement object
+    let targetMeas = null;
+    if (this.selectedChannel !== 'ALL' && this.measurements.has(this.selectedChannel)) {
+      targetMeas = this.measurements.get(this.selectedChannel);
+    } else if (probeIds.length > 0) {
+      targetMeas = this.measurements.get(probeIds[0]);
+    }
+
+    const setVal = (elemId, val) => {
+      const el = document.getElementById(elemId);
+      if (el) el.textContent = val;
+    };
+
+    if (targetMeas) {
+      setVal('croValFreq', targetMeas.freq > 0 ? formatValueWithPrefix(targetMeas.freq, 'Hz') : '-- Hz');
+      setVal('croValPeriod', targetMeas.period > 0 ? formatValueWithPrefix(targetMeas.period, 's') : '-- s');
+      setVal('croValAmp', formatValueWithPrefix(targetMeas.amp, 'V'));
+      setVal('croValVpp', formatValueWithPrefix(targetMeas.vpp, 'V'));
+      setVal('croValVmax', formatValueWithPrefix(targetMeas.max, 'V'));
+      setVal('croValVmin', formatValueWithPrefix(targetMeas.min, 'V'));
+      setVal('croValVrms', formatValueWithPrefix(targetMeas.rms, 'V'));
+      setVal('croValVmean', formatValueWithPrefix(targetMeas.mean, 'V'));
+
+      // Cursor live readouts
+      setVal('croCursor1Time', `t₁ = ${formatValueWithPrefix(this.cursorMeasurements.t1, 's')}`);
+      setVal('croCursor1Volt', `V₁ = ${formatValueWithPrefix(targetMeas.vCursor1, 'V')}`);
+      setVal('croCursor2Time', `t₂ = ${formatValueWithPrefix(this.cursorMeasurements.t2, 's')}`);
+      setVal('croCursor2Volt', `V₂ = ${formatValueWithPrefix(targetMeas.vCursor2, 'V')}`);
+      setVal('croCursorDeltaTime', `Δt = ${formatValueWithPrefix(this.cursorMeasurements.dt, 's')}`);
+      setVal('croCursorDeltaVolt', `ΔV = ${formatValueWithPrefix(Math.abs(targetMeas.dvCursor), 'V')}`);
+      setVal('croCursorDeltaFreq', `1/Δt = ${formatValueWithPrefix(this.cursorMeasurements.freq, 'Hz')}`);
+    } else {
+      setVal('croValFreq', '-- Hz');
+      setVal('croValPeriod', '-- s');
+      setVal('croValAmp', '-- V');
+      setVal('croValVpp', '-- V');
+      setVal('croValVmax', '-- V');
+      setVal('croValVmin', '-- V');
+      setVal('croValVrms', '-- V');
+      setVal('croValVmean', '-- V');
+
+      setVal('croCursor1Time', `t₁ = ${formatValueWithPrefix(this.cursorMeasurements.t1, 's')}`);
+      setVal('croCursor1Volt', 'V₁ = -- V');
+      setVal('croCursor2Time', `t₂ = ${formatValueWithPrefix(this.cursorMeasurements.t2, 's')}`);
+      setVal('croCursor2Volt', 'V₂ = -- V');
+      setVal('croCursorDeltaTime', `Δt = ${formatValueWithPrefix(this.cursorMeasurements.dt, 's')}`);
+      setVal('croCursorDeltaVolt', 'ΔV = -- V');
+      setVal('croCursorDeltaFreq', `1/Δt = ${formatValueWithPrefix(this.cursorMeasurements.freq, 'Hz')}`);
+    }
   }
 }

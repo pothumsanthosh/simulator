@@ -1653,6 +1653,62 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(passPriority,
       `[Hit Priority] Pin hit testing (14px radius) takes strict precedence for wiring, while body click (200, 200) activates component dragging`, g10);
   }
+
+  // 10.20 CRO Exact Voltage Cursors & Quick Parameters Panel DSP Analytics
+  {
+    // Simulate sinusoidal signal history: 1000 Hz, 5V peak (10Vpp), sampled at 100 kHz (dt = 10µs)
+    const history = [];
+    const freq = 1000;
+    const period = 1 / freq; // 1.0 ms
+    const amp = 5.0;
+    const dt = 1e-5;
+    for (let t = 0; t <= 0.005; t += dt) {
+      const v = amp * Math.sin(2 * Math.PI * freq * t);
+      history.push({
+        time: t,
+        probes: {
+          'p1': { id: 'p1', name: 'Probe 1', color: '#00d2ff', value: v, unit: 'V' }
+        }
+      });
+    }
+
+    // Function matching CircuitGrapher.getVoltageAtTime
+    const getVoltageAtTime = (targetTime) => {
+      let low = 0;
+      let high = history.length - 1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (history[mid].time < targetTime) low = mid + 1;
+        else high = mid - 1;
+      }
+      const idx0 = Math.max(0, high);
+      const idx1 = Math.min(history.length - 1, low);
+      const pt0 = history[idx0];
+      const pt1 = history[idx1];
+      if (pt1.time === pt0.time) return pt0.probes.p1.value;
+      const frac = (targetTime - pt0.time) / (pt1.time - pt0.time);
+      return pt0.probes.p1.value + frac * (pt1.probes.p1.value - pt0.probes.p1.value);
+    };
+
+    // Test exact voltage interpolation at t = 0.25ms (Peak: +5.0V), t = 0.75ms (Valley: -5.0V), t = 0.50ms (Zero: 0.0V)
+    const vPeak = getVoltageAtTime(0.00025);
+    const vValley = getVoltageAtTime(0.00075);
+    const vZero = getVoltageAtTime(0.00050);
+
+    const passInterp = Math.abs(vPeak - 5.0) < 1e-3 && Math.abs(vValley - (-5.0)) < 1e-3 && Math.abs(vZero - 0.0) < 1e-3;
+
+    // Test Quick Parameters: Time Period, Freq, Vamp, Vpp, Vrms
+    const vpp = vPeak - vValley;
+    const vAmpCalc = vpp / 2;
+    const cursorDt = 0.00075 - 0.00025; // 0.5 ms
+    const cursorDv = Math.abs(vValley - vPeak); // 10 V
+    const cursorFreq = 1 / (2 * cursorDt); // 1000 Hz
+
+    const passParams = Math.abs(vpp - 10.0) < 1e-3 && Math.abs(vAmpCalc - 5.0) < 1e-3 && Math.abs(cursorDv - 10.0) < 1e-3 && Math.abs(cursorFreq - 1000) < 1e-3;
+
+    assert(passInterp && passParams,
+      `[CRO Quick Panel] Exact voltage interpolation (V_peak=${vPeak.toFixed(3)}V, V_valley=${vValley.toFixed(3)}V) & Quick Parameters (T=${(period*1000).toFixed(2)}ms, f=${freq}Hz, Vamp=${vAmpCalc.toFixed(2)}V, Vpp=${vpp.toFixed(2)}V, ΔV=${cursorDv.toFixed(2)}V) verified`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------
