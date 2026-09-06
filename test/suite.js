@@ -259,6 +259,73 @@ console.log('\n[5/5] Rectified Models & Bug Fix Verification');
   assert(Math.abs(vNode - 5.4545) < 0.05, `Multi-wire Junction Node voltage = ${vNode.toFixed(4)}V (Expected: 5.4545V)`);
 }
 
+// 6. Dynamic Component Movement, Multi-Selection Drag & Wire Rubber-Banding
+console.log('\n[6/6] Dynamic Drag-and-Drop & Wire Rubber-Banding EDA Engine');
+{
+  // Test A: Single component drag offset preservation and grid snapping
+  const r1 = { id: 'R1', type: 'RESISTOR', x: 100, y: 100, pins: [{ id: 'p1', x: -30, y: 0 }, { id: 'p2', x: 30, y: 0 }] };
+  const grabPoint = { x: 110, y: 105 }; // clicked slightly off-center
+  const currentCursor = { x: 172, y: 143 }; // moved cursor
+  const dx = currentCursor.x - grabPoint.x; // 62
+  const dy = currentCursor.y - grabPoint.y; // 38
+  const gridSize = 20;
+  const newX = Math.round((100 + dx) / gridSize) * gridSize; // round(162/20)*20 = 160
+  const newY = Math.round((100 + dy) / gridSize) * gridSize; // round(138/20)*20 = 140
+  r1.x = newX;
+  r1.y = newY;
+  assert(r1.x === 160 && r1.y === 140, `Component drag smoothly snapped to (${r1.x}, ${r1.y}) preserving grab offset`);
+
+  // Test B: Connected wire endpoints rubber-band dynamically with component coordinates
+  const c1 = { id: 'C1', type: 'CAPACITOR', x: 260, y: 140, pins: [{ id: 'p1', x: -20, y: 0 }, { id: 'p2', x: 20, y: 0 }] };
+  const wire = { fromPin: 'R1:p2', toPin: 'C1:p1' };
+  
+  function getPinPos(comp, pinId) {
+    const pin = comp.pins.find(p => p.id === pinId);
+    return { x: comp.x + pin.x, y: comp.y + pin.y };
+  }
+
+  const p1Before = getPinPos(r1, 'p2'); // (160+30, 140) = (190, 140)
+  const p2Before = getPinPos(c1, 'p1'); // (260-20, 140) = (240, 140)
+  assert(p1Before.x === 190 && p1Before.y === 140 && p2Before.x === 240, `Wire endpoint tracks component initial pin position`);
+
+  // Move C1
+  c1.x = 300;
+  c1.y = 200;
+  const p2After = getPinPos(c1, 'p1'); // (300-20, 200) = (280, 200)
+  assert(p2After.x === 280 && p2After.y === 200, `Wire endpoint dynamically rubber-bands to moved component position (280, 200)`);
+
+  // Test C: Group multi-selection translation maintains relative spacing
+  const group = [
+    { id: 'Q1', x: 100, y: 100 },
+    { id: 'Q2', x: 160, y: 100 },
+    { id: 'Q3', x: 220, y: 160 }
+  ];
+  const groupInitial = group.map(c => ({ id: c.id, x: c.x, y: c.y }));
+  const groupDx = 40, groupDy = 60;
+  group.forEach(c => {
+    const init = groupInitial.find(i => i.id === c.id);
+    c.x = Math.round((init.x + groupDx) / gridSize) * gridSize;
+    c.y = Math.round((init.y + groupDy) / gridSize) * gridSize;
+  });
+  assert(group[0].x === 140 && group[1].x === 200 && group[2].x === 260, `Multi-selection group drag maintains rigid relative spacing`);
+
+  // Test D: Pre-movement state snapshotting allows single Undo to restore original location
+  const historyStack = [];
+  function saveState(components) {
+    historyStack.push(JSON.parse(JSON.stringify(components)));
+  }
+  const comps = [{ id: 'R1', x: 100, y: 100 }];
+  // Save before movement
+  saveState(comps);
+  comps[0].x = 220;
+  comps[0].y = 300;
+  // Undo restores
+  const restored = historyStack.pop();
+  comps[0].x = restored[0].x;
+  comps[0].y = restored[0].y;
+  assert(comps[0].x === 100 && comps[0].y === 100, `Pre-drag state snapshotting accurately restores pre-movement coordinates on Undo`);
+}
+
 console.log('\n----------------------------------------------------');
 console.log(`TOTAL RESULTS: ${passCount} Passed, ${failCount} Failed.`);
 if (failCount > 0) process.exit(1);

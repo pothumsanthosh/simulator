@@ -55,6 +55,9 @@ export class SchematicCanvas {
     // Dragging & Panning & Multi-touch Gestures (Bare Hands)
     this.isDragging = false;
     this.dragCandidate = false;
+    this.hasMovedPastThreshold = false;
+    this.dragHistorySaved = false;
+    this.dragPointerId = null;
     this.isPanning = false;
     this.isPinching = false;
     this.isBoxSelecting = false;
@@ -116,29 +119,19 @@ export class SchematicCanvas {
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
-    // Native Touch Event Trapping (Prevents mobile/tablet gesture cancellations on canvas)
-    const preventTouchGestures = (e) => {
-      if (e.cancelable) e.preventDefault();
-    };
-    this.canvas.addEventListener('touchstart', preventTouchGestures, { passive: false });
-    this.canvas.addEventListener('touchmove', preventTouchGestures, { passive: false });
-    this.canvas.addEventListener('touchend', preventTouchGestures, { passive: false });
-    this.canvas.addEventListener('touchcancel', preventTouchGestures, { passive: false });
-
-    // Pointer Events (Unified Touchscreen "Bare Hands", Stylus & Mouse)
+    // Single-Source Pointer Events on Canvas (Desktop Mouse, Touchscreen & Stylus)
     this.canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
     this.canvas.addEventListener('pointermove', (e) => this.handlePointerMove(e));
-    window.addEventListener('pointermove', (e) => this.handlePointerMove(e));
     this.canvas.addEventListener('pointerup', (e) => this.handlePointerUp(e));
-    window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
-    this.canvas.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
-    window.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
+    this.canvas.addEventListener('pointercancel', (e) => this.handlePointerCancel(e));
+
     window.addEventListener('blur', () => {
       this.activePointers.clear();
       this.isDragging = false;
       this.isPanning = false;
       this.isPinching = false;
       this.isBoxSelecting = false;
+      this.state = CanvasState.IDLE;
     });
 
     this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
@@ -511,10 +504,13 @@ export class SchematicCanvas {
     if (this.activePointers.size === 2 && e.pointerType === 'touch') {
       this.isPinching = true;
       this.isDragging = false;
+      this.dragCandidate = false;
       this.isPanning = false;
+      this.isBoxSelecting = false;
       this.wiringStartPin = null;
       this.wiringCurrentPos = null;
       this.hoveredTargetPin = null;
+      this.state = CanvasState.PINCHING;
       const pts = Array.from(this.activePointers.values());
       this.initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       this.initialPinchZoom = this.zoom;
@@ -538,7 +534,10 @@ export class SchematicCanvas {
 
     // Middle-click or Alt+LeftClick: Pan
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      this.state = CanvasState.PANNING_CANVAS;
       this.isPanning = true;
+      this.isDragging = false;
+      this.dragCandidate = false;
       this.dragStartX = e.clientX;
       this.dragStartY = e.clientY;
       return;
@@ -547,6 +546,7 @@ export class SchematicCanvas {
     if (e.button === 0 || e.pointerType === 'touch' || e.pointerType === 'pen' || e.button === undefined) {
       // 1. Placement Mode
       if (this.mode === 'PLACE' && this.placementComponentType) {
+        this.state = CanvasState.PLACING_COMPONENT;
         const sx = this.snapToGrid(worldPos.x);
         const sy = this.snapToGrid(worldPos.y);
 
@@ -586,12 +586,19 @@ export class SchematicCanvas {
         }
         if (newComp) {
           this.isDragging = true;
+          this.dragCandidate = true;
+          this.hasMovedPastThreshold = false;
+          this.dragHistorySaved = true;
+          this.dragPointerId = e.pointerId;
           this.isPanning = false;
           this.isBoxSelecting = false;
           this.dragStartX = worldPos.x;
           this.dragStartY = worldPos.y;
+          this.dragStartScreen = { x: e.clientX, y: e.clientY };
+          this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
           this.compInitialPositions.clear();
           this.compInitialPositions.set(newComp, { x: newComp.x, y: newComp.y });
+          this.state = CanvasState.DRAGGING_COMPONENT;
         }
         return;
       }
@@ -615,6 +622,7 @@ export class SchematicCanvas {
           this.wiringStartPin = null;
           this.wiringCurrentPos = null;
           this.hoveredTargetPin = null;
+          this.state = CanvasState.IDLE;
           this.notifyModified();
           this.render();
           return;
@@ -641,6 +649,7 @@ export class SchematicCanvas {
           this.wiringStartPin = null;
           this.wiringCurrentPos = null;
           this.hoveredTargetPin = null;
+          this.state = CanvasState.IDLE;
           this.notifyModified();
           this.render();
           return;
@@ -650,6 +659,7 @@ export class SchematicCanvas {
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
         this.hoveredTargetPin = null;
+        this.state = CanvasState.IDLE;
         this.render();
         return;
       }
@@ -694,8 +704,15 @@ export class SchematicCanvas {
 
         this.selectWire(null);
         this.isDragging = true;
+        this.dragCandidate = true;
+        this.hasMovedPastThreshold = false;
+        this.dragHistorySaved = false;
+        this.dragPointerId = e.pointerId;
         this.dragStartX = worldPos.x;
         this.dragStartY = worldPos.y;
+        this.dragStartScreen = { x: e.clientX, y: e.clientY };
+        this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
+        this.state = CanvasState.SELECTING;
 
         this.compInitialPositions.clear();
         this.selectedComponents.forEach(c => {
@@ -713,7 +730,9 @@ export class SchematicCanvas {
       const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
       if (pinHit) {
         this.isDragging = false;
+        this.dragCandidate = false;
         this.isPanning = false;
+        this.state = CanvasState.WIRING;
         this.wiringStartPin = pinHit;
         this.wiringCurrentPos = pinHit.pos;
         this.render();
@@ -724,16 +743,20 @@ export class SchematicCanvas {
       const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
       if (wireHit) {
         this.isDragging = false;
+        this.dragCandidate = false;
         this.isPanning = false;
+        this.state = CanvasState.IDLE;
         this.selectWire(wireHit);
         return;
       }
 
       // 6. Empty Canvas Click -> Marquee Selection or Pan
       this.isDragging = false;
+      this.dragCandidate = false;
       if (e.shiftKey) {
         this.isPanning = false;
         this.isBoxSelecting = true;
+        this.state = CanvasState.SELECTING;
         this.boxSelectStart = worldPos;
         this.boxSelectCurrent = worldPos;
       } else {
@@ -744,6 +767,7 @@ export class SchematicCanvas {
           this.onSelectionChange({ type: 'component', item: null, group: [] });
         }
         this.isPanning = true;
+        this.state = CanvasState.PANNING_CANVAS;
         this.dragStartX = e.clientX;
         this.dragStartY = e.clientY;
       }
@@ -791,15 +815,24 @@ export class SchematicCanvas {
 
     // Direct Dragging Priority: Move selected components with mouse or touch
     if (this.isDragging && this.selectedComponents.size > 0) {
-      const dx = worldPos.x - this.dragStartX;
-      const dy = worldPos.y - this.dragStartY;
-      this.selectedComponents.forEach(c => {
-        const initPos = this.compInitialPositions.get(c) || { x: c.x, y: c.y };
-        c.x = this.snapToGrid(initPos.x + dx);
-        c.y = this.snapToGrid(initPos.y + dy);
-      });
-      this.render();
-      return;
+      const screenDist = Math.hypot(e.clientX - this.dragStartScreen.x, e.clientY - this.dragStartScreen.y);
+      if (screenDist > 2 || this.hasMovedPastThreshold) {
+        this.hasMovedPastThreshold = true;
+        if (!this.dragHistorySaved) {
+          this.saveState();
+          this.dragHistorySaved = true;
+        }
+        this.state = CanvasState.DRAGGING_COMPONENT;
+        const dx = worldPos.x - this.dragStartWorld.x;
+        const dy = worldPos.y - this.dragStartWorld.y;
+        this.selectedComponents.forEach(c => {
+          const initPos = this.compInitialPositions.get(c) || { x: c.x, y: c.y };
+          c.x = this.snapToGrid(initPos.x + dx);
+          c.y = this.snapToGrid(initPos.y + dy);
+        });
+        this.render();
+        return;
+      }
     }
 
     if (this.isPanning) {
@@ -874,6 +907,7 @@ export class SchematicCanvas {
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
         this.hoveredTargetPin = null;
+        this.state = CanvasState.IDLE;
         this.notifyModified();
         this.render();
         return;
@@ -898,6 +932,7 @@ export class SchematicCanvas {
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
         this.hoveredTargetPin = null;
+        this.state = CanvasState.IDLE;
         this.notifyModified();
         this.render();
         return;
@@ -907,19 +942,13 @@ export class SchematicCanvas {
     if (this.isDragging) {
       this.isDragging = false;
       this.dragCandidate = false;
-      this.state = CanvasState.IDLE;
-      let hasMoved = false;
-      for (const [c, initPos] of this.compInitialPositions.entries()) {
-        if (c.x !== initPos.x || c.y !== initPos.y) {
-          hasMoved = true;
-          break;
-        }
-      }
-      if (hasMoved) {
-        this.saveState();
+      if (this.hasMovedPastThreshold && this.dragHistorySaved) {
         this.notifyModified();
       }
       this.compInitialPositions.clear();
+      this.hasMovedPastThreshold = false;
+      this.dragHistorySaved = false;
+      this.state = CanvasState.IDLE;
       this.render();
     }
     this.dragCandidate = false;
@@ -943,6 +972,33 @@ export class SchematicCanvas {
       }
       this.render();
     }
+  }
+
+  handlePointerCancel(e) {
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    this.activePointers.delete(e.pointerId);
+
+    if (this.isDragging && this.dragHistorySaved) {
+      for (const [c, initPos] of this.compInitialPositions.entries()) {
+        c.x = initPos.x;
+        c.y = initPos.y;
+      }
+      this.undo();
+    }
+
+    this.isDragging = false;
+    this.dragCandidate = false;
+    this.hasMovedPastThreshold = false;
+    this.dragHistorySaved = false;
+    this.compInitialPositions.clear();
+    this.isPanning = false;
+    this.isPinching = false;
+    this.isBoxSelecting = false;
+    this.wiringStartPin = null;
+    this.wiringCurrentPos = null;
+    this.hoveredTargetPin = null;
+    this.state = CanvasState.IDLE;
+    this.render();
   }
 
   handleMouseUp(e) {
