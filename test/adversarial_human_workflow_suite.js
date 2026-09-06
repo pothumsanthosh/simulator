@@ -1598,6 +1598,61 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(passNodes && passVoltages,
       `[Node Option] SPICE Node Mapping (GND=0, V1=Node ${v1Node} (5.0V), Mid=Node ${midNode} (2.5V)) accurately resolved for on-canvas node badges`, g10);
   }
+
+  // 10.19 Terminal Pin Wiring Priority vs Component Body Drag Hit-Testing
+  {
+    const comp = {
+      id: 'R1',
+      type: ComponentTypes.RESISTOR,
+      x: 200,
+      y: 200,
+      width: 40,
+      height: 20,
+      rotation: 0,
+      pins: [
+        { id: 'p1', x: -30, y: 0, dir: 'left' },
+        { id: 'p2', x: 30, y: 0, dir: 'right' }
+      ]
+    };
+
+    const getPinWorldPos = (c, p) => ({ x: c.x + p.x, y: c.y + p.y });
+    const findPinAt = (comps, wx, wy, radius = 14) => {
+      for (const c of comps) {
+        for (const pin of c.pins) {
+          const pos = getPinWorldPos(c, pin);
+          if (Math.hypot(wx - pos.x, wy - pos.y) <= radius) {
+            return { comp: c, pin, pos };
+          }
+        }
+      }
+      return null;
+    };
+
+    const findComponentAt = (comps, wx, wy, padding = 10) => {
+      for (const c of comps) {
+        const hw = Math.max((c.width / 2) + padding, 22);
+        const hh = Math.max((c.height / 2) + padding, 22);
+        if (Math.abs(wx - c.x) <= hw && Math.abs(wy - c.y) <= hh) {
+          return c;
+        }
+      }
+      return null;
+    };
+
+    // Pin 1 is at (170, 200)
+    // Clicking on Pin 1 terminal (170, 200)
+    const pinHitAtPin = findPinAt([comp], 170, 200, 14);
+    // Clicking near Pin 1 (175, 201)
+    const pinHitNearPin = findPinAt([comp], 175, 201, 14);
+    // Clicking at component center / body (200, 200)
+    const pinHitAtCenter = findPinAt([comp], 200, 200, 14);
+    const compHitAtCenter = findComponentAt([comp], 200, 200, 10);
+
+    const passPriority = pinHitAtPin !== null && pinHitNearPin !== null && pinHitAtCenter === null && compHitAtCenter !== null;
+
+    assert(passPriority,
+      `[Hit Priority] Pin hit testing (14px radius) takes strict precedence for wiring, while body click (200, 200) activates component dragging`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

@@ -658,8 +658,22 @@ export class SchematicCanvas {
         return;
       }
 
-      // 3. Component Selection & Direct Dragging (Priority over pin click, generous 20px hit radius)
-      const compHit = this.findComponentAt(worldPos.x, worldPos.y, 20);
+      // 3. Pin Click to Start / Extend Wiring (HIGHEST PRIORITY: clicking terminal starts wire extension)
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 14);
+      if (pinHit) {
+        this.drag.active = false;
+        this.isPanning = false;
+        this.isBoxSelecting = false;
+        this.state = CanvasState.WIRING;
+        this.wiringStartPin = pinHit;
+        this.wiringCurrentPos = pinHit.pos;
+        this.canvas.style.cursor = 'crosshair';
+        this.render();
+        return;
+      }
+
+      // 4. Component Selection & Direct Dragging (When clicking inside component body)
+      const compHit = this.findComponentAt(worldPos.x, worldPos.y, 10);
       if (compHit) {
         console.log('COMPONENT DOWN', compHit?.id);
 
@@ -721,18 +735,6 @@ export class SchematicCanvas {
 
         this.render();
 
-        return;
-      }
-
-      // 4. Pin Click to Start Wiring
-      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
-      if (pinHit) {
-        this.drag.active = false;
-        this.isPanning = false;
-        this.state = CanvasState.WIRING;
-        this.wiringStartPin = pinHit;
-        this.wiringCurrentPos = pinHit.pos;
-        this.render();
         return;
       }
 
