@@ -435,8 +435,11 @@ export const ComponentDefinitions = {
     paramSchema: [
       { key: 'v1', label: 'Initial Voltage', type: 'number', unit: 'V', default: 0 },
       { key: 'v2', label: 'Pulsed Voltage', type: 'number', unit: 'V', default: 5 },
-      { key: 'tWidth', label: 'Pulse Width', type: 'number', unit: 's', default: 1e-3 },
-      { key: 'period', label: 'Period', type: 'number', unit: 's', default: 2e-3 }
+      { key: 'tDelay', label: 'Delay Time (TD)', type: 'number', unit: 's', default: 0 },
+      { key: 'tRise', label: 'Rise Time (TR)', type: 'number', unit: 's', default: 1e-6 },
+      { key: 'tFall', label: 'Fall Time (TF)', type: 'number', unit: 's', default: 1e-6 },
+      { key: 'tWidth', label: 'Pulse Width (PW)', type: 'number', unit: 's', default: 1e-3 },
+      { key: 'period', label: 'Period (PER / 0 for single pulse)', type: 'number', unit: 's', default: 2e-3 }
     ]
   },
   [ComponentTypes.AM_VOLTAGE]: {
@@ -911,6 +914,21 @@ export const ComponentDefinitions = {
     params: { vGateTrig: 1.0 },
     paramSchema: [{ key: 'vGateTrig', label: 'Gate Trigger Voltage', type: 'number', unit: 'V', default: 1.0 }]
   },
+  [ComponentTypes.DIAC]: {
+    name: 'DIAC Trigger Diode (DB3)',
+    type: ComponentTypes.DIAC,
+    category: ComponentCategory.POWER,
+    prefix: 'DIAC',
+    width: 40, height: 40,
+    pins: [
+      { id: 'p1', name: '1', x: -20, y: 0, dir: 'left' },
+      { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }
+    ],
+    params: { vBreakover: 32, rOn: 5, rOff: 1e7 },
+    paramSchema: [
+      { key: 'vBreakover', label: 'Breakover Voltage (Vbo)', type: 'number', unit: 'V', default: 32 }
+    ]
+  },
 
   // =================== 6. ANALOG & LINEAR ICS ===================
   [ComponentTypes.OPAMP]: {
@@ -966,6 +984,31 @@ export const ComponentDefinitions = {
       { id: 'thresh', name: 'THRESH (6)', x: -35, y: 10, dir: 'left' },
       { id: 'disch', name: 'DISCH (7)', x: -35, y: 30, dir: 'left' },
       { id: 'vcc', name: 'VCC (8)', x: 35, y: 30, dir: 'right' }
+    ],
+    params: { vcc: 9 },
+    paramSchema: [{ key: 'vcc', label: 'Supply Voltage (Vcc)', type: 'number', unit: 'V', default: 9 }]
+  },
+  [ComponentTypes.TIMER556]: {
+    name: 'Dual 556 Precision Timer IC',
+    type: ComponentTypes.TIMER556,
+    category: ComponentCategory.ANALOG,
+    prefix: 'U_556',
+    width: 80, height: 100,
+    pins: [
+      { id: 'disch1', name: 'DIS1 (1)', x: -40, y: -35, dir: 'left' },
+      { id: 'thresh1', name: 'TH1 (2)', x: -40, y: -20, dir: 'left' },
+      { id: 'ctrl1', name: 'CV1 (3)', x: -40, y: -5, dir: 'left' },
+      { id: 'reset1', name: 'RST1 (4)', x: -40, y: 10, dir: 'left' },
+      { id: 'out1', name: 'OUT1 (5)', x: -40, y: 25, dir: 'left' },
+      { id: 'trig1', name: 'TR1 (6)', x: -40, y: 40, dir: 'left' },
+      { id: 'gnd', name: 'GND (7)', x: 0, y: 50, dir: 'bottom' },
+      { id: 'vcc', name: 'VCC (14)', x: 0, y: -50, dir: 'top' },
+      { id: 'disch2', name: 'DIS2 (13)', x: 40, y: -35, dir: 'right' },
+      { id: 'thresh2', name: 'TH2 (12)', x: 40, y: -20, dir: 'right' },
+      { id: 'ctrl2', name: 'CV2 (11)', x: 40, y: -5, dir: 'right' },
+      { id: 'reset2', name: 'RST2 (10)', x: 40, y: 10, dir: 'right' },
+      { id: 'out2', name: 'OUT2 (9)', x: 40, y: 25, dir: 'right' },
+      { id: 'trig2', name: 'TR2 (8)', x: 40, y: 40, dir: 'right' }
     ],
     params: { vcc: 9 },
     paramSchema: [{ key: 'vcc', label: 'Supply Voltage (Vcc)', type: 'number', unit: 'V', default: 9 }]
@@ -1141,8 +1184,115 @@ export const ComponentDefinitions = {
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
+  [ComponentTypes.SCHMITT_TRIGGER]: {
+    name: 'Schmitt Trigger Inverter (74HC14)',
+    type: ComponentTypes.SCHMITT_TRIGGER,
+    category: ComponentCategory.LOGIC_GATES,
+    prefix: 'U_ST',
+    width: 50, height: 40,
+    pins: [
+      { id: 'in', name: 'A', x: -25, y: 0, dir: 'left' },
+      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+    ],
+    params: { vHigh: 5, vLow: 0, vThreshPos: 3.0, vThreshNeg: 1.8, isInverting: true },
+    paramSchema: [
+      { key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 },
+      { key: 'vLow', label: 'Logic Low (GND)', type: 'number', unit: 'V', default: 0 },
+      { key: 'vThreshPos', label: 'Positive Threshold (VT+)', type: 'number', unit: 'V', default: 3.0 },
+      { key: 'vThreshNeg', label: 'Negative Threshold (VT-)', type: 'number', unit: 'V', default: 1.8 },
+      { key: 'isInverting', label: 'Inverting (7414)', type: 'boolean', default: true }
+    ]
+  },
+  [ComponentTypes.BUFFER_GATE]: {
+    name: 'Non-Inverting Buffer Gate (74HC07)',
+    type: ComponentTypes.BUFFER_GATE,
+    category: ComponentCategory.LOGIC_GATES,
+    prefix: 'U_BUF',
+    width: 40, height: 30,
+    pins: [
+      { id: 'in', name: 'A', x: -20, y: 0, dir: 'left' },
+      { id: 'out', name: 'Y', x: 20, y: 0, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
+  },
+  [ComponentTypes.AND3_GATE]: {
+    name: '3-Input AND Gate (74HC11)',
+    type: ComponentTypes.AND3_GATE,
+    category: ComponentCategory.LOGIC_GATES,
+    prefix: 'U_AND3',
+    width: 50, height: 50,
+    pins: [
+      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
+      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
+      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
+      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
+  },
+  [ComponentTypes.NAND3_GATE]: {
+    name: '3-Input NAND Gate (74HC10)',
+    type: ComponentTypes.NAND3_GATE,
+    category: ComponentCategory.LOGIC_GATES,
+    prefix: 'U_NAND3',
+    width: 50, height: 50,
+    pins: [
+      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
+      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
+      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
+      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
+  },
+  [ComponentTypes.OR3_GATE]: {
+    name: '3-Input OR Gate (74HC4075)',
+    type: ComponentTypes.OR3_GATE,
+    category: ComponentCategory.LOGIC_GATES,
+    prefix: 'U_OR3',
+    width: 50, height: 50,
+    pins: [
+      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
+      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
+      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
+      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
+  },
+  [ComponentTypes.NOR3_GATE]: {
+    name: '3-Input NOR Gate (74HC27)',
+    type: ComponentTypes.NOR3_GATE,
+    category: ComponentCategory.LOGIC_GATES,
+    prefix: 'U_NOR3',
+    width: 50, height: 50,
+    pins: [
+      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
+      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
+      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
+      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
+  },
 
   // =================== 9. 74xx & SEQUENTIAL DIGITAL ICS ===================
+  [ComponentTypes.SR_LATCH]: {
+    name: 'SR Latch (Set/Reset)',
+    type: ComponentTypes.SR_LATCH,
+    category: ComponentCategory.FLIP_FLOPS,
+    prefix: 'U_SR',
+    width: 50, height: 60,
+    pins: [
+      { id: 's', name: 'S', x: -25, y: -15, dir: 'left' },
+      { id: 'r', name: 'R', x: -25, y: 15, dir: 'left' },
+      { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
+      { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
+  },
   [ComponentTypes.D_FLIPFLOP]: {
     name: 'D Flip-Flop (74HC74)',
     type: ComponentTypes.D_FLIPFLOP,
@@ -1168,6 +1318,21 @@ export const ComponentDefinitions = {
       { id: 'j', name: 'J', x: -25, y: -20, dir: 'left' },
       { id: 'clk', name: 'CLK', x: -25, y: 0, dir: 'left' },
       { id: 'k', name: 'K', x: -25, y: 20, dir: 'left' },
+      { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
+      { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
+    ],
+    params: { vHigh: 5 },
+    paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
+  },
+  [ComponentTypes.T_FLIPFLOP]: {
+    name: 'T Flip-Flop (Toggle Clock Trigger)',
+    type: ComponentTypes.T_FLIPFLOP,
+    category: ComponentCategory.FLIP_FLOPS,
+    prefix: 'U_TFF',
+    width: 50, height: 60,
+    pins: [
+      { id: 't', name: 'T', x: -25, y: -15, dir: 'left' },
+      { id: 'clk', name: 'CLK', x: -25, y: 15, dir: 'left' },
       { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
       { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
     ],
@@ -1277,6 +1442,16 @@ export const ComponentDefinitions = {
     pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
     params: { closed: false },
     paramSchema: [{ key: 'closed', label: 'Pressed', type: 'boolean', default: false }]
+  },
+  [ComponentTypes.PUSH_BUTTON_NC]: {
+    name: 'Pushbutton (Normally Closed)',
+    type: ComponentTypes.PUSH_BUTTON_NC,
+    category: ComponentCategory.SWITCHES,
+    prefix: 'PB_NC',
+    width: 40, height: 30,
+    pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
+    params: { closed: true },
+    paramSchema: [{ key: 'closed', label: 'Closed State', type: 'boolean', default: true }]
   },
   [ComponentTypes.RELAY_SPDT]: {
     name: 'Electromechanical Relay (SPDT)',

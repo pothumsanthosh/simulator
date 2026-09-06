@@ -678,7 +678,7 @@ export class SchematicCanvas {
         console.log('COMPONENT DOWN', compHit?.id);
 
         // Toggle interactive switch components
-        if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON) {
+        if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON || compHit.type === ComponentTypes.PUSH_BUTTON_NC) {
           compHit.params.closed = !compHit.params.closed;
           this.notifyModified();
           this.render();
@@ -1924,6 +1924,20 @@ export class SchematicCanvas {
         break;
       }
 
+      case ComponentTypes.CLOCK_VOLTAGE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        // Clock pulse icon
+        ctx.moveTo(-10, 5); ctx.lineTo(-10, -5); ctx.lineTo(-3, -5); ctx.lineTo(-3, 5); ctx.lineTo(4, 5); ctx.lineTo(4, -5); ctx.lineTo(10, -5);
+        ctx.stroke();
+        break;
+      }
+
       case ComponentTypes.PULSE_VOLTAGE: {
         ctx.beginPath();
         ctx.arc(0, 0, 18, 0, Math.PI * 2);
@@ -2318,6 +2332,25 @@ export class SchematicCanvas {
         break;
       }
 
+      case ComponentTypes.DIAC: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-8, 0);
+        ctx.moveTo(8, 0); ctx.lineTo(20, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-8, -10); ctx.lineTo(4, 0); ctx.lineTo(-8, 10);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(8, -10); ctx.lineTo(-4, 0); ctx.lineTo(8, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+
       case ComponentTypes.OPAMP:
       case ComponentTypes.COMPARATOR: {
         ctx.beginPath();
@@ -2378,7 +2411,7 @@ export class SchematicCanvas {
         ctx.fill();
         ctx.stroke();
 
-        if (comp.type === ComponentTypes.NAND_GATE) {
+        if (comp.type === ComponentTypes.NAND_GATE || comp.type === ComponentTypes.NAND3_GATE) {
           ctx.beginPath();
           ctx.arc(21, 0, 3, 0, Math.PI * 2);
           ctx.fill();
@@ -2387,8 +2420,30 @@ export class SchematicCanvas {
         break;
       }
 
+      case ComponentTypes.AND3_GATE:
+      case ComponentTypes.NAND3_GATE: {
+        ctx.beginPath();
+        ctx.moveTo(-25, -20); ctx.lineTo(0, -20);
+        ctx.arc(0, 0, 20, -Math.PI / 2, Math.PI / 2, false);
+        ctx.lineTo(-25, 20);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        if (comp.type === ComponentTypes.NAND3_GATE) {
+          ctx.beginPath();
+          ctx.arc(23, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        break;
+      }
+
       case ComponentTypes.OR_GATE:
-      case ComponentTypes.NOR_GATE: {
+      case ComponentTypes.NOR_GATE:
+      case ComponentTypes.OR3_GATE:
+      case ComponentTypes.NOR3_GATE: {
         ctx.beginPath();
         ctx.moveTo(-25, -18);
         ctx.quadraticCurveTo(0, -18, 20, 0);
@@ -2398,7 +2453,7 @@ export class SchematicCanvas {
         ctx.fill();
         ctx.stroke();
 
-        if (comp.type === ComponentTypes.NOR_GATE) {
+        if (comp.type === ComponentTypes.NOR_GATE || comp.type === ComponentTypes.NOR3_GATE) {
           ctx.beginPath();
           ctx.arc(23, 0, 3, 0, Math.PI * 2);
           ctx.fill();
@@ -2407,16 +2462,41 @@ export class SchematicCanvas {
         break;
       }
 
-      case ComponentTypes.NOT_GATE: {
+      case ComponentTypes.NOT_GATE:
+      case ComponentTypes.BUFFER_GATE: {
         ctx.beginPath();
-        ctx.moveTo(-20, -14); ctx.lineTo(12, 0); ctx.lineTo(-20, 14);
+        ctx.moveTo(-20, -14); ctx.lineTo(comp.type === ComponentTypes.NOT_GATE ? 12 : 18, 0); ctx.lineTo(-20, 14);
         ctx.closePath();
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.stroke();
+        if (comp.type === ComponentTypes.NOT_GATE) {
+          ctx.beginPath();
+          ctx.arc(16, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case ComponentTypes.SCHMITT_TRIGGER: {
         ctx.beginPath();
-        ctx.arc(16, 0, 3, 0, Math.PI * 2);
+        ctx.moveTo(-22, -16); ctx.lineTo(12, 0); ctx.lineTo(-22, 16);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
         ctx.fill();
+        ctx.stroke();
+        if (p.isInverting ?? true) {
+          ctx.beginPath();
+          ctx.arc(16, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        // Schmitt hysteresis symbol inside body
+        ctx.beginPath();
+        ctx.moveTo(-13, 4); ctx.lineTo(-6, 4); ctx.lineTo(-6, -4); ctx.lineTo(1, -4);
+        ctx.moveTo(1, -4); ctx.lineTo(-2, -4); ctx.lineTo(-2, 4); ctx.lineTo(-13, 4);
+        ctx.lineWidth = 1.3;
         ctx.stroke();
         break;
       }
@@ -2460,6 +2540,30 @@ export class SchematicCanvas {
         break;
       }
 
+      case ComponentTypes.PUSH_BUTTON:
+      case ComponentTypes.PUSH_BUTTON_NC: {
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-10, 0);
+        ctx.moveTo(10, 0); ctx.lineTo(20, 0);
+        ctx.arc(-10, 0, 2.5, 0, Math.PI * 2);
+        ctx.arc(10, 0, 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Push button contact bar & stalk
+        const isClosed = p.closed ?? (comp.type === ComponentTypes.PUSH_BUTTON_NC);
+        ctx.beginPath();
+        if (isClosed) {
+          ctx.moveTo(-10, -3); ctx.lineTo(10, -3);
+          ctx.moveTo(0, -3); ctx.lineTo(0, -14);
+        } else {
+          ctx.moveTo(-10, -10); ctx.lineTo(10, -10);
+          ctx.moveTo(0, -10); ctx.lineTo(0, -18);
+        }
+        ctx.moveTo(-4, isClosed ? -14 : -18); ctx.lineTo(4, isClosed ? -14 : -18);
+        ctx.stroke();
+        break;
+      }
+
       case ComponentTypes.SPDT_SWITCH: {
         ctx.beginPath();
         ctx.moveTo(-25, 0); ctx.lineTo(-12, 0);
@@ -2474,6 +2578,48 @@ export class SchematicCanvas {
         if (p.position === 2) ctx.lineTo(12, 15);
         else ctx.lineTo(12, -15);
         ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.TIMER555: {
+        ctx.beginPath();
+        ctx.rect(-35, -40, 70, 80);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 7.5px sans-serif';
+        ctx.fillStyle = '#0284c7';
+        ctx.textAlign = 'left';
+        ctx.fillText('GND', -30, -28);
+        ctx.fillText('TRIG', -30, -8);
+        ctx.fillText('THRES', -30, 12);
+        ctx.fillText('DISCH', -30, 32);
+
+        ctx.textAlign = 'right';
+        ctx.fillText('OUT', 30, -28);
+        ctx.fillText('RST', 30, -8);
+        ctx.fillText('CTRL', 30, 12);
+        ctx.fillText('VCC', 30, 32);
+
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#1e293b';
+        ctx.textAlign = 'center';
+        ctx.fillText('NE555', 0, 4);
+        break;
+      }
+
+      case ComponentTypes.TIMER556: {
+        ctx.beginPath();
+        ctx.rect(-40, -50, 80, 100);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#1e293b';
+        ctx.textAlign = 'center';
+        ctx.fillText('NE556', 0, 4);
         break;
       }
 
@@ -2517,6 +2663,8 @@ export class SchematicCanvas {
         break;
       }
 
+      case ComponentTypes.SR_LATCH:
+      case ComponentTypes.T_FLIPFLOP:
       case ComponentTypes.D_FLIPFLOP:
       case ComponentTypes.JK_FLIPFLOP: {
         ctx.beginPath();
@@ -2524,16 +2672,23 @@ export class SchematicCanvas {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.stroke();
-        // Clock dynamic triangle symbol
-        ctx.beginPath();
-        ctx.moveTo(-25, (comp.type === ComponentTypes.D_FLIPFLOP ? 10 : -5));
-        ctx.lineTo(-17, (comp.type === ComponentTypes.D_FLIPFLOP ? 15 : 0));
-        ctx.lineTo(-25, (comp.type === ComponentTypes.D_FLIPFLOP ? 20 : 5));
-        ctx.stroke();
+        // Clock dynamic triangle symbol for edge-triggered flip-flops
+        if (comp.type !== ComponentTypes.SR_LATCH) {
+          ctx.beginPath();
+          const clkY = (comp.type === ComponentTypes.T_FLIPFLOP || comp.type === ComponentTypes.D_FLIPFLOP) ? 15 : 0;
+          ctx.moveTo(-25, clkY - 5);
+          ctx.lineTo(-17, clkY);
+          ctx.lineTo(-25, clkY + 5);
+          ctx.stroke();
+        }
         ctx.font = 'bold 9px sans-serif';
         ctx.fillStyle = '#1e293b';
         ctx.textAlign = 'center';
-        ctx.fillText(comp.type === ComponentTypes.D_FLIPFLOP ? 'D-FF' : 'JK-FF', 0, -5);
+        let label = 'D-FF';
+        if (comp.type === ComponentTypes.SR_LATCH) label = 'SR-LATCH';
+        else if (comp.type === ComponentTypes.T_FLIPFLOP) label = 'T-FF';
+        else if (comp.type === ComponentTypes.JK_FLIPFLOP) label = 'JK-FF';
+        ctx.fillText(label, 0, -5);
         break;
       }
 

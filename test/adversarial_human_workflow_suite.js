@@ -1797,6 +1797,218 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(passSelectAll && passMarquee && passCopy && passPaste && passBatchDelete,
       `[Batch Operations] Select All (3 comps), Marquee Area Drag (R1/R2), Internal Wire Preserved Copy/Paste (W1 -> R3:p2-R4:p1), and Batch Delete verified`, g10);
   }
+
+  // 10.22 Pulse Voltage Generator (PULSE_VOLTAGE) Delay, Slew, & Single-Shot Trigger Mode
+  {
+    const engine = new CircuitEngine();
+    const vPulse = {
+      id: 'VP1',
+      type: ComponentTypes.PULSE_VOLTAGE,
+      params: { v1: 0, v2: 5, tDelay: 1e-3, tRise: 1e-4, tFall: 1e-4, tWidth: 1e-3, period: 0 } // Single trigger pulse at 1ms
+    };
+    const rLoad = { id: 'RL1', type: ComponentTypes.RESISTOR, params: { resistance: 1000 } };
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+    const wires = [
+      { fromPin: 'VP1:p_pos', toPin: 'RL1:p1' },
+      { fromPin: 'RL1:p2', toPin: 'GND1:p1' },
+      { fromPin: 'VP1:p_neg', toPin: 'GND1:p1' }
+    ];
+
+    engine.setCircuit([vPulse, rLoad, gnd], wires);
+    
+    // Test at t = 0.5ms (Before trigger delay: V = 0V)
+    engine.time = 0.0005;
+    engine.step(1e-5);
+    const nOut = engine.getNode(rLoad, 'p1');
+    const vBefore = engine.nodeVoltages[nOut];
+
+    // Test at t = 1.05ms (During rising edge ramp: V ~= 2.5V)
+    engine.time = 0.00105;
+    engine.step(1e-5);
+    const vRising = engine.nodeVoltages[nOut];
+
+    // Test at t = 1.5ms (During pulse high width: V = 5.0V)
+    engine.time = 0.0015;
+    engine.step(1e-5);
+    const vHigh = engine.nodeVoltages[nOut];
+
+    // Test at t = 3.0ms (After pulse completed in single-shot mode: V = 0V)
+    engine.time = 0.0030;
+    engine.step(1e-5);
+    const vAfter = engine.nodeVoltages[nOut];
+
+    const passPulse = Math.abs(vBefore - 0) < 1e-3 &&
+                      Math.abs(vRising - 2.5) < 0.2 &&
+                      Math.abs(vHigh - 5.0) < 1e-3 &&
+                      Math.abs(vAfter - 0) < 1e-3;
+
+    assert(passPulse,
+      `[Trigger Pulse Source] PULSE_VOLTAGE Verified: t=0.5ms (0V), t=1.05ms (Ramp ${vRising.toFixed(2)}V), t=1.5ms (5.0V Peak), t=3ms (Single-shot rest 0V)`, g10);
+  }
+
+  // 10.23 Schmitt Trigger Inverter Hysteresis Thresholds (VT+ = 3.0V, VT- = 1.8V)
+  {
+    const engine = new CircuitEngine();
+    const vIn = { id: 'VIN', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 0 } };
+    const st = {
+      id: 'ST1',
+      type: ComponentTypes.SCHMITT_TRIGGER,
+      params: { vHigh: 5, vLow: 0, vThreshPos: 3.0, vThreshNeg: 1.8, isInverting: true }
+    };
+    const rLoad = { id: 'RL', type: ComponentTypes.RESISTOR, params: { resistance: 10000 } };
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+    const wires = [
+      { fromPin: 'VIN:p_pos', toPin: 'ST1:in' },
+      { fromPin: 'VIN:p_neg', toPin: 'GND1:p1' },
+      { fromPin: 'ST1:out', toPin: 'RL:p1' },
+      { fromPin: 'RL:p2', toPin: 'GND1:p1' }
+    ];
+
+    engine.setCircuit([vIn, st, rLoad, gnd], wires);
+
+    // Initial state: Vin = 0V -> Out = 5V
+    vIn.params.voltage = 0.0;
+    engine.step(1e-4);
+    const nOut = engine.getNode(st, 'out');
+    const vOut0 = engine.nodeVoltages[nOut];
+
+    // Ramp up below VT+: Vin = 2.5V -> Out should remain 5V
+    vIn.params.voltage = 2.5;
+    engine.step(1e-4);
+    const vOut2_5_up = engine.nodeVoltages[nOut];
+
+    // Cross VT+: Vin = 3.2V -> Out switches to 0V
+    vIn.params.voltage = 3.2;
+    engine.step(1e-4);
+    const vOut3_2 = engine.nodeVoltages[nOut];
+
+    // Ramp down above VT-: Vin = 2.5V -> Out should remain 0V (Hysteresis Memory!)
+    vIn.params.voltage = 2.5;
+    engine.step(1e-4);
+    const vOut2_5_down = engine.nodeVoltages[nOut];
+
+    // Cross VT-: Vin = 1.5V -> Out switches back to 5V
+    vIn.params.voltage = 1.5;
+    engine.step(1e-4);
+    const vOut1_5 = engine.nodeVoltages[nOut];
+
+    const passSchmitt = Math.abs(vOut0 - 5.0) < 1e-3 &&
+                        Math.abs(vOut2_5_up - 5.0) < 1e-3 &&
+                        Math.abs(vOut3_2 - 0.0) < 1e-3 &&
+                        Math.abs(vOut2_5_down - 0.0) < 1e-3 &&
+                        Math.abs(vOut1_5 - 5.0) < 1e-3;
+
+    assert(passSchmitt,
+      `[Schmitt Trigger] Verified Hysteresis: Vin=2.5V Up (Out=${vOut2_5_up.toFixed(1)}V), Vin=3.2V (Out=${vOut3_2.toFixed(1)}V), Vin=2.5V Down (Out=${vOut2_5_down.toFixed(1)}V), Vin=1.5V (Out=${vOut1_5.toFixed(1)}V)`, g10);
+  }
+
+  // 10.24 555 Timer Monostable Trigger Pulse & Reset Override
+  {
+    const engine = new CircuitEngine();
+    const vcc = { id: 'VCC', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 9.0 } };
+    const t555 = { id: 'U1', type: ComponentTypes.TIMER555, params: {} };
+    const vTrig = { id: 'VTRIG', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 9.0 } };
+    const vThresh = { id: 'VTH', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 0.0 } };
+    const vRst = { id: 'VRST', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 9.0 } };
+    const rLoad = { id: 'RL', type: ComponentTypes.RESISTOR, params: { resistance: 1000 } };
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+
+    const wires = [
+      { fromPin: 'VCC:p_pos', toPin: 'U1:vcc' },
+      { fromPin: 'VCC:p_neg', toPin: 'GND1:p1' },
+      { fromPin: 'U1:gnd', toPin: 'GND1:p1' },
+      { fromPin: 'VTRIG:p_pos', toPin: 'U1:trig' },
+      { fromPin: 'VTRIG:p_neg', toPin: 'GND1:p1' },
+      { fromPin: 'VTH:p_pos', toPin: 'U1:thresh' },
+      { fromPin: 'VTH:p_neg', toPin: 'GND1:p1' },
+      { fromPin: 'VRST:p_pos', toPin: 'U1:reset' },
+      { fromPin: 'VRST:p_neg', toPin: 'GND1:p1' },
+      { fromPin: 'U1:out', toPin: 'RL:p1' },
+      { fromPin: 'RL:p2', toPin: 'GND1:p1' }
+    ];
+
+    engine.setCircuit([vcc, t555, vTrig, vThresh, vRst, rLoad, gnd], wires);
+
+    // Apply low trigger pulse: Vtrig = 1.0V (< 1/3 Vcc = 3.0V) -> Output triggers High (Vout ~ 7.8V)
+    vTrig.params.voltage = 1.0;
+    vThresh.params.voltage = 0.0;
+    engine.step(1e-4);
+    const nOut = engine.getNode(t555, 'out');
+    const vOutTriggered = engine.nodeVoltages[nOut];
+
+    // Threshold reaches 7.0V (> 2/3 Vcc = 6.0V) with Trig=9V -> Output resets Low (Vout ~ 0.1V)
+    vTrig.params.voltage = 9.0;
+    vThresh.params.voltage = 7.0;
+    engine.step(1e-4);
+    const vOutReset = engine.nodeVoltages[nOut];
+
+    // Reset pin forced Low (0V) -> Output immediately forced Low
+    vTrig.params.voltage = 1.0; // even with trigger low
+    vRst.params.voltage = 0.0;  // reset active
+    engine.step(1e-4);
+    const vOutForcedReset = engine.nodeVoltages[nOut];
+
+    const pass555 = vOutTriggered > 7.0 && vOutReset < 0.5 && vOutForcedReset < 0.5;
+
+    assert(pass555,
+      `[555 Timer Trigger] Monostable pulse triggered (Vout=${vOutTriggered.toFixed(2)}V), Threshold reset (Vout=${vOutReset.toFixed(2)}V), Reset pin override (Vout=${vOutForcedReset.toFixed(2)}V)`, g10);
+  }
+
+  // 10.25 DIAC Breakover Trigger & T Flip-Flop Clock Triggering
+  {
+    const engine = new CircuitEngine();
+    const vSrc = { id: 'VSRC', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 20 } };
+    const diac = { id: 'D1', type: ComponentTypes.DIAC, params: { vBreakover: 32 } };
+    const rLoad = { id: 'RL', type: ComponentTypes.RESISTOR, params: { resistance: 1000 } };
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+    const wires1 = [
+      { fromPin: 'VSRC:p_pos', toPin: 'D1:p1' },
+      { fromPin: 'D1:p2', toPin: 'RL:p1' },
+      { fromPin: 'RL:p2', toPin: 'GND1:p1' },
+      { fromPin: 'VSRC:p_neg', toPin: 'GND1:p1' }
+    ];
+
+    engine.setCircuit([vSrc, diac, rLoad, gnd], wires1);
+
+    // Below breakover: 20V -> Diac OFF, Vload ~= 0V
+    vSrc.params.voltage = 20.0;
+    engine.step(1e-4);
+    const nLoad = engine.getNode(rLoad, 'p1');
+    const vOff = engine.nodeVoltages[nLoad];
+
+    // Above breakover: 35V -> Diac triggers ON, Vload ~= 35V
+    vSrc.params.voltage = 35.0;
+    engine.step(1e-4);
+    const vOn = engine.nodeVoltages[nLoad];
+
+    // Test T-Flip Flop Triggering
+    const engineTFF = new CircuitEngine();
+    const clk = { id: 'CLK', type: ComponentTypes.CLOCK_VOLTAGE, params: { vHigh: 5, frequency: 1000 } };
+    const tff = { id: 'TFF1', type: ComponentTypes.T_FLIPFLOP, params: { vHigh: 5 } };
+    const wires2 = [
+      { fromPin: 'CLK:p_pos', toPin: 'TFF1:clk' },
+      { fromPin: 'CLK:p_neg', toPin: 'GND1:p1' }
+    ];
+    engineTFF.setCircuit([clk, tff, gnd], wires2);
+
+    // Pulse 1
+    engineTFF.time = 0.0001;
+    engineTFF.step(1e-5);
+    const nQ = engineTFF.getNode(tff, 'q');
+    const q1 = engineTFF.nodeVoltages[nQ];
+
+    // Pulse 2 (falling edge then next rising edge at t = 1.05ms)
+    engineTFF.time = 0.0006;
+    engineTFF.step(1e-5);
+    engineTFF.time = 0.00105;
+    engineTFF.step(1e-5);
+    const q2 = engineTFF.nodeVoltages[nQ];
+
+    const passDiacAndTFF = vOff < 0.1 && vOn > 30.0 && q1 > 4.5 && q2 < 0.5;
+
+    assert(passDiacAndTFF,
+      `[DIAC & T-FlipFlop] DIAC OFF (${vOff.toFixed(2)}V), DIAC ON (${vOn.toFixed(2)}V), T-FF Toggle 0->1 (${q1.toFixed(1)}V) and 1->0 (${q2.toFixed(1)}V) on clock trigger pulses`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

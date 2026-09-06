@@ -339,6 +339,15 @@ class MultisimApp {
               }
             }
 
+            // Aliases for Trigger / Pulse / Clock / Timing / Switches
+            if (!isMatch) {
+              if (type.includes('pulse') || type.includes('clock') || type.includes('timer') || type.includes('schmitt') || type.includes('latch') || type.includes('flipflop') || type.includes('button') || type.includes('triac') || type.includes('diac') || type.includes('scr')) {
+                if ('trigger'.includes(query) || 'pulse'.includes(query) || 'clock'.includes(query) || 'timer'.includes(query) || 'oneshot'.includes(query) || 'square'.includes(query) || 'signal'.includes(query)) {
+                  isMatch = true;
+                }
+              }
+            }
+
             item.style.display = isMatch ? 'flex' : 'none';
             if (isMatch) matchCount++;
           });
@@ -467,6 +476,7 @@ class MultisimApp {
       case ComponentTypes.COMPARATOR:
         return `<svg viewBox="0 0 24 24"><polygon points="4,4 20,12 4,20" fill="none" stroke="#0284c7" stroke-width="1.8"/><text x="7" y="10" font-size="6" fill="#0284c7" font-weight="bold">-</text><text x="7" y="17" font-size="6" fill="#0284c7" font-weight="bold">+</text></svg>`;
       case ComponentTypes.TIMER555:
+      case ComponentTypes.TIMER556:
         return `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="#f8fafc" stroke="#2b2d2f" stroke-width="1.6"/><text x="12" y="14" font-size="6.5" text-anchor="middle" font-weight="bold" fill="#0284c7">555</text></svg>`;
       case ComponentTypes.ANALOG_MULTIPLIER:
         return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#2b2d2f" stroke-width="1.8" fill="none"/><text x="12" y="15" font-size="9" text-anchor="middle" font-weight="bold" fill="#03b585">✕</text></svg>`;
@@ -480,15 +490,19 @@ class MultisimApp {
 
       // 8. Digital Logic Gates
       case ComponentTypes.AND_GATE:
+      case ComponentTypes.AND3_GATE:
       case ComponentTypes.IC_7408:
         return `<svg viewBox="0 0 24 24"><path d="M4,5 L11,5 C16,5 19,8 19,12 C19,16 16,19 11,19 L4,19 Z" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
       case ComponentTypes.NAND_GATE:
+      case ComponentTypes.NAND3_GATE:
       case ComponentTypes.IC_7400:
         return `<svg viewBox="0 0 24 24"><path d="M3,5 L9,5 C14,5 17,8 17,12 C17,16 14,19 9,19 L3,19 Z" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><circle cx="19" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.4" fill="none"/></svg>`;
       case ComponentTypes.OR_GATE:
+      case ComponentTypes.OR3_GATE:
       case ComponentTypes.IC_7432:
         return `<svg viewBox="0 0 24 24"><path d="M3,5 Q10,5 20,12 Q10,19 3,19 Q7,12 3,5 Z" stroke="#2b2d2f" stroke-width="1.8" fill="none"/></svg>`;
       case ComponentTypes.NOR_GATE:
+      case ComponentTypes.NOR3_GATE:
       case ComponentTypes.IC_7402:
         return `<svg viewBox="0 0 24 24"><path d="M3,5 Q9,5 17,12 Q9,19 3,19 Q6,12 3,5 Z" stroke="#2b2d2f" stroke-width="1.6" fill="none"/><circle cx="19" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.4" fill="none"/></svg>`;
       case ComponentTypes.XOR_GATE:
@@ -503,22 +517,21 @@ class MultisimApp {
         return `<svg viewBox="0 0 24 24"><polygon points="4,5 16,12 4,19" fill="none" stroke="#2b2d2f" stroke-width="1.8"/><circle cx="18" cy="12" r="2" stroke="#2b2d2f" stroke-width="1.5" fill="none"/></svg>`;
 
       // 9. Digital ICs & Flip-Flops
-      case ComponentTypes.D_FLIP_FLOP:
-      case ComponentTypes.JK_FLIP_FLOP:
+      case ComponentTypes.D_FLIPFLOP:
+      case ComponentTypes.JK_FLIPFLOP:
       case ComponentTypes.SR_LATCH:
-      case ComponentTypes.T_FLIP_FLOP:
-      case ComponentTypes.DECODER_BCD_7SEG:
+      case ComponentTypes.T_FLIPFLOP:
       case ComponentTypes.BINARY_COUNTER_4BIT:
-      case ComponentTypes.SHIFT_REGISTER_8BIT:
       case ComponentTypes.HALF_ADDER:
       case ComponentTypes.FULL_ADDER:
-      case ComponentTypes.ALU_4BIT:
+      case ComponentTypes.MUX_4TO1:
         return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#f8fafc" stroke="#2b2d2f" stroke-width="1.6"/><text x="12" y="14" font-size="6" text-anchor="middle" font-weight="bold" fill="#0284c7">LOGIC</text></svg>`;
 
       // 10. Switches & Relays
       case ComponentTypes.SPST_SWITCH:
       case ComponentTypes.SPDT_SWITCH:
       case ComponentTypes.PUSH_BUTTON:
+      case ComponentTypes.PUSH_BUTTON_NC:
       case ComponentTypes.RELAY_SPDT:
         return `<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="#2b2d2f"/><circle cx="19" cy="12" r="2" fill="#2b2d2f"/><line x1="5" y1="12" x2="16" y2="6" stroke="#2b2d2f" stroke-width="2"/></svg>`;
 
