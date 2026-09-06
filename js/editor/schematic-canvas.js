@@ -445,15 +445,10 @@ export class SchematicCanvas {
         return;
       }
 
-      // 2. Wiring Click (Priority over component or wire selection)
-      const pinHit = this.findPinAt(worldPos.x, worldPos.y);
-      if (pinHit) {
-        if (!this.wiringStartPin) {
-          this.wiringStartPin = pinHit;
-          this.wiringCurrentPos = pinHit.pos;
-          this.render();
-          return;
-        } else if (this.wiringStartPin.pinKey !== pinHit.pinKey) {
+      // 2. Wiring in progress: Target pin or wire click
+      if (this.wiringStartPin) {
+        const pinHit = this.findPinAt(worldPos.x, worldPos.y, 10);
+        if (pinHit && pinHit.pinKey !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
           const to = pinHit.pinKey;
           const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
@@ -471,10 +466,7 @@ export class SchematicCanvas {
           this.render();
           return;
         }
-      }
 
-      // 2b. T-Junction Wire Tap: If wiring is active and user clicks on an existing wire
-      if (this.wiringStartPin) {
         const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
         if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
@@ -495,14 +487,25 @@ export class SchematicCanvas {
           return;
         }
 
+        // Clicked elsewhere while wiring was active -> cancel wiring and continue to process selection
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
+        this.render();
+      }
+
+      // 3. Pin Click to Start Wiring (Dedicated pin click with clean 8px tolerance)
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
+      const compHit = this.findComponentAt(worldPos.x, worldPos.y);
+
+      // If clicked specifically on pin and not body center of a component
+      if (pinHit && (!compHit || Math.hypot(worldPos.x - pinHit.pos.x, worldPos.y - pinHit.pos.y) <= 8)) {
+        this.wiringStartPin = pinHit;
+        this.wiringCurrentPos = pinHit.pos;
         this.render();
         return;
       }
 
-      // 3. Component Click
-      const compHit = this.findComponentAt(worldPos.x, worldPos.y);
+      // 4. Component Selection & Dragging
       if (compHit) {
         // Toggle interactive switch components
         if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON) {
@@ -550,14 +553,14 @@ export class SchematicCanvas {
         return;
       }
 
-      // 4. Wire Click
-      const wireHit = this.findWireAt(worldPos.x, worldPos.y);
+      // 5. Wire Click
+      const wireHit = this.findWireAt(worldPos.x, worldPos.y, 6);
       if (wireHit) {
         this.selectWire(wireHit);
         return;
       }
 
-      // 5. Empty Canvas Click -> Marquee Selection or Pan
+      // 6. Empty Canvas Click -> Marquee Selection or Pan
       if (e.shiftKey) {
         this.isBoxSelecting = true;
         this.boxSelectStart = worldPos;
@@ -566,6 +569,9 @@ export class SchematicCanvas {
         this.selectedComponents.clear();
         this.selectedComponent = null;
         this.selectWire(null);
+        if (this.onSelectionChange) {
+          this.onSelectionChange({ type: 'component', item: null, group: [] });
+        }
         this.isPanning = true;
         this.dragStartX = e.clientX;
         this.dragStartY = e.clientY;
@@ -671,7 +677,14 @@ export class SchematicCanvas {
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
     const comp = this.findComponentAt(worldPos.x, worldPos.y);
     if (comp) {
-      this.rotateSelected(90);
+      this.selectComponent(comp);
+      setTimeout(() => {
+        const firstInput = document.querySelector('#propertiesContent input.prop-param-input, #propertiesContent #propNameInput');
+        if (firstInput) {
+          firstInput.focus();
+          firstInput.select();
+        }
+      }, 50);
     }
   }
 

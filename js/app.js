@@ -440,11 +440,15 @@ class MultisimApp {
       def.paramSchema.forEach(schema => {
         const currentVal = comp.params[schema.key] ?? schema.default;
         if (schema.type === 'number') {
+          let displayVal = currentVal;
+          if (typeof currentVal === 'number') {
+            displayVal = formatValueWithPrefix(currentVal, '').trim();
+          }
           html += `
             <div class="property-group">
               <label class="property-label">${schema.label}</label>
               <div class="property-input-row">
-                <input type="number" class="property-input prop-param-input" data-key="${schema.key}" value="${currentVal}" step="${schema.step || 'any'}"/>
+                <input type="text" class="property-input prop-param-input" data-key="${schema.key}" data-type="number" value="${displayVal}"/>
                 <span class="property-unit">${schema.unit || ''}</span>
               </div>
             </div>
@@ -496,7 +500,7 @@ class MultisimApp {
 
     container.innerHTML = html;
 
-    document.getElementById('propNameInput').addEventListener('input', (e) => {
+    document.getElementById('propNameInput')?.addEventListener('input', (e) => {
       comp.name = e.target.value;
       this.canvas.notifyModified();
       this.canvas.render();
@@ -504,24 +508,38 @@ class MultisimApp {
 
     container.querySelectorAll('.prop-param-input').forEach(input => {
       const key = input.dataset.key;
-      input.addEventListener('input', () => {
+      const handleUpdate = () => {
         let val;
         if (input.type === 'checkbox') {
           val = input.checked;
-        } else if (input.type === 'number' || input.type === 'range') {
+        } else if (input.type === 'range') {
           val = parseFloat(input.value);
+        } else if (input.dataset.type === 'number') {
+          val = parseEngineeringValue(input.value);
         } else {
           const isNum = typeof comp.params[key] === 'number';
           val = isNum ? parseEngineeringValue(input.value) : input.value;
         }
 
-        comp.params[key] = val;
-        const displayLabel = document.getElementById(`val_${key}`);
-        if (displayLabel) displayLabel.textContent = val;
+        if (typeof val === 'number') {
+          if (!isNaN(val)) {
+            comp.params[key] = val;
+            const displayLabel = document.getElementById(`val_${key}`);
+            if (displayLabel) displayLabel.textContent = val;
+            this.canvas.notifyModified();
+            this.canvas.render();
+            this.grapher.render();
+          }
+        } else {
+          comp.params[key] = val;
+          this.canvas.notifyModified();
+          this.canvas.render();
+          this.grapher.render();
+        }
+      };
 
-        this.canvas.notifyModified();
-        this.canvas.render();
-      });
+      input.addEventListener('input', handleUpdate);
+      input.addEventListener('change', handleUpdate);
     });
 
     document.getElementById('btnPropRotate')?.addEventListener('click', () => this.canvas.rotateSelected(90));
@@ -539,13 +557,19 @@ class MultisimApp {
     preset.load(this.canvas);
     this.engine.setCircuit(this.canvas.components, this.canvas.wires);
 
-    document.getElementById('circuitNameInput').value = preset.name;
-    document.getElementById('circuitPresetSelect').value = presetKey;
+    const nameInput = document.getElementById('circuitNameInput');
+    if (nameInput) nameInput.value = preset.name;
+    const select = document.getElementById('circuitPresetSelect');
+    if (select) select.value = presetKey;
     document.title = `${preset.name} - Multisim Live`;
 
-    this.canvas.fitToScreen();
-    this.canvas.render();
-    this.grapher.render();
+    setTimeout(() => {
+      this.canvas.resize();
+      this.canvas.fitToScreen();
+      this.grapher.resize();
+      this.canvas.render();
+      this.grapher.render();
+    }, 50);
   }
 
   // --- Discover Page Population ---

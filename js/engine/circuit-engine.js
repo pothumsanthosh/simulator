@@ -1320,9 +1320,11 @@ export class CircuitEngine {
 
   recordProbeHistory() {
     const dataPoint = { time: this.time, probes: {} };
+    let probeCount = 0;
 
     this.components.forEach(comp => {
       if (comp.type === ComponentTypes.PROBE_V) {
+        probeCount++;
         const node = this.getNode(comp, 'tip');
         const v = node !== -1 ? (this.nodeVoltages[node] || 0) : 0;
         dataPoint.probes[comp.id] = {
@@ -1333,6 +1335,7 @@ export class CircuitEngine {
           unit: 'V'
         };
       } else if (comp.type === ComponentTypes.PROBE_I) {
+        probeCount++;
         const node = this.getNode(comp, 'tip');
         const v = node !== -1 ? (this.nodeVoltages[node] || 0) : 0;
         dataPoint.probes[comp.id] = {
@@ -1342,8 +1345,36 @@ export class CircuitEngine {
           value: v / 1000,
           unit: 'A'
         };
+      } else if (comp.type === ComponentTypes.VOLTMETER) {
+        probeCount++;
+        const nPos = this.getNode(comp, 'p_pos');
+        const nNeg = this.getNode(comp, 'p_neg');
+        const v1 = nPos !== -1 ? (this.nodeVoltages[nPos] || 0) : 0;
+        const v2 = nNeg !== -1 ? (this.nodeVoltages[nNeg] || 0) : 0;
+        dataPoint.probes[comp.id] = {
+          id: comp.id,
+          name: comp.name || 'DVM',
+          color: '#0284c7',
+          value: v1 - v2,
+          unit: 'V'
+        };
       }
     });
+
+    // Auto-probe active non-ground circuit nodes if no dedicated probe is placed
+    if (probeCount === 0 && this.nodeVoltages.length > 1) {
+      const colors = ['#00d2ff', '#10b981', '#fbbf24', '#f43f5e', '#a855f7'];
+      const maxAutoNodes = Math.min(this.nodeVoltages.length - 1, 4);
+      for (let n = 1; n <= maxAutoNodes; n++) {
+        dataPoint.probes[`node_${n}`] = {
+          id: `node_${n}`,
+          name: `Node ${n}`,
+          color: colors[(n - 1) % colors.length],
+          value: this.nodeVoltages[n] || 0,
+          unit: 'V'
+        };
+      }
+    }
 
     this.history.push(dataPoint);
     if (this.history.length > this.maxHistoryLength) {

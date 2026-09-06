@@ -215,7 +215,7 @@ export class CircuitGrapher {
     const stepY = h / numDivY;
     if (stepX <= 0 || stepY <= 0) return;
 
-    ctx.strokeStyle = isLight ? '#e2e8f0' : '#1f2937';
+    ctx.strokeStyle = isLight ? '#e2e8f0' : '#1e293b';
     ctx.lineWidth = 1.0;
 
     // Vertical grid lines
@@ -230,12 +230,26 @@ export class CircuitGrapher {
     ctx.stroke();
 
     // Center axes (dashed)
-    ctx.strokeStyle = isLight ? '#94a3b8' : '#374151';
-    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = isLight ? '#94a3b8' : '#475569';
+    ctx.setLineDash([4, 4]);
     ctx.beginPath();
     ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // Y-Axis Voltage Markings on left edge
+    ctx.save();
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.fillStyle = isLight ? '#64748b' : '#64748b';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= numDivY; i++) {
+      const y = i * stepY;
+      const v = (4 - i) * this.voltsPerDiv;
+      const label = `${v >= 0 ? '+' : ''}${formatValueWithPrefix(v, 'V')}`;
+      ctx.fillText(label, 6, Math.max(10, Math.min(h - 10, y)));
+    }
+    ctx.restore();
   }
 
   drawEmptyMessage(ctx, w, h) {
@@ -256,11 +270,13 @@ export class CircuitGrapher {
 
     probeIds.forEach(probeId => {
       const probeInfo = sample.probes[probeId];
-      const color = probeInfo.color || '#03b585';
+      const color = probeInfo.color || '#00d2ff';
 
       ctx.save();
       ctx.strokeStyle = color;
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2.4;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       ctx.beginPath();
 
       let started = false;
