@@ -162,6 +162,7 @@ class SwitchaApp {
         updatedAt: Date.now() - 3600000,
         presetKey: 'switchSpstLamp',
         components: [
+          { id: 'txt1', type: ComponentTypes.TEXT_LABEL, x: 340, y: 50, params: { text: 'INTERACTIVE SWITCH & LED LAMP', fontSize: 14, bold: true, color: '#334155' }, rotation: 0, flipX: false, flipY: false },
           { id: 'v1', type: ComponentTypes.DC_VOLTAGE, x: 120, y: 220, params: { voltage: 9 }, rotation: 0, flipX: false, flipY: false },
           { id: 'gnd1', type: ComponentTypes.GROUND, x: 120, y: 340, params: {}, rotation: 0, flipX: false, flipY: false },
           { id: 'sw1', type: ComponentTypes.SWITCH_SPST, x: 260, y: 140, params: { closed: true, name: 'Main Power' }, rotation: 0, flipX: false, flipY: false },
@@ -1078,6 +1079,14 @@ class SwitchaApp {
     });
     document.getElementById('btnAddNode')?.addEventListener('click', () => {
       this.canvas.setPlacementMode(ComponentTypes.NODE);
+    });
+    document.getElementById('btnAddTextToolbar')?.addEventListener('click', () => {
+      this.canvas.setPlacementMode(ComponentTypes.TEXT_LABEL);
+      this.updatePlacementBanner(ComponentDefinitions[ComponentTypes.TEXT_LABEL]);
+    });
+    document.getElementById('btnAddTextFloating')?.addEventListener('click', () => {
+      this.canvas.setPlacementMode(ComponentTypes.TEXT_LABEL);
+      this.updatePlacementBanner(ComponentDefinitions[ComponentTypes.TEXT_LABEL]);
     });
 
     // Quick Component Ribbon Buttons (Touch & Mouse Placement Mode)

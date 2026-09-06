@@ -401,8 +401,15 @@ export class SchematicCanvas {
       const dy = worldY - comp.y;
       const localX = dx * cos - dy * sin;
       const localY = dx * sin + dy * cos;
-      const hw = Math.max(((comp.width || 40) / 2) + padding, 22);
-      const hh = Math.max(((comp.height || 40) / 2) + padding, 22);
+      let compW = comp.width || 40;
+      let compH = comp.height || 40;
+      if (comp.type === ComponentTypes.TEXT_LABEL || comp.type === ComponentTypes.ANNOTATION) {
+        const textStr = comp.params?.text || comp.name || '';
+        compW = Math.max(compW, textStr.length * 8.5 + 24);
+        compH = Math.max(compH, (comp.params?.fontSize || 14) + 12);
+      }
+      const hw = Math.max((compW / 2) + padding, 22);
+      const hh = Math.max((compH / 2) + padding, 22);
       if (Math.abs(localX) <= hw && Math.abs(localY) <= hh) {
         return comp;
       }
@@ -1143,6 +1150,9 @@ export class SchematicCanvas {
     } else if (!isCtrlOrCmd && (e.key === 'j' || e.key === 'J')) {
       e.preventDefault();
       this.setPlacementMode(ComponentTypes.NODE);
+    } else if (!isCtrlOrCmd && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      this.setPlacementMode(ComponentTypes.TEXT_LABEL);
     } else if (!isCtrlOrCmd && (e.key === 'w' || e.key === 'W')) {
       e.preventDefault();
       if (this.selectedComponent) {
@@ -1870,19 +1880,23 @@ export class SchematicCanvas {
     const isHovered = this.hoveredComponent === comp;
 
     if (isSelected) {
-      ctx.strokeStyle = '#007aff';
-      ctx.lineWidth = 1.5;
-      ctx.fillStyle = 'rgba(0, 122, 255, 0.08)';
-      const hw = comp.width / 2 + 5;
-      const hh = comp.height / 2 + 5;
-      ctx.strokeRect(-hw, -hh, comp.width + 10, comp.height + 10);
-      ctx.fillRect(-hw, -hh, comp.width + 10, comp.height + 10);
+      if (comp.type !== ComponentTypes.TEXT_LABEL && comp.type !== ComponentTypes.ANNOTATION) {
+        ctx.strokeStyle = '#007aff';
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = 'rgba(0, 122, 255, 0.08)';
+        const hw = comp.width / 2 + 5;
+        const hh = comp.height / 2 + 5;
+        ctx.strokeRect(-hw, -hh, comp.width + 10, comp.height + 10);
+        ctx.fillRect(-hw, -hh, comp.width + 10, comp.height + 10);
+      }
     } else if (isHovered) {
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1.0;
-      const hw = comp.width / 2 + 4;
-      const hh = comp.height / 2 + 4;
-      ctx.strokeRect(-hw, -hh, comp.width + 8, comp.height + 8);
+      if (comp.type !== ComponentTypes.TEXT_LABEL && comp.type !== ComponentTypes.ANNOTATION) {
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.0;
+        const hw = comp.width / 2 + 4;
+        const hh = comp.height / 2 + 4;
+        ctx.strokeRect(-hw, -hh, comp.width + 8, comp.height + 8);
+      }
     }
 
     ctx.strokeStyle = '#1e293b';
@@ -2788,7 +2802,7 @@ export class SchematicCanvas {
 
       case ComponentTypes.TEXT_LABEL:
       case ComponentTypes.ANNOTATION: {
-        const text = p.text || 'Circuit Title';
+        const text = p.text || comp.name || 'Circuit Title';
         const fontSize = p.fontSize || 13;
         const isBold = p.bold !== false;
         const color = p.color || '#334155';
@@ -2799,16 +2813,22 @@ export class SchematicCanvas {
         ctx.textBaseline = 'middle';
         ctx.fillText(text, 0, 0);
 
-        // If selected, draw dashed outline
-        if (this.selectedComponents.has(comp)) {
+        // If selected or hovered, draw clean dashed outline
+        const isSel = this.selectedComponents.has(comp) || this.selectedComponent === comp;
+        const isHov = this.hoveredComponent === comp;
+        if (isSel || isHov) {
           const metrics = ctx.measureText(text);
           const w = Math.max(metrics.width + 16, 60);
-          const h = fontSize + 10;
+          const h = fontSize + 12;
           ctx.save();
-          ctx.strokeStyle = '#0284c7';
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = isSel ? '#0284c7' : '#94a3b8';
+          ctx.lineWidth = 1.2;
           ctx.setLineDash([3, 3]);
           ctx.strokeRect(-w / 2, -h / 2, w, h);
+          if (isSel) {
+            ctx.fillStyle = 'rgba(2, 132, 199, 0.06)';
+            ctx.fillRect(-w / 2, -h / 2, w, h);
+          }
           ctx.restore();
         }
         break;

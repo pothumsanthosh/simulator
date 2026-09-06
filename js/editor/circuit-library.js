@@ -17,6 +17,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 330, 30, { text: 'SIMPLE BUCK CONVERTER (DC-DC)', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vIn = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 100, 200, { voltage: 12 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 320, {}, 0);
       const clk = canvas.addComponent(ComponentTypes.CLOCK_VOLTAGE, 220, 100, { vHigh: 12, vLow: 0, frequency: 20000, dutyCycle: 42 }, 90);
@@ -55,6 +56,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 340, 40, { text: '555 TIMER ASTABLE MULTIVIBRATOR', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vcc = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 200, { voltage: 9 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 320, {}, 0);
       const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 220, 100, { resistance: 10000 }, 90);
@@ -98,6 +100,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 370, 30, { text: 'CLASS-AB PUSH-PULL AUDIO POWER AMPLIFIER', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vPos = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 100, { voltage: 15 }, 0);
       const vNeg = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 300, { voltage: 15 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 200, {}, 0);
@@ -156,6 +159,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 300, 30, { text: '4-BIT BINARY COUNTER WITH 7-SEGMENT DISPLAY', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vcc = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 200, { voltage: 5 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 320, {}, 0);
       const clk = canvas.addComponent(ComponentTypes.CLOCK_VOLTAGE, 180, 200, { vHigh: 5, vLow: 0, frequency: 2, dutyCycle: 50 }, 0);
@@ -195,6 +199,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 400, 30, { text: '4TH-ORDER BUTTERWORTH SALLEN-KEY FILTER', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vIn = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 80, 220, { amplitude: 2.0, frequency: 1000 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 340, {}, 0);
 
@@ -249,6 +254,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 280, 30, { text: 'AM MODULATOR & DIODE ENVELOPE DEMODULATOR', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vAm = canvas.addComponent(ComponentTypes.AM_VOLTAGE, 100, 200, { carrierAmp: 5, carrierFreq: 40000, modFreq: 1000, modIndex: 0.8 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 320, {}, 0);
       const d1 = canvas.addComponent(ComponentTypes.SCHOTTKY, 240, 200, { forwardDrop: 0.25 }, 0);
@@ -283,6 +289,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 280, 30, { text: 'NON-INVERTING OP-AMP AC AMPLIFIER (11x)', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vAc = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 100, 200, { amplitude: 0.2, frequency: 1000 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 320, {}, 0);
       const opamp = canvas.addComponent(ComponentTypes.OPAMP, 300, 200, { openLoopGain: 100000, vSatPos: 12, vSatNeg: -12 }, 0);
@@ -317,6 +324,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 330, 30, { text: 'FULL-WAVE BRIDGE RECTIFIER & FILTER', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vAc = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 100, 200, { amplitude: 12, frequency: 60 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 560, 320, {}, 0);
       const d1 = canvas.addComponent(ComponentTypes.DIODE, 260, 140, { forwardDrop: 0.7 }, 0);
@@ -351,40 +359,46 @@ export const CircuitLibrary = {
   // 9. Digital Logic: Half Adder
   halfAdder: {
     id: 'half-adder',
-    name: 'Digital Logic: Half Adder',
-    description: 'Fundamental binary arithmetic circuit with XOR gate producing the SUM and AND gate producing the CARRY out.',
+    name: 'Digital Logic: Half Adder (XOR/AND)',
+    description: 'Fundamental binary arithmetic circuit with interactive DG digital switches, XOR gate producing SUM and AND gate producing CARRY with active LEDs.',
     author: 'Digitallc',
     stats: { stars: 65, copies: 210, views: 42100 },
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
 
-      const vcc = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 200, { voltage: 5 }, 0);
-      const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 320, {}, 0);
-      const swA = canvas.addComponent(ComponentTypes.SPST_SWITCH, 200, 140, { closed: true }, 0);
-      const swB = canvas.addComponent(ComponentTypes.SPST_SWITCH, 200, 260, { closed: false }, 0);
-      const rA = canvas.addComponent(ComponentTypes.RESISTOR, 280, 180, { resistance: 10000 }, 90);
-      const rB = canvas.addComponent(ComponentTypes.RESISTOR, 280, 300, { resistance: 10000 }, 90);
-      const xorGate = canvas.addComponent(ComponentTypes.XOR_GATE, 400, 140, { vHigh: 5 }, 0);
-      const andGate = canvas.addComponent(ComponentTypes.AND_GATE, 400, 260, { vHigh: 5 }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 280, 40, { text: 'DIGITAL LOGIC: HALF ADDER (SUM & CARRY)', fontSize: 14, bold: true, color: '#334155' }, 0);
+      const dg1 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 100, 130, { state: 1, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg1.name = 'DG1';
+      const dg2 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 100, 230, { state: 1, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg2.name = 'DG2';
 
-      const prSum = canvas.addComponent(ComponentTypes.PROBE_V, 500, 100, { color: '#03b585', label: 'SUM Output' }, 0);
-      const prCarry = canvas.addComponent(ComponentTypes.PROBE_V, 500, 220, { color: '#ff9500', label: 'CARRY Output' }, 0);
+      const xorGate = canvas.addComponent(ComponentTypes.XOR_GATE, 280, 130, { vHigh: 5.0 }, 0);
+      xorGate.name = 'U1 (XOR)';
+      const andGate = canvas.addComponent(ComponentTypes.AND_GATE, 280, 230, { vHigh: 5.0 }, 0);
+      andGate.name = 'U2 (AND)';
+
+      const ledSum = canvas.addComponent(ComponentTypes.LED, 400, 130, { color: '#03b585' }, 0);
+      ledSum.name = 'SUM';
+      const ledCarry = canvas.addComponent(ComponentTypes.LED, 400, 230, { color: '#ff3b30' }, 0);
+      ledCarry.name = 'CARRY';
+
+      const gnd = canvas.addComponent(ComponentTypes.GROUND, 460, 180, {}, 0);
+
+      const prSum = canvas.addComponent(ComponentTypes.PROBE_V, 360, 80, { color: '#03b585', label: 'SUM Output' }, 0);
+      const prCarry = canvas.addComponent(ComponentTypes.PROBE_V, 360, 280, { color: '#ff9500', label: 'CARRY Output' }, 0);
 
       canvas.wires = [
-        { id: 'w1', fromPin: `${vcc.id}:p_neg`, toPin: `${gnd.id}:p1` },
-        { id: 'w2', fromPin: `${vcc.id}:p_pos`, toPin: `${swA.id}:p1` },
-        { id: 'w3', fromPin: `${vcc.id}:p_pos`, toPin: `${swB.id}:p1` },
-        { id: 'w4', fromPin: `${swA.id}:p2`, toPin: `${rA.id}:p1` },
-        { id: 'w5', fromPin: `${swA.id}:p2`, toPin: `${xorGate.id}:in1` },
-        { id: 'w6', fromPin: `${swA.id}:p2`, toPin: `${andGate.id}:in1` },
-        { id: 'w7', fromPin: `${swB.id}:p2`, toPin: `${rB.id}:p1` },
-        { id: 'w8', fromPin: `${swB.id}:p2`, toPin: `${xorGate.id}:in2` },
-        { id: 'w9', fromPin: `${swB.id}:p2`, toPin: `${andGate.id}:in2` },
-        { id: 'w10', fromPin: `${rA.id}:p2`, toPin: `${gnd.id}:p1` },
-        { id: 'w11', fromPin: `${rB.id}:p2`, toPin: `${gnd.id}:p1` },
-        { id: 'w12', fromPin: `${xorGate.id}:out`, toPin: `${prSum.id}:tip` },
-        { id: 'w13', fromPin: `${andGate.id}:out`, toPin: `${prCarry.id}:tip` }
+        { id: 'w1', fromPin: `${dg1.id}:out`, toPin: `${xorGate.id}:in1` },
+        { id: 'w2', fromPin: `${dg1.id}:out`, toPin: `${andGate.id}:in1` },
+        { id: 'w3', fromPin: `${dg2.id}:out`, toPin: `${xorGate.id}:in2` },
+        { id: 'w4', fromPin: `${dg2.id}:out`, toPin: `${andGate.id}:in2` },
+        { id: 'w5', fromPin: `${xorGate.id}:out`, toPin: `${ledSum.id}:anode` },
+        { id: 'w6', fromPin: `${xorGate.id}:out`, toPin: `${prSum.id}:tip` },
+        { id: 'w7', fromPin: `${andGate.id}:out`, toPin: `${ledCarry.id}:anode` },
+        { id: 'w8', fromPin: `${andGate.id}:out`, toPin: `${prCarry.id}:tip` },
+        { id: 'w9', fromPin: `${ledSum.id}:cathode`, toPin: `${gnd.id}:p1` },
+        { id: 'w10', fromPin: `${ledCarry.id}:cathode`, toPin: `${gnd.id}:p1` }
       ];
       canvas.fitToScreen();
     }
@@ -401,6 +415,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 240, 30, { text: 'RC LOW-PASS PASSIVE FILTER', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vAc = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 100, 200, { amplitude: 5, frequency: 1000 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 320, {}, 0);
       const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 240, 160, { resistance: 1000 }, 0);
@@ -432,6 +447,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 280, 20, { text: 'BJT DIFFERENTIAL PAIR AMPLIFIER', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vPos = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 60, 80, { voltage: 12 }, 0);
       const vNeg = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 60, 340, { voltage: 12 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 60, 210, {}, 0);
@@ -481,6 +497,7 @@ export const CircuitLibrary = {
       canvas.components = [];
       canvas.wires = [];
 
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 400, 30, { text: 'HIGH-DENSITY R-C LADDER NETWORK (100+ NODES)', fontSize: 14, bold: true, color: '#334155' }, 0);
       const vIn = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 60, 200, { amplitude: 10, frequency: 1000 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 60, 320, {}, 0);
       canvas.wires.push({ id: 'w_in_gnd', fromPin: `${vIn.id}:p_neg`, toPin: `${gnd.id}:p1` });
@@ -519,6 +536,7 @@ export const CircuitLibrary = {
       canvas.wires = [];
 
       // 1. Sources & Grounds
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 440, 20, { text: 'ASK MODULATION & DEMODULATION TRANSCEIVER', fontSize: 14, bold: true, color: '#334155' }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 360, {}, 0);
       const vMsg = canvas.addComponent(ComponentTypes.CLOCK_VOLTAGE, 100, 140, { vHigh: 10, vLow: 0, frequency: 500, dutyCycle: 50 }, 0);
       const vCarrier = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 100, 260, { amplitude: 5, frequency: 50000 }, 0);
