@@ -759,6 +759,50 @@ class MultisimApp {
     document.getElementById('circuitNameInput').addEventListener('change', (e) => {
       document.title = `${e.target.value} - Multisim Live`;
     });
+
+    // --- Responsive Sidebar & Topbar Handlers ---
+    const announcementCloseBtn = document.getElementById('btnCloseAnnouncement');
+    if (announcementCloseBtn) {
+      announcementCloseBtn.addEventListener('click', () => {
+        document.body.classList.add('announcement-hidden');
+        const announcement = document.getElementById('topAnnouncement');
+        if (announcement) announcement.classList.add('hidden');
+        setTimeout(() => {
+          this.canvas.resize();
+          this.grapher.resize();
+        }, 220);
+      });
+    }
+
+    const togglePaletteHandler = () => {
+      const sidebar = document.getElementById('paletteSidebar');
+      const btn = document.getElementById('btnTogglePalette');
+      if (sidebar) {
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        if (btn) btn.classList.toggle('active', !isCollapsed);
+        setTimeout(() => {
+          this.canvas.resize();
+          this.grapher.resize();
+        }, 220);
+      }
+    };
+    document.getElementById('btnTogglePalette')?.addEventListener('click', togglePaletteHandler);
+    document.getElementById('btnCollapsePalette')?.addEventListener('click', togglePaletteHandler);
+
+    const togglePropertiesHandler = () => {
+      const sidebar = document.getElementById('propertiesSidebar');
+      const btn = document.getElementById('btnToggleProperties');
+      if (sidebar) {
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        if (btn) btn.classList.toggle('active', !isCollapsed);
+        setTimeout(() => {
+          this.canvas.resize();
+          this.grapher.resize();
+        }, 220);
+      }
+    };
+    document.getElementById('btnToggleProperties')?.addEventListener('click', togglePropertiesHandler);
+    document.getElementById('btnCloseProperties')?.addEventListener('click', togglePropertiesHandler);
   }
 
   initQuickSearch() {

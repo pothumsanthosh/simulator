@@ -55,10 +55,38 @@ button, input, select, textarea {
   background-color: var(--announcement-bg);
   border-bottom: 1px solid var(--announcement-border);
   z-index: 10001;
-  padding: 8px 16px;
+  padding: 8px 36px 8px 16px;
   font-size: 13px;
   color: var(--announcement-text);
   text-align: center;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.topbar--announcement.hidden,
+body.announcement-hidden .topbar--announcement {
+  display: none !important;
+}
+
+.announcement-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--announcement-text);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.announcement-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .topbar--announcement a {
@@ -80,6 +108,20 @@ button, input, select, textarea {
   z-index: 10000;
   display: flex;
   align-items: center;
+  transition: top 0.2s ease;
+}
+
+body.announcement-hidden .topbar {
+  top: 0;
+}
+
+body.announcement-hidden .view-container {
+  margin-top: var(--header-height);
+  min-height: calc(100vh - var(--header-height));
+}
+
+body.announcement-hidden .studio-wrapper {
+  height: calc(100vh - var(--header-height));
 }
 
 .topbar-container {

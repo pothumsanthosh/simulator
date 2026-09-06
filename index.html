@@ -16,8 +16,9 @@
 <body>
 
   <!-- Top Announcement Notice (Multisim Live EOL / Transition Notice) -->
-  <div class="topbar--announcement">
+  <div class="topbar--announcement" id="topAnnouncement">
     <span>The Future of Multisim is on the Desktop. On September 15, 2026, the Multisim Live online simulator will be shut down. Read more about this transition <a href="https://support.digilent.com/hc/en-us/articles/41178584173979-Multisim-Live-EOL-Letter" target="_blank" rel="noopener noreferrer">here</a></span>
+    <button class="announcement-close" id="btnCloseAnnouncement" title="Dismiss announcement">✕</button>
   </div>
 
   <!-- Main Website Navigation Bar -->
@@ -341,6 +342,7 @@
         <!-- Studio Toolbar -->
         <div class="studio-toolbar">
           <div class="studio-toolbar-left">
+            <button class="tool-btn active" id="btnTogglePalette" title="Toggle Components Palette Sidebar (P)" style="font-weight: bold; font-size: 14px;">☰</button>
             <input type="text" class="circuit-title-input" id="circuitNameInput" value="Untitled Circuit" title="Click to rename circuit"/>
             <div class="toolbar-divider"></div>
             
@@ -393,6 +395,7 @@
               <button class="quick-comp-btn" data-type="GROUND" title="Add Ground (GND)">⏚ GND</button>
               <button class="quick-comp-btn" data-type="DC_VOLTAGE" title="Add DC Voltage Source">⚡ DC</button>
               <button class="quick-comp-btn" data-type="AC_VOLTAGE" title="Add AC Voltage Source">∿ AC</button>
+              <button class="quick-comp-btn" data-type="TRIGGER_PULSE" title="Add Manual Trigger Pulse Button">⚡ Trig</button>
               <button class="quick-comp-btn" data-type="RESISTOR" title="Add Resistor (R)">⟿ Res</button>
               <button class="quick-comp-btn" data-type="CAPACITOR" title="Add Capacitor (C)">⫞ Cap</button>
               <button class="quick-comp-btn" data-type="INDUCTOR" title="Add Inductor (L)">∿ Ind</button>
@@ -405,31 +408,40 @@
           </div>
 
           <div class="studio-toolbar-right">
-            <button class="tool-btn" id="btnSelectAll" title="Select All Components (Ctrl+A)" style="font-weight: 600; font-size: 11.5px;">⬚ All</button>
-            <button class="tool-btn" id="btnCut" title="Cut Selected (Ctrl+X)">✂</button>
-            <button class="tool-btn" id="btnCopy" title="Copy Selected (Ctrl+C)">📋</button>
-            <button class="tool-btn" id="btnPaste" title="Paste (Ctrl+V)">📥</button>
-            <button class="tool-btn" id="btnDelete" title="Delete Selected (Del / Backspace)">🗑</button>
+            <div class="toolbar-toolgroup">
+              <button class="tool-btn" id="btnSelectAll" title="Select All Components (Ctrl+A)" style="font-weight: 600; font-size: 11px;">⬚ All</button>
+              <button class="tool-btn" id="btnCut" title="Cut Selected (Ctrl+X)">✂</button>
+              <button class="tool-btn" id="btnCopy" title="Copy Selected (Ctrl+C)">📋</button>
+              <button class="tool-btn" id="btnPaste" title="Paste (Ctrl+V)">📥</button>
+              <button class="tool-btn" id="btnDelete" title="Delete Selected (Del / Backspace)">🗑</button>
+            </div>
             <div class="toolbar-divider"></div>
-            <button class="tool-btn" id="btnAddNodeToolbar" title="Add Junction Node / Multi-Wire Hub (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
-            <button class="tool-btn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
-            <button class="tool-btn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
-            <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
-            <button class="tool-btn" id="btnFlipH" title="Flip Horizontal (H)">⇄</button>
-            <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
-            <button class="tool-btn" id="btnFitScreen" title="Fit to Screen">⛶</button>
-            <button class="tool-btn active" id="btnToggleNodesToolbar" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
+            <div class="toolbar-toolgroup">
+              <button class="tool-btn" id="btnAddNodeToolbar" title="Add Junction Node / Multi-Wire Hub (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
+              <button class="tool-btn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+              <button class="tool-btn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+              <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
+              <button class="tool-btn" id="btnFlipH" title="Flip Horizontal (H)">⇄</button>
+              <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
+              <button class="tool-btn" id="btnFitScreen" title="Fit Circuit to Screen (F)">⛶</button>
+              <button class="tool-btn active" id="btnToggleNodesToolbar" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
+            </div>
             <div class="toolbar-divider"></div>
-            <button class="btn btn-outline" id="btnExportMenu" style="padding: 4px 10px; font-size: 12px;">Export ▾</button>
+            <button class="tool-btn active" id="btnToggleProperties" title="Toggle Configuration Pane (Properties)">⚙</button>
+            <button class="btn btn-outline" id="btnExportMenu" style="padding: 4px 8px; font-size: 11.5px;">Export ▾</button>
           </div>
         </div>
 
         <!-- Studio Main Workspace -->
         <div class="studio-main">
           <!-- Left Palette Sidebar -->
-          <aside class="palette-sidebar">
+          <aside class="palette-sidebar" id="paletteSidebar">
+            <div class="palette-header-row">
+              <span class="palette-title">Components</span>
+              <button class="palette-collapse-btn" id="btnCollapsePalette" title="Collapse Palette">◀</button>
+            </div>
             <div class="palette-search">
-              <input type="text" id="paletteSearchInput" placeholder="Search components..."/>
+              <input type="text" id="paletteSearchInput" placeholder="Search components (Ctrl+F)..."/>
             </div>
             <div class="palette-categories" id="paletteContainer">
               <!-- Dynamically rendered by app.js from ComponentDefinitions -->
@@ -605,9 +617,11 @@
             </div>
           </div>
 
-          <!-- Right Properties Inspector -->
           <aside class="properties-sidebar" id="propertiesSidebar">
-            <h3 class="properties-header">Configuration Pane</h3>
+            <div class="properties-header-row">
+              <h3 class="properties-header">Configuration Pane</h3>
+              <button class="properties-close-btn" id="btnCloseProperties" title="Close Configuration Pane">✕</button>
+            </div>
             <div id="propertiesContent">
               <p class="no-selection-msg">Select a component on the schematic to inspect and edit its parameters.</p>
             </div>

@@ -1428,10 +1428,18 @@ export class SchematicCanvas {
   }
 
   fitToScreen() {
+    if (this.canvas.parentElement) {
+      const rect = this.canvas.parentElement.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        this.displayWidth = rect.width;
+        this.displayHeight = rect.height;
+      }
+    }
+
     const dw = this.displayWidth || 800;
     const dh = this.displayHeight || 600;
 
-    if (this.components.length === 0) {
+    if (this.components.length === 0 && this.wires.length === 0) {
       this.zoom = 1.0;
       this.panX = dw / 2;
       this.panY = dh / 2;
@@ -1440,20 +1448,67 @@ export class SchematicCanvas {
     }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
     this.components.forEach(c => {
-      minX = Math.min(minX, c.x - (c.width || 40) / 2);
-      minY = Math.min(minY, c.y - (c.height || 40) / 2);
-      maxX = Math.max(maxX, c.x + (c.width || 40) / 2);
-      maxY = Math.max(maxY, c.y + (c.height || 40) / 2);
+      const w = c.width || 40;
+      const h = c.height || 40;
+      minX = Math.min(minX, c.x - w / 2 - 20);
+      minY = Math.min(minY, c.y - h / 2 - 20);
+      maxX = Math.max(maxX, c.x + w / 2 + 20);
+      maxY = Math.max(maxY, c.y + h / 2 + 20);
+
+      // Also include pins in bounding box
+      if (Array.isArray(c.pins)) {
+        c.pins.forEach(p => {
+          if (p.x !== undefined && p.y !== undefined) {
+            minX = Math.min(minX, p.x - 10);
+            minY = Math.min(minY, p.y - 10);
+            maxX = Math.max(maxX, p.x + 10);
+            maxY = Math.max(maxY, p.y + 10);
+          }
+        });
+      }
     });
 
-    const padding = 80;
-    const circuitW = Math.max(maxX - minX + padding * 2, 100);
-    const circuitH = Math.max(maxY - minY + padding * 2, 100);
+    // Also include wires and waypoints
+    this.wires.forEach(w => {
+      if (w.x1 !== undefined && w.y1 !== undefined) {
+        minX = Math.min(minX, w.x1);
+        minY = Math.min(minY, w.y1);
+        maxX = Math.max(maxX, w.x1);
+        maxY = Math.max(maxY, w.y1);
+      }
+      if (w.x2 !== undefined && w.y2 !== undefined) {
+        minX = Math.min(minX, w.x2);
+        minY = Math.min(minY, w.y2);
+        maxX = Math.max(maxX, w.x2);
+        maxY = Math.max(maxY, w.y2);
+      }
+      if (Array.isArray(w.waypoints)) {
+        w.waypoints.forEach(wp => {
+          minX = Math.min(minX, wp.x);
+          minY = Math.min(minY, wp.y);
+          maxX = Math.max(maxX, wp.x);
+          maxY = Math.max(maxY, wp.y);
+        });
+      }
+    });
+
+    if (!isFinite(minX) || !isFinite(maxX)) {
+      this.zoom = 1.0;
+      this.panX = dw / 2;
+      this.panY = dh / 2;
+      this.render();
+      return;
+    }
+
+    const padding = 70;
+    const circuitW = Math.max(maxX - minX + padding * 2, 80);
+    const circuitH = Math.max(maxY - minY + padding * 2, 80);
 
     const zoomX = dw / circuitW;
     const zoomY = dh / circuitH;
-    this.zoom = Math.min(Math.max(Math.min(zoomX, zoomY), 0.35), 2.0);
+    this.zoom = Math.min(Math.max(Math.min(zoomX, zoomY), 0.25), 2.2);
 
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
