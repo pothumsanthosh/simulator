@@ -7,6 +7,16 @@
 
 import { ComponentTypes, ComponentDefinitions, formatValueWithPrefix } from '../engine/components.js';
 
+export const CanvasState = {
+  IDLE: 'IDLE',
+  SELECTING: 'SELECTING',
+  DRAGGING_COMPONENT: 'DRAGGING_COMPONENT',
+  PANNING_CANVAS: 'PANNING_CANVAS',
+  WIRING: 'WIRING',
+  PLACING_COMPONENT: 'PLACING_COMPONENT',
+  PINCHING: 'PINCHING'
+};
+
 export class SchematicCanvas {
   constructor(canvasElement, engine) {
     this.canvas = canvasElement;
@@ -33,7 +43,8 @@ export class SchematicCanvas {
     this.hoveredComponent = null;
     this.showNodeNumbers = true;
 
-    // Interaction Modes
+    // Interaction Modes & State Machine
+    this.state = CanvasState.IDLE;
     this.mode = 'SELECT';
     this.placementComponentType = null;
 
@@ -896,11 +907,23 @@ export class SchematicCanvas {
     if (this.isDragging) {
       this.isDragging = false;
       this.dragCandidate = false;
-      this.saveState();
-      this.notifyModified();
+      this.state = CanvasState.IDLE;
+      let hasMoved = false;
+      for (const [c, initPos] of this.compInitialPositions.entries()) {
+        if (c.x !== initPos.x || c.y !== initPos.y) {
+          hasMoved = true;
+          break;
+        }
+      }
+      if (hasMoved) {
+        this.saveState();
+        this.notifyModified();
+      }
+      this.compInitialPositions.clear();
       this.render();
     }
     this.dragCandidate = false;
+    this.state = CanvasState.IDLE;
 
     if (this.isBoxSelecting) {
       this.isBoxSelecting = false;
