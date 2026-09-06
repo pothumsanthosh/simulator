@@ -465,8 +465,38 @@ class MultisimApp {
     });
 
     document.getElementById('btnToggleCursors').addEventListener('click', () => this.grapher.toggleCursors());
-    document.getElementById('timeScaleSelect').addEventListener('change', (e) => this.grapher.setTimeScale(parseFloat(e.target.value)));
-    document.getElementById('voltScaleSelect')?.addEventListener('change', (e) => this.grapher.setVoltScale(e.target.value));
+    
+    // Time/Div Manual Text Input and Preset Selector
+    const timeInput = document.getElementById('timeScaleInput');
+    const timeSelect = document.getElementById('timeScaleSelect');
+    if (timeInput) {
+      const applyTime = () => this.grapher.setTimeScale(timeInput.value);
+      timeInput.addEventListener('change', applyTime);
+      timeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyTime(); timeInput.blur(); } });
+    }
+    if (timeSelect) {
+      timeSelect.addEventListener('change', (e) => {
+        this.grapher.setTimeScale(parseFloat(e.target.value));
+        if (timeInput) timeInput.value = formatValueWithPrefix(parseFloat(e.target.value), 's');
+      });
+    }
+
+    // Volts/Div Manual Text Input and Preset Selector
+    const voltInput = document.getElementById('voltScaleInput');
+    const voltSelect = document.getElementById('voltScaleSelect');
+    if (voltInput) {
+      const applyVolt = () => this.grapher.setVoltScale(voltInput.value);
+      voltInput.addEventListener('change', applyVolt);
+      voltInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyVolt(); voltInput.blur(); } });
+    }
+    if (voltSelect) {
+      voltSelect.addEventListener('change', (e) => {
+        this.grapher.setVoltScale(e.target.value);
+        if (voltInput) voltInput.value = e.target.value === 'auto' ? 'Auto' : formatValueWithPrefix(parseFloat(e.target.value), 'V');
+      });
+    }
+
+    document.getElementById('btnGraphResetView')?.addEventListener('click', () => this.grapher.resetView());
     document.getElementById('btnGraphTheme')?.addEventListener('click', (e) => {
       const newTheme = this.grapher.toggleTheme();
       e.target.textContent = `Theme: ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)}`;
@@ -559,9 +589,13 @@ class MultisimApp {
     const loop = () => {
       if (!this.isSimRunning) return;
 
-      const stepsPerFrame = 20; // 20 steps * 50us = 1ms simulated per animation frame
-      for (let i = 0; i < stepsPerFrame; i++) {
-        this.engine.step(5e-5);
+      const adaptiveDt = this.engine.getAdaptiveTimeStep(this.grapher?.timePerDiv);
+      // Simulate up to 1ms or appropriate frame window, balanced between 20 and 300 steps per frame
+      const targetSimTime = Math.max(adaptiveDt * 20, Math.min(1e-3, (this.grapher?.timePerDiv || 0.001) * 2));
+      const steps = Math.max(20, Math.min(300, Math.round(targetSimTime / adaptiveDt)));
+
+      for (let i = 0; i < steps; i++) {
+        this.engine.step(adaptiveDt);
       }
 
       this.updateSimTimeDisplay();

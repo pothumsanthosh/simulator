@@ -6,7 +6,7 @@
  * Min/Max LOD decimation, and CSV/PNG export.
  */
 
-import { formatValueWithPrefix } from '../engine/components.js';
+import { formatValueWithPrefix, parseEngineeringValue } from '../engine/components.js';
 
 export class CircuitGrapher {
   constructor(canvasElement, engine) {
@@ -14,13 +14,15 @@ export class CircuitGrapher {
     this.ctx = this.canvas.getContext('2d');
     this.engine = engine;
 
-    // Timebase & Vertical Settings
+    // Timebase & Vertical Settings (Unlimited manual variations)
     this.timePerDiv = 0.001; // 1 ms/div (10 divisions = 10ms window)
     this.voltsPerDiv = 2.0;  // 2 V/div (8 vertical divisions)
+    this.timeOffset = 0.0;   // Horizontal pan offset in seconds
+    this.voltOffset = 0.0;   // Vertical baseline offset in Volts
     this.autoScale = true;
-    this.theme = 'dark'; // 'dark' or 'light'
+    this.theme = 'dark';     // 'dark' or 'light'
 
-    // Measurement Cursors
+    // Measurement Cursors (Draggable by touch / mouse)
     this.showCursors = true;
     this.cursor1 = 0.25; // X position ratio (0.0 to 1.0)
     this.cursor2 = 0.75;
@@ -33,6 +35,18 @@ export class CircuitGrapher {
 
     // Automated Measurements Cache
     this.measurements = new Map();
+
+    // Touch & Pointer Gesture Tracking (Bare Hands & Mouse)
+    this.activePointers = new Map();
+    this.isPanning = false;
+    this.isPinching = false;
+    this.panStartX = 0;
+    this.panStartY = 0;
+    this.initialTimeOffset = 0;
+    this.initialVoltOffset = 0;
+    this.initialPinchDist = 0;
+    this.initialPinchTimePerDiv = 0.001;
+    this.initialPinchVoltsPerDiv = 2.0;
 
     this.initEvents();
     this.resize();
@@ -47,8 +61,8 @@ export class CircuitGrapher {
       return;
     }
     const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
+    this.canvas.width = Math.round(rect.width * dpr);
+    this.canvas.height = Math.round(rect.height * dpr);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(dpr, dpr);
     this.width = rect.width;
@@ -59,43 +73,159 @@ export class CircuitGrapher {
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
-    this.canvas.addEventListener('mousedown', (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left) / this.width;
-      if (Math.abs(mouseX - this.cursor1) < 0.035) {
-        this.activeCursor = 1;
-      } else if (Math.abs(mouseX - this.cursor2) < 0.035) {
-        this.activeCursor = 2;
+    // --- Unified Pointer Events (Touchscreen "Bare Hands", Stylus & Mouse) ---
+    this.canvas.addEventListener('pointerdown', (e) => {
+      try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (this.activePointers.size === 1) {
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left) / this.width;
+
+        // Generous cursor hit testing (35px) for fingertip touches
+        if (Math.abs(mouseX - this.cursor1) < 0.04) {
+          this.activeCursor = 1;
+        } else if (Math.abs(mouseX - this.cursor2) < 0.04) {
+          this.activeCursor = 2;
+        } else {
+          this.isPanning = true;
+          this.panStartX = e.clientX;
+          this.panStartY = e.clientY;
+          this.initialTimeOffset = this.timeOffset;
+          this.initialVoltOffset = this.voltOffset;
+        }
+      } else if (this.activePointers.size === 2) {
+        // Two-Finger Pinch Zoom (Bare Hands)
+        this.activeCursor = null;
+        this.isPanning = false;
+        this.isPinching = true;
+        const pts = Array.from(this.activePointers.values());
+        this.initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        this.initialPinchTimePerDiv = this.timePerDiv;
+        this.initialPinchVoltsPerDiv = this.voltsPerDiv;
       }
     });
 
-    window.addEventListener('mousemove', (e) => {
-      if (!this.activeCursor) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / this.width));
-      if (this.activeCursor === 1) this.cursor1 = mouseX;
-      else if (this.activeCursor === 2) this.cursor2 = mouseX;
-      this.render();
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (!this.activePointers.has(e.pointerId)) return;
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (this.isPinching && this.activePointers.size >= 2) {
+        const pts = Array.from(this.activePointers.values());
+        const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (this.initialPinchDist > 5 && currentDist > 5) {
+          const ratio = this.initialPinchDist / currentDist;
+          this.timePerDiv = Math.max(1e-12, Math.min(1e4, this.initialPinchTimePerDiv * ratio));
+          this.syncInputs();
+          this.render();
+        }
+        return;
+      }
+
+      if (this.activeCursor) {
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = Math.max(0.01, Math.min(0.99, (e.clientX - rect.left) / this.width));
+        if (this.activeCursor === 1) this.cursor1 = mouseX;
+        else if (this.activeCursor === 2) this.cursor2 = mouseX;
+        this.render();
+        return;
+      }
+
+      if (this.isPanning) {
+        const dx = e.clientX - this.panStartX;
+        const dy = e.clientY - this.panStartY;
+        const totalSpan = this.timePerDiv * 10;
+        this.timeOffset = this.initialTimeOffset - (dx / this.width) * totalSpan;
+        this.voltOffset = this.initialVoltOffset + (dy / this.height) * (this.voltsPerDiv * 8);
+        this.render();
+      }
     });
 
-    window.addEventListener('mouseup', () => {
-      this.activeCursor = null;
-    });
+    const endPointer = (e) => {
+      try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      this.activePointers.delete(e.pointerId);
+      if (this.activePointers.size === 0) {
+        this.activeCursor = null;
+        this.isPanning = false;
+        this.isPinching = false;
+      } else if (this.activePointers.size === 1) {
+        this.isPinching = false;
+      }
+    };
+
+    this.canvas.addEventListener('pointerup', endPointer);
+    this.canvas.addEventListener('pointercancel', endPointer);
+
+    // --- Continuous Mouse Wheel Zoom (Unlimited Variations on X and Y) ---
+    this.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const factor = e.deltaY < 0 ? 0.85 : 1.18;
+
+      if (mouseX < 65 || e.shiftKey) {
+        // Vertical Volts/Div Zoom
+        this.autoScale = false;
+        this.voltsPerDiv = Math.max(1e-6, Math.min(1e6, this.voltsPerDiv * factor));
+      } else {
+        // Horizontal Time/Div Zoom
+        this.timePerDiv = Math.max(1e-12, Math.min(1e4, this.timePerDiv * factor));
+      }
+      this.syncInputs();
+      this.render();
+    }, { passive: false });
   }
 
+  // --- Unlimited Manual Variations Scaling ---
   setTimeScale(scale) {
-    this.timePerDiv = Math.max(parseFloat(scale) || 0.001, 1e-6);
+    if (typeof scale === 'string') {
+      const parsed = parseEngineeringValue(scale);
+      if (parsed && !isNaN(parsed) && parsed > 0) {
+        this.timePerDiv = Math.max(1e-12, Math.min(1e4, parsed));
+      }
+    } else if (typeof scale === 'number' && scale > 0) {
+      this.timePerDiv = Math.max(1e-12, Math.min(1e4, scale));
+    }
+    this.syncInputs();
     this.render();
   }
 
   setVoltScale(scale) {
-    if (scale === 'auto') {
+    if (scale === 'auto' || scale === 'Auto') {
       this.autoScale = true;
-    } else {
+    } else if (typeof scale === 'string') {
+      const parsed = parseEngineeringValue(scale);
+      if (parsed && !isNaN(parsed) && parsed > 0) {
+        this.autoScale = false;
+        this.voltsPerDiv = Math.max(1e-6, Math.min(1e6, parsed));
+      }
+    } else if (typeof scale === 'number' && scale > 0) {
       this.autoScale = false;
-      this.voltsPerDiv = Math.max(parseFloat(scale) || 1.0, 0.01);
+      this.voltsPerDiv = Math.max(1e-6, Math.min(1e6, scale));
     }
+    this.syncInputs();
     this.render();
+  }
+
+  resetView() {
+    this.timePerDiv = 0.001;
+    this.voltsPerDiv = 2.0;
+    this.autoScale = true;
+    this.timeOffset = 0.0;
+    this.voltOffset = 0.0;
+    this.syncInputs();
+    this.render();
+  }
+
+  syncInputs() {
+    const timeInput = document.getElementById('timeScaleInput');
+    if (timeInput && document.activeElement !== timeInput) {
+      timeInput.value = formatValueWithPrefix(this.timePerDiv, 's');
+    }
+    const voltInput = document.getElementById('voltScaleInput');
+    if (voltInput && document.activeElement !== voltInput) {
+      voltInput.value = this.autoScale ? 'Auto' : formatValueWithPrefix(this.voltsPerDiv, 'V');
+    }
   }
 
   setTheme(theme) {
@@ -176,15 +306,16 @@ export class CircuitGrapher {
       return;
     }
 
-    // Time window bounds (10 horizontal divisions)
-    const totalTimeSpan = Math.max(this.timePerDiv * 10, 1e-9);
+    // Time window bounds with timeOffset
+    const totalTimeSpan = Math.max(this.timePerDiv * 10, 1e-12);
     const latestTime = history[history.length - 1].time;
-    const startTime = Math.max(0, latestTime - totalTimeSpan);
+    const baseStartTime = Math.max(0, latestTime - totalTimeSpan);
+    const startTime = baseStartTime + (this.timeOffset || 0);
 
     // Auto-scale vertical range only if explicitly set to auto
     if (this.autoScale && history.length > 5) {
       let minV = -1, maxV = 1;
-      const recentPoints = history.slice(-400);
+      const recentPoints = history.slice(-500);
       recentPoints.forEach(pt => {
         Object.values(pt.probes).forEach(pr => {
           if (pr.value < minV) minV = pr.value;
@@ -192,7 +323,7 @@ export class CircuitGrapher {
         });
       });
       const maxSpan = Math.max(Math.abs(minV), Math.abs(maxV)) * 1.25;
-      this.voltsPerDiv = Math.max(maxSpan / 4, 0.1);
+      this.voltsPerDiv = Math.max(maxSpan / 4, 0.05);
     }
 
     // Calculate automated measurements
@@ -229,11 +360,15 @@ export class CircuitGrapher {
     }
     ctx.stroke();
 
-    // Center axes (dashed)
+    // Center axes (dashed) with vertical baseline offset
+    const yPixelsPerVolt = (h / 8) / this.voltsPerDiv;
+    const centerY = (h / 2) + (this.voltOffset || 0) * yPixelsPerVolt;
+
     ctx.strokeStyle = isLight ? '#94a3b8' : '#475569';
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+    ctx.moveTo(0, Math.max(0, Math.min(h, centerY)));
+    ctx.lineTo(w, Math.max(0, Math.min(h, centerY)));
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -245,7 +380,7 @@ export class CircuitGrapher {
     ctx.textBaseline = 'middle';
     for (let i = 0; i <= numDivY; i++) {
       const y = i * stepY;
-      const v = (4 - i) * this.voltsPerDiv;
+      const v = (4 - i) * this.voltsPerDiv - (this.voltOffset || 0);
       const label = `${v >= 0 ? '+' : ''}${formatValueWithPrefix(v, 'V')}`;
       ctx.fillText(label, 6, Math.max(10, Math.min(h - 10, y)));
     }
@@ -265,8 +400,8 @@ export class CircuitGrapher {
 
     const sample = history[history.length - 1];
     const probeIds = Object.keys(sample.probes);
-    const centerY = h / 2;
     const yPixelsPerVolt = (h / 8) / this.voltsPerDiv;
+    const centerY = (h / 2) + (this.voltOffset || 0) * yPixelsPerVolt;
 
     probeIds.forEach(probeId => {
       const probeInfo = sample.probes[probeId];
@@ -335,11 +470,19 @@ export class CircuitGrapher {
         const rms = Math.sqrt(sumSq / count);
         const vpp = max - min;
 
-        // Approximate zero-crossing frequency calculation
+        // Enhanced zero-crossing frequency detection with noise hysteresis
         let crossings = 0;
+        const hyst = Math.max(vpp * 0.05, 1e-4);
+        let lastState = (vals[0].v > mean + hyst) ? 1 : ((vals[0].v < mean - hyst) ? -1 : 0);
+
         for (let i = 1; i < count; i++) {
-          if ((vals[i - 1].v - mean) * (vals[i].v - mean) < 0) {
-            crossings++;
+          const v = vals[i].v;
+          if (lastState <= 0 && v > mean + hyst) {
+            if (lastState === -1) crossings++;
+            lastState = 1;
+          } else if (lastState >= 0 && v < mean - hyst) {
+            if (lastState === 1) crossings++;
+            lastState = -1;
           }
         }
         const timeSpan = vals[count - 1].t - vals[0].t;

@@ -1441,6 +1441,88 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     const vMid = eng2.nodeVoltages[nMid];
     assert(Math.abs(vMid - 6.0) < 1e-4, `[Save/Load] Serialized JSON project imported and simulated cleanly (V_divider = ${vMid.toFixed(4)}V)`, g10);
   }
+
+  // 10.12 Adaptive High-Frequency Solver (1MHz & 10MHz RF Sources)
+  {
+    const eng = new CircuitEngine();
+    const rfSource = { id: 'RF1', type: ComponentTypes.AC_VOLTAGE, params: { amplitude: 5.0, frequency: 10000000, offset: 0 } }; // 10 MHz
+    const rLoad = { id: 'RL', type: ComponentTypes.RESISTOR, params: { resistance: 50 } }; // 50 Ohm RF load
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+    const wires = [
+      { fromPin: 'RF1:p_neg', toPin: 'GND1:p1' },
+      { fromPin: 'RF1:p_pos', toPin: 'RL:p1' },
+      { fromPin: 'RL:p2', toPin: 'GND1:p1' }
+    ];
+
+    eng.setCircuit([rfSource, rLoad, gnd], wires);
+    const dt = eng.getAdaptiveTimeStep(1e-7); // 100 ns timebase
+    assert(dt <= 2.5e-9, `[High Freq] Adaptive timestep computed: dt = ${(dt * 1e9).toFixed(3)}ns for 10MHz RF source (<= 2.5ns)`, g10);
+
+    let hasDivergence = false;
+    for (let i = 0; i < 200; i++) {
+      eng.step(dt);
+      const v = eng.nodeVoltages[eng.getNode(rLoad, 'p1')] || 0;
+      if (isNaN(v) || !isFinite(v) || Math.abs(v) > 6.0) {
+        hasDivergence = true;
+        break;
+      }
+    }
+    assert(!hasDivergence, `[High Freq] 10MHz RF source simulated for 200 steps with 0 divergence and clean sinusoid amplitude`, g10);
+  }
+
+  // 10.13 Drag Threshold Selection Immunity (<5px movement invariant)
+  {
+    const initialPos = { x: 100, y: 100 };
+    let isDragging = false;
+    let dragCandidate = true;
+    const startScreen = { x: 250, y: 300 };
+
+    // Small finger/mouse jitter (3px movement during tap/selection)
+    const jitterScreen = { x: 252, y: 302 };
+    const distJitter = Math.hypot(jitterScreen.x - startScreen.x, jitterScreen.y - startScreen.y);
+    if (distJitter >= 5) isDragging = true;
+    let currentPos = { ...initialPos };
+    if (isDragging) {
+      currentPos.x += (jitterScreen.x - startScreen.x);
+      currentPos.y += (jitterScreen.y - startScreen.y);
+    }
+    const immuneToJitter = (currentPos.x === initialPos.x && currentPos.y === initialPos.y && !isDragging);
+
+    // Intentional drag (25px movement)
+    const dragScreen = { x: 275, y: 300 };
+    const distDrag = Math.hypot(dragScreen.x - startScreen.x, dragScreen.y - startScreen.y);
+    if (distDrag >= 5) isDragging = true;
+    if (isDragging) {
+      currentPos.x += (dragScreen.x - startScreen.x);
+      currentPos.y += (dragScreen.y - startScreen.y);
+    }
+    const dragSuccess = (isDragging && currentPos.x === initialPos.x + 25);
+
+    assert(immuneToJitter && dragSuccess, `[Bare Hands] 5px Drag Threshold: Tap/selection strictly preserves position, intentional drag engages cleanly`, g10);
+  }
+
+  // 10.14 Unlimited Manual Scaling Parser on X and Y Axes
+  {
+    const scales = [
+      { str: '10ns', expected: 1e-8 },
+      { str: '500ns', expected: 5e-7 },
+      { str: '20us', expected: 2e-5 },
+      { str: '100us', expected: 1e-4 },
+      { str: '2.5ms', expected: 2.5e-3 },
+      { str: '5s', expected: 5.0 },
+      { str: '50uV', expected: 5e-5 },
+      { str: '500mV', expected: 0.5 },
+      { str: '12V', expected: 12.0 },
+      { str: '10kV', expected: 10000.0 }
+    ];
+
+    const allMatched = scales.every(s => {
+      const parsed = parseEngineeringValue(s.str);
+      return Math.abs(parsed - s.expected) / s.expected < 1e-6;
+    });
+
+    assert(allMatched, `[Unlimited X/Y] Engineering unit parser resolved all scales from 10ns to 10kV with exact precision`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

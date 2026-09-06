@@ -292,6 +292,9 @@
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Canvas Floating Overlay Controls */
@@ -318,6 +321,7 @@
   align-items: center;
   justify-content: center;
   z-index: 40;
+  touch-action: none;
 }
 
 .split-gutter::after {
@@ -341,6 +345,7 @@
   position: relative;
   border-top: 1px solid #232a30;
   overflow: hidden;
+  touch-action: none;
 }
 
 .grapher-toolbar {
@@ -365,12 +370,16 @@
 .grapher-canvas-wrapper {
   flex-grow: 1;
   position: relative;
+  touch-action: none;
 }
 
 .grapher-canvas {
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .grapher-select {
@@ -380,6 +389,25 @@
   padding: 3px 8px;
   border-radius: 4px;
   font-size: 12px;
+}
+
+.grapher-input {
+  background: #14181b;
+  border: 1px solid #334155;
+  color: #38bdf8;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 500;
+  width: 62px;
+  text-align: center;
+}
+
+.grapher-input:focus {
+  outline: none;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
 }
 
 .btn-grapher-action {

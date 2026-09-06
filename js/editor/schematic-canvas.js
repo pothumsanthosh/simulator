@@ -40,16 +40,27 @@ export class SchematicCanvas {
     this.wiringStartPin = null;
     this.wiringCurrentPos = null;
 
-    // Dragging & Panning
+    // Dragging & Panning & Multi-touch Gestures (Bare Hands)
     this.isDragging = false;
+    this.dragCandidate = false;
     this.isPanning = false;
+    this.isPinching = false;
     this.isBoxSelecting = false;
     this.dragStartX = 0;
     this.dragStartY = 0;
+    this.dragStartScreen = { x: 0, y: 0 };
+    this.dragStartWorld = { x: 0, y: 0 };
     this.boxSelectStart = { x: 0, y: 0 };
     this.boxSelectCurrent = { x: 0, y: 0 };
     this.draggedComponent = null;
     this.compInitialPositions = new Map();
+    this.activePointers = new Map();
+    this.initialPinchDist = 0;
+    this.initialPinchZoom = 1.0;
+    this.initialPinchPan = { x: 0, y: 0 };
+    this.hoveredTargetPin = null;
+    this.lastTapTime = 0;
+    this.lastTapPos = { x: 0, y: 0 };
 
     // Clipboard & Monotonic Counter
     this.clipboard = null;
@@ -93,9 +104,12 @@ export class SchematicCanvas {
   initEvents() {
     window.addEventListener('resize', () => this.resize());
 
-    this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-    this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-    this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+    // Pointer Events (Unified Touchscreen "Bare Hands", Stylus & Mouse)
+    this.canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
+    this.canvas.addEventListener('pointermove', (e) => this.handlePointerMove(e));
+    this.canvas.addEventListener('pointerup', (e) => this.handlePointerUp(e));
+    this.canvas.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
+
     this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
     this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
     this.canvas.addEventListener('contextmenu', (e) => {
@@ -422,8 +436,41 @@ export class SchematicCanvas {
     ];
   }
 
-  // --- Mouse & Keyboard Handlers ---
-  handleMouseDown(e) {
+  // --- Unified Pointer & Multi-Touch Gesture Handlers (Bare Hands & Mouse) ---
+  handlePointerDown(e) {
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Multi-Touch (Bare Hands Two-Finger Pinch Zoom & Pan)
+    if (this.activePointers.size === 2) {
+      this.isPinching = true;
+      this.isDragging = false;
+      this.dragCandidate = false;
+      this.isPanning = false;
+      this.wiringStartPin = null;
+      this.wiringCurrentPos = null;
+      this.hoveredTargetPin = null;
+      const pts = Array.from(this.activePointers.values());
+      this.initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      this.initialPinchZoom = this.zoom;
+      this.initialPinchCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      this.initialPinchPan = { x: this.panX, y: this.panY };
+      this.render();
+      return;
+    }
+
+    if (this.activePointers.size !== 1) return;
+
+    // Double-tap detection for touchscreens
+    const now = Date.now();
+    if (now - this.lastTapTime < 300 && Math.hypot(e.clientX - this.lastTapPos.x, e.clientY - this.lastTapPos.y) < 25) {
+      this.handleDoubleClick(e);
+      this.lastTapTime = 0;
+      return;
+    }
+    this.lastTapTime = now;
+    this.lastTapPos = { x: e.clientX, y: e.clientY };
+
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
     // Middle-click or Alt+LeftClick: Pan
@@ -434,7 +481,7 @@ export class SchematicCanvas {
       return;
     }
 
-    if (e.button === 0) {
+    if (e.button === 0 || e.pointerType === 'touch' || e.pointerType === 'pen') {
       // 1. Placement Mode
       if (this.mode === 'PLACE' && this.placementComponentType) {
         this.addComponent(this.placementComponentType, worldPos.x, worldPos.y);
@@ -447,7 +494,8 @@ export class SchematicCanvas {
 
       // 2. Wiring in progress: Target pin or wire click
       if (this.wiringStartPin) {
-        const pinHit = this.findPinAt(worldPos.x, worldPos.y, 10);
+        // Generous 16px touch grab radius for effortless connection
+        const pinHit = this.findPinAt(worldPos.x, worldPos.y, 16);
         if (pinHit && pinHit.pinKey !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
           const to = pinHit.pinKey;
@@ -462,12 +510,13 @@ export class SchematicCanvas {
           }
           this.wiringStartPin = null;
           this.wiringCurrentPos = null;
+          this.hoveredTargetPin = null;
           this.notifyModified();
           this.render();
           return;
         }
 
-        const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
+        const wireHit = this.findWireAt(worldPos.x, worldPos.y, 12);
         if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
           const to = wireHit.fromPin;
@@ -482,30 +531,32 @@ export class SchematicCanvas {
           }
           this.wiringStartPin = null;
           this.wiringCurrentPos = null;
+          this.hoveredTargetPin = null;
           this.notifyModified();
           this.render();
           return;
         }
 
-        // Clicked elsewhere while wiring was active -> cancel wiring and continue to process selection
+        // Clicked elsewhere while wiring was active -> cancel wiring
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
+        this.hoveredTargetPin = null;
         this.render();
+        return;
       }
 
-      // 3. Pin Click to Start Wiring (Dedicated pin click with clean 8px tolerance)
-      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
-      const compHit = this.findComponentAt(worldPos.x, worldPos.y);
-
-      // If clicked specifically on pin and not body center of a component
-      if (pinHit && (!compHit || Math.hypot(worldPos.x - pinHit.pos.x, worldPos.y - pinHit.pos.y) <= 8)) {
+      // 3. Pin Click to Start Wiring (Dedicated 14px tolerance)
+      // PIN HIT ALWAYS TAKES STRICT PRECEDENCE OVER COMPONENT DRAGGING
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 14);
+      if (pinHit) {
         this.wiringStartPin = pinHit;
         this.wiringCurrentPos = pinHit.pos;
         this.render();
         return;
       }
 
-      // 4. Component Selection & Dragging
+      // 4. Component Selection & Drag Candidate
+      const compHit = this.findComponentAt(worldPos.x, worldPos.y);
       if (compHit) {
         // Toggle interactive switch components
         if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON) {
@@ -537,9 +588,11 @@ export class SchematicCanvas {
         }
 
         this.selectWire(null);
-        this.isDragging = true;
-        this.dragStartX = worldPos.x;
-        this.dragStartY = worldPos.y;
+        // Set drag candidate, but DO NOT move until mouse/finger moves >= 5px
+        this.dragCandidate = true;
+        this.isDragging = false;
+        this.dragStartScreen = { x: e.clientX, y: e.clientY };
+        this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
 
         this.compInitialPositions.clear();
         this.selectedComponents.forEach(c => {
@@ -554,7 +607,7 @@ export class SchematicCanvas {
       }
 
       // 5. Wire Click
-      const wireHit = this.findWireAt(worldPos.x, worldPos.y, 6);
+      const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
       if (wireHit) {
         this.selectWire(wireHit);
         return;
@@ -580,7 +633,34 @@ export class SchematicCanvas {
     }
   }
 
-  handleMouseMove(e) {
+  handleMouseDown(e) {
+    this.handlePointerDown(e);
+  }
+
+  handlePointerMove(e) {
+    if (this.activePointers.has(e.pointerId)) {
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    // Two-Finger Pinch Zoom & Pan (Bare Hands)
+    if (this.isPinching && this.activePointers.size >= 2) {
+      const pts = Array.from(this.activePointers.values());
+      const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (this.initialPinchDist > 5 && currentDist > 5) {
+        const factor = currentDist / this.initialPinchDist;
+        const newZoom = Math.min(Math.max(this.initialPinchZoom * factor, this.minZoom), this.maxZoom);
+        const rect = this.canvas.getBoundingClientRect();
+        const centerScreenX = (pts[0].x + pts[1].x) / 2 - rect.left;
+        const centerScreenY = (pts[0].y + pts[1].y) / 2 - rect.top;
+
+        this.panX = centerScreenX - (centerScreenX - this.initialPinchPan.x) * (newZoom / this.initialPinchZoom);
+        this.panY = centerScreenY - (centerScreenY - this.initialPinchPan.y) * (newZoom / this.initialPinchZoom);
+        this.zoom = newZoom;
+        this.render();
+      }
+      return;
+    }
+
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
     if (this.isPanning) {
@@ -594,9 +674,16 @@ export class SchematicCanvas {
       return;
     }
 
+    if (this.dragCandidate && !this.isDragging && this.selectedComponents.size > 0) {
+      const dist = Math.hypot(e.clientX - this.dragStartScreen.x, e.clientY - this.dragStartScreen.y);
+      if (dist >= 5) {
+        this.isDragging = true;
+      }
+    }
+
     if (this.isDragging && this.selectedComponents.size > 0) {
-      const dx = worldPos.x - this.dragStartX;
-      const dy = worldPos.y - this.dragStartY;
+      const dx = worldPos.x - this.dragStartWorld.x;
+      const dy = worldPos.y - this.dragStartWorld.y;
       this.selectedComponents.forEach(c => {
         const initPos = this.compInitialPositions.get(c) || { x: c.x, y: c.y };
         c.x = this.snapToGrid(initPos.x + dx);
@@ -613,29 +700,54 @@ export class SchematicCanvas {
     }
 
     if (this.wiringStartPin) {
-      this.wiringCurrentPos = this.snapPos(worldPos);
+      // Magnetic target pin snapping (16px radius)
+      const targetPinHit = this.findPinAt(worldPos.x, worldPos.y, 16);
+      if (targetPinHit && targetPinHit.pinKey !== this.wiringStartPin.pinKey) {
+        this.wiringCurrentPos = targetPinHit.pos;
+        this.hoveredTargetPin = targetPinHit;
+      } else {
+        this.wiringCurrentPos = this.snapPos(worldPos);
+        this.hoveredTargetPin = null;
+      }
       this.render();
       return;
     }
 
-    const pinHit = this.findPinAt(worldPos.x, worldPos.y);
+    const pinHit = this.findPinAt(worldPos.x, worldPos.y, 14);
     const compHit = this.findComponentAt(worldPos.x, worldPos.y);
 
     if (pinHit !== this.hoveredPin || compHit !== this.hoveredComponent) {
       this.hoveredPin = pinHit;
       this.hoveredComponent = compHit;
-      this.canvas.style.cursor = pinHit ? 'crosshair' : (compHit ? 'move' : 'default');
+      this.canvas.style.cursor = pinHit ? 'crosshair' : (compHit ? 'grab' : 'default');
       this.render();
     }
   }
 
-  handleMouseUp(e) {
+  handleMouseMove(e) {
+    this.handlePointerMove(e);
+  }
+
+  handlePointerUp(e) {
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    this.activePointers.delete(e.pointerId);
+
+    if (this.activePointers.size === 0) {
+      this.isPinching = false;
+      this.isPanning = false;
+    } else if (this.activePointers.size === 1) {
+      this.isPinching = false;
+    }
+
     if (this.isDragging) {
       this.isDragging = false;
+      this.dragCandidate = false;
       this.saveState();
       this.notifyModified();
       this.render();
     }
+    this.dragCandidate = false;
+
     if (this.isBoxSelecting) {
       this.isBoxSelecting = false;
       const minX = Math.min(this.boxSelectStart.x, this.boxSelectCurrent.x);
@@ -654,7 +766,10 @@ export class SchematicCanvas {
       }
       this.render();
     }
-    this.isPanning = false;
+  }
+
+  handleMouseUp(e) {
+    this.handlePointerUp(e);
   }
 
   handleWheel(e) {
@@ -782,8 +897,13 @@ export class SchematicCanvas {
   cancelAction() {
     this.wiringStartPin = null;
     this.wiringCurrentPos = null;
+    this.hoveredTargetPin = null;
     this.mode = 'SELECT';
     this.placementComponentType = null;
+    this.isDragging = false;
+    this.dragCandidate = false;
+    this.isPanning = false;
+    this.isPinching = false;
     this.isBoxSelecting = false;
     this.render();
   }
@@ -1081,6 +1201,7 @@ export class SchematicCanvas {
         const pinKey = `${comp.id}:${pin.id}`;
         const isHovered = this.hoveredPin && this.hoveredPin.pinKey === pinKey;
         const isWiringSource = this.wiringStartPin && this.wiringStartPin.pinKey === pinKey;
+        const isWiringTarget = this.hoveredTargetPin && this.hoveredTargetPin.pinKey === pinKey;
 
         ctx.save();
         if (isWiringSource) {
@@ -1088,6 +1209,14 @@ export class SchematicCanvas {
           ctx.beginPath();
           ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
           ctx.fill();
+        } else if (isWiringTarget) {
+          ctx.fillStyle = '#10b981';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
         } else if (isHovered) {
           ctx.fillStyle = '#03b585';
           ctx.strokeStyle = '#ffffff';

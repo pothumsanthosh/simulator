@@ -27,7 +27,7 @@ export class CircuitEngine {
     this.prevNodeVoltages = [];
     this.branchCurrents = new Map();
     this.history = [];
-    this.maxHistoryLength = 3000;
+    this.maxHistoryLength = 8000;
 
     this.isRunning = false;
     this.internalStates = new Map(); // Storage for reactive, latch, and sequential states
@@ -176,6 +176,39 @@ export class CircuitEngine {
     this.internalStates.clear();
     this.history = [];
     this.branchCurrents.clear();
+  }
+
+  /**
+   * Calculates dynamic adaptive integration timestep based on highest circuit frequency
+   * and user oscilloscope horizontal timebase scale. Handles frequencies from DC to >100 MHz.
+   */
+  getAdaptiveTimeStep(userTimeScale = null) {
+    let maxFreq = 1000;
+
+    this.components.forEach(c => {
+      const p = c.params || {};
+      if (p.frequency && p.frequency > maxFreq) maxFreq = p.frequency;
+      if (p.freq && p.freq > maxFreq) maxFreq = p.freq;
+      if (p.carrierFreq && p.carrierFreq > maxFreq) maxFreq = p.carrierFreq;
+      if (p.modFreq && p.modFreq > maxFreq) maxFreq = p.modFreq;
+      if (p.period && p.period > 0) {
+        const fFromPeriod = 1 / p.period;
+        if (fFromPeriod > maxFreq) maxFreq = fFromPeriod;
+      }
+      if (p.tWidth && p.tWidth > 0) {
+        const fFromWidth = 1 / (2 * p.tWidth);
+        if (fFromWidth > maxFreq) maxFreq = fFromWidth;
+      }
+    });
+
+    // MNA numerical stability: at least 40 steps per cycle of highest frequency
+    const dtFreq = 1 / (40 * maxFreq);
+    const dtUser = (userTimeScale && userTimeScale > 0) ? (userTimeScale / 50) : Infinity;
+
+    const dt = Math.min(5e-5, dtFreq, dtUser);
+    // Dynamic clamp between 10 picoseconds (1e-11) and 50 microseconds (5e-5)
+    this.timeStep = Math.max(1e-11, Math.min(5e-5, dt));
+    return this.timeStep;
   }
 
   /**

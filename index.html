@@ -431,9 +431,13 @@
               <div class="grapher-toolbar">
                 <div class="grapher-controls-left">
                   <span style="font-weight: 700; color: #f8fafc;">Grapher / Oscilloscope</span>
-                  <button class="btn-grapher-action" id="btnToggleCursors">Toggle Cursors (C1, C2)</button>
-                  <label>Time/Div: 
-                    <select class="grapher-select" id="timeScaleSelect">
+                  <button class="btn-grapher-action" id="btnToggleCursors" title="Toggle measurement cursors">Cursors (C1, C2)</button>
+                  <label style="display: inline-flex; align-items: center; gap: 4px;">Time/Div: 
+                    <input type="text" class="grapher-input" id="timeScaleInput" value="1 ms" title="Manual Time/Div (e.g. 10ns, 1us, 1ms, 5s)"/>
+                    <select class="grapher-select" id="timeScaleSelect" title="Time/Div Presets">
+                      <option value="0.00000001">10 ns</option>
+                      <option value="0.0000001">100 ns</option>
+                      <option value="0.000001">1 µs</option>
                       <option value="0.00001">10 µs</option>
                       <option value="0.0001">100 µs</option>
                       <option value="0.0005">500 µs</option>
@@ -441,20 +445,29 @@
                       <option value="0.005">5 ms</option>
                       <option value="0.01">10 ms</option>
                       <option value="0.05">50 ms</option>
+                      <option value="0.1">100 ms</option>
+                      <option value="1.0">1 s</option>
                     </select>
                   </label>
-                  <label style="margin-left: 8px;">Volts/Div: 
-                    <select class="grapher-select" id="voltScaleSelect">
+                  <label style="display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;">Volts/Div: 
+                    <input type="text" class="grapher-input" id="voltScaleInput" value="Auto" title="Manual Volts/Div (e.g. 50uV, 500mV, 2V, 50V) or 'Auto'"/>
+                    <select class="grapher-select" id="voltScaleSelect" title="Volts/Div Presets">
                       <option value="auto" selected>Auto</option>
+                      <option value="0.001">1 mV</option>
+                      <option value="0.01">10 mV</option>
+                      <option value="0.05">50 mV</option>
                       <option value="0.1">100 mV</option>
                       <option value="0.5">500 mV</option>
                       <option value="1.0">1 V</option>
                       <option value="2.0">2 V</option>
                       <option value="5.0">5 V</option>
                       <option value="10.0">10 V</option>
+                      <option value="50.0">50 V</option>
+                      <option value="100.0">100 V</option>
                     </select>
                   </label>
-                  <button class="btn-grapher-action" id="btnGraphTheme" title="Toggle Light/Dark Graph Theme" style="margin-left: 8px;">Theme: Dark</button>
+                  <button class="btn-grapher-action" id="btnGraphResetView" title="Reset Zoom & Pan to default" style="margin-left: 4px;">Reset View</button>
+                  <button class="btn-grapher-action" id="btnGraphTheme" title="Toggle Light/Dark Graph Theme" style="margin-left: 4px;">Theme: Dark</button>
                 </div>
                 <div class="grapher-controls-right">
                   <button class="btn-grapher-action" id="btnExportCSV">Export CSV</button>
