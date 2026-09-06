@@ -748,25 +748,21 @@ export class SchematicCanvas {
         return;
       }
 
-      // 6. Empty Canvas Click -> Marquee Selection or Pan
+      // 6. Empty Canvas Click -> Area Drag (Marquee Box Selection)
       this.drag.active = false;
-      if (e.shiftKey) {
-        this.isPanning = false;
-        this.isBoxSelecting = true;
-        this.state = CanvasState.SELECTING;
-        this.boxSelectStart = worldPos;
-        this.boxSelectCurrent = worldPos;
-      } else {
+      this.isPanning = false;
+      this.isBoxSelecting = true;
+      this.state = CanvasState.SELECTING;
+      this.boxSelectStart = worldPos;
+      this.boxSelectCurrent = worldPos;
+
+      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
         this.selectedComponents.clear();
         this.selectedComponent = null;
         this.selectWire(null);
         if (this.onSelectionChange) {
           this.onSelectionChange({ type: 'component', item: null, group: [] });
         }
-        this.isPanning = true;
-        this.state = CanvasState.PANNING_CANVAS;
-        this.dragStartX = e.clientX;
-        this.dragStartY = e.clientY;
       }
       this.render();
     }
@@ -989,17 +985,46 @@ export class SchematicCanvas {
       const maxX = Math.max(this.boxSelectStart.x, this.boxSelectCurrent.x);
       const minY = Math.min(this.boxSelectStart.y, this.boxSelectCurrent.y);
       const maxY = Math.max(this.boxSelectStart.y, this.boxSelectCurrent.y);
+      const dragDist = Math.hypot(this.boxSelectCurrent.x - this.boxSelectStart.x, this.boxSelectCurrent.y - this.boxSelectStart.y);
 
-      this.components.forEach(c => {
-        if (c.x >= minX && c.x <= maxX && c.y >= minY && c.y <= maxY) {
-          this.selectedComponents.add(c);
+      if (dragDist > 5) {
+        this.components.forEach(c => {
+          const hw = (c.width || 40) / 2;
+          const hh = (c.height || 40) / 2;
+          const compLeft = c.x - hw;
+          const compRight = c.x + hw;
+          const compTop = c.y - hh;
+          const compBottom = c.y + hh;
+
+          // Check if component intersects or is contained in selection box
+          if (compRight >= minX && compLeft <= maxX && compBottom >= minY && compTop <= maxY) {
+            this.selectedComponents.add(c);
+          }
+        });
+
+        this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
+        if (this.onSelectionChange) {
+          this.onSelectionChange({
+            type: 'component',
+            item: this.selectedComponent,
+            group: Array.from(this.selectedComponents)
+          });
         }
-      });
-      this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
-      if (this.onSelectionChange) {
-        this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
+      } else {
+        // Simple click without drag on empty space: ensure selection is cleared
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          this.selectedComponents.clear();
+          this.selectedComponent = null;
+          this.selectWire(null);
+          if (this.onSelectionChange) {
+            this.onSelectionChange({ type: 'component', item: null, group: [] });
+          }
+        }
       }
+
+      this.state = CanvasState.IDLE;
       this.render();
+      return;
     }
   }
 
@@ -1117,6 +1142,12 @@ export class SchematicCanvas {
     } else if (isCtrlOrCmd && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
       e.preventDefault();
       this.undo();
+    } else if (isCtrlOrCmd && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      this.selectAll();
+    } else if (isCtrlOrCmd && (e.key === 'x' || e.key === 'X')) {
+      e.preventDefault();
+      this.cutSelection();
     } else if (isCtrlOrCmd && (e.key === 'y' || e.key === 'Y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z')))) {
       e.preventDefault();
       this.redo();
@@ -1128,8 +1159,7 @@ export class SchematicCanvas {
       this.pasteSelection();
     } else if (isCtrlOrCmd && (e.key === 'd' || e.key === 'D')) {
       e.preventDefault();
-      this.copySelection();
-      this.pasteSelection(40, 40);
+      this.duplicateSelection(40, 40);
     } else if (e.key.startsWith('Arrow')) {
       e.preventDefault();
       const step = e.shiftKey ? this.gridSize * 5 : this.gridSize;
@@ -1153,36 +1183,108 @@ export class SchematicCanvas {
     }
   }
 
+  selectAll() {
+    this.selectedComponents.clear();
+    this.components.forEach(c => this.selectedComponents.add(c));
+    this.selectedComponent = this.components.length > 0 ? this.components[0] : null;
+    this.selectedWire = null;
+    if (this.onSelectionChange) {
+      this.onSelectionChange({
+        type: 'component',
+        item: this.selectedComponent,
+        group: Array.from(this.selectedComponents)
+      });
+    }
+    this.render();
+    return Array.from(this.selectedComponents);
+  }
+
+  cutSelection() {
+    if (this.selectedComponents.size === 0 && !this.selectedWire) return;
+    this.copySelection();
+    this.removeSelected();
+  }
+
   copySelection() {
     if (this.selectedComponents.size === 0) return;
-    this.clipboard = Array.from(this.selectedComponents).map(c => JSON.parse(JSON.stringify(c)));
+    const selectedList = Array.from(this.selectedComponents);
+    const selectedIds = new Set(selectedList.map(c => c.id));
+
+    // Preserve internal wires connecting selected components together
+    const internalWires = this.wires.filter(w => {
+      const fromId = w.fromPin.split(':')[0];
+      const toId = w.toPin.split(':')[0];
+      return selectedIds.has(fromId) && selectedIds.has(toId);
+    });
+
+    this.clipboard = {
+      components: selectedList.map(c => JSON.parse(JSON.stringify(c))),
+      wires: internalWires.map(w => JSON.parse(JSON.stringify(w)))
+    };
   }
 
   pasteSelection(offsetDx = 40, offsetDy = 40) {
-    if (!this.clipboard || this.clipboard.length === 0) return;
+    if (!this.clipboard) return;
+    const compsToPaste = Array.isArray(this.clipboard) ? this.clipboard : this.clipboard.components;
+    const wiresToPaste = Array.isArray(this.clipboard) ? [] : (this.clipboard.wires || []);
+
+    if (!compsToPaste || compsToPaste.length === 0) return;
     this.saveState();
     this.selectedComponents.clear();
 
-    this.clipboard.forEach(origComp => {
-      const def = ComponentDefinitions[origComp.type];
-      const newId = this.generateUniqueId(def.prefix);
+    const idMap = new Map();
 
+    compsToPaste.forEach(origComp => {
+      const def = ComponentDefinitions[origComp.type];
+      const prefix = def ? def.prefix : (origComp.id ? origComp.id.replace(/[0-9]/g, '') : 'C');
+      const newId = this.generateUniqueId(prefix);
+      idMap.set(origComp.id, newId);
+
+      const count = this.components.filter(c => c.type === origComp.type).length + 1;
       const newComp = {
         ...origComp,
         id: newId,
-        name: `${def.prefix}${this.components.filter(c => c.type === origComp.type).length + 1}`,
-        x: origComp.x + offsetDx,
-        y: origComp.y + offsetDy,
-        pins: JSON.parse(JSON.stringify(origComp.pins))
+        name: def ? `${def.prefix}${count}` : origComp.name,
+        x: this.snapToGrid(origComp.x + offsetDx),
+        y: this.snapToGrid(origComp.y + offsetDy),
+        pins: JSON.parse(JSON.stringify(origComp.pins || []))
       };
 
       this.components.push(newComp);
       this.selectedComponents.add(newComp);
     });
 
-    this.selectedComponent = Array.from(this.selectedComponents)[0];
+    // Reconstruct internal connecting wires with new cloned pin IDs
+    wiresToPaste.forEach(origWire => {
+      const [fromCompId, fromPinId] = origWire.fromPin.split(':');
+      const [toCompId, toPinId] = origWire.toPin.split(':');
+      const newFromCompId = idMap.get(fromCompId);
+      const newToCompId = idMap.get(toCompId);
+      if (newFromCompId && newToCompId) {
+        this.wires.push({
+          id: this.generateUniqueId('W'),
+          fromPin: `${newFromCompId}:${fromPinId}`,
+          toPin: `${newToCompId}:${toPinId}`
+        });
+      }
+    });
+
+    this.selectedComponent = Array.from(this.selectedComponents)[0] || null;
+    this.selectedWire = null;
+    if (this.onSelectionChange) {
+      this.onSelectionChange({
+        type: 'component',
+        item: this.selectedComponent,
+        group: Array.from(this.selectedComponents)
+      });
+    }
     this.notifyModified();
     this.render();
+  }
+
+  duplicateSelection(offsetDx = 40, offsetDy = 40) {
+    this.copySelection();
+    this.pasteSelection(offsetDx, offsetDy);
   }
 
   cancelAction() {

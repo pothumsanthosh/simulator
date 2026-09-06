@@ -636,13 +636,20 @@ class MultisimApp {
       this.updatePlacementBanner();
     });
 
+    document.getElementById('btnSelectAll')?.addEventListener('click', () => this.canvas.selectAll());
+    document.getElementById('btnSelectAllFloating')?.addEventListener('click', () => this.canvas.selectAll());
+    document.getElementById('btnCut')?.addEventListener('click', () => this.canvas.cutSelection());
+    document.getElementById('btnCopy')?.addEventListener('click', () => this.canvas.copySelection());
+    document.getElementById('btnPaste')?.addEventListener('click', () => this.canvas.pasteSelection());
+    document.getElementById('btnDelete')?.addEventListener('click', () => this.canvas.removeSelected());
+    document.getElementById('btnDeleteFloating')?.addEventListener('click', () => this.canvas.removeSelected());
+
     document.getElementById('btnUndo').addEventListener('click', () => this.canvas.undo());
     document.getElementById('btnRedo').addEventListener('click', () => this.canvas.redo());
 
     document.getElementById('btnRotate').addEventListener('click', () => this.canvas.rotateSelected(90));
     document.getElementById('btnFlipH')?.addEventListener('click', () => this.canvas.flipSelected('x'));
     document.getElementById('btnFlipV')?.addEventListener('click', () => this.canvas.flipSelected('y'));
-    document.getElementById('btnDelete').addEventListener('click', () => this.canvas.removeSelected());
     document.getElementById('btnFitScreen').addEventListener('click', () => this.canvas.fitToScreen());
 
     document.getElementById('btnZoomIn').addEventListener('click', () => this.canvas.zoomIn());

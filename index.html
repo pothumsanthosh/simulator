@@ -405,13 +405,18 @@
           </div>
 
           <div class="studio-toolbar-right">
+            <button class="tool-btn" id="btnSelectAll" title="Select All Components (Ctrl+A)" style="font-weight: 600; font-size: 11.5px;">⬚ All</button>
+            <button class="tool-btn" id="btnCut" title="Cut Selected (Ctrl+X)">✂</button>
+            <button class="tool-btn" id="btnCopy" title="Copy Selected (Ctrl+C)">📋</button>
+            <button class="tool-btn" id="btnPaste" title="Paste (Ctrl+V)">📥</button>
+            <button class="tool-btn" id="btnDelete" title="Delete Selected (Del / Backspace)">🗑</button>
+            <div class="toolbar-divider"></div>
             <button class="tool-btn" id="btnAddNodeToolbar" title="Add Junction Node / Multi-Wire Hub (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
             <button class="tool-btn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
             <button class="tool-btn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
             <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
             <button class="tool-btn" id="btnFlipH" title="Flip Horizontal (H)">⇄</button>
             <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
-            <button class="tool-btn" id="btnDelete" title="Delete Selected (Del)">🗑</button>
             <button class="tool-btn" id="btnFitScreen" title="Fit to Screen">⛶</button>
             <button class="tool-btn active" id="btnToggleNodesToolbar" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
             <div class="toolbar-divider"></div>
@@ -445,6 +450,8 @@
               </div>
 
               <div class="canvas-floating-controls">
+                <button class="tool-btn" id="btnSelectAllFloating" title="Select All Components (Ctrl+A)" style="font-size: 11px; font-weight: bold;">⬚ All</button>
+                <button class="tool-btn" id="btnDeleteFloating" title="Delete Selected (Del)" style="font-size: 12px;">🗑</button>
                 <button class="tool-btn" id="btnAddNode" title="Add Junction Node (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
                 <button class="tool-btn" id="btnZoomIn" title="Zoom In">+</button>
                 <button class="tool-btn" id="btnZoomOut" title="Zoom Out">−</button>

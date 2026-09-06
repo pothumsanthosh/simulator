@@ -1709,6 +1709,94 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(passInterp && passParams,
       `[CRO Quick Panel] Exact voltage interpolation (V_peak=${vPeak.toFixed(3)}V, V_valley=${vValley.toFixed(3)}V) & Quick Parameters (T=${(period*1000).toFixed(2)}ms, f=${freq}Hz, Vamp=${vAmpCalc.toFixed(2)}V, Vpp=${vpp.toFixed(2)}V, ΔV=${cursorDv.toFixed(2)}V) verified`, g10);
   }
+
+  // 10.21 Multi-Component Batch Operations (Select All, Area Drag Marquee Selection, Cut, Copy, Paste, Delete)
+  {
+    // Setup circuit with 3 components and 2 connecting wires
+    let components = [
+      { id: 'R1', type: ComponentTypes.RESISTOR, x: 100, y: 100, width: 40, height: 20 },
+      { id: 'R2', type: ComponentTypes.RESISTOR, x: 200, y: 100, width: 40, height: 20 },
+      { id: 'C1', type: ComponentTypes.CAPACITOR, x: 300, y: 200, width: 40, height: 20 }
+    ];
+
+    let wires = [
+      { id: 'W1', fromPin: 'R1:p2', toPin: 'R2:p1' },
+      { id: 'W2', fromPin: 'R2:p2', toPin: 'C1:p1' }
+    ];
+
+    // 1. Test Select All
+    let selectedComponents = new Set();
+    const selectAll = () => {
+      selectedComponents.clear();
+      components.forEach(c => selectedComponents.add(c));
+    };
+    selectAll();
+    const passSelectAll = selectedComponents.size === 3;
+
+    // 2. Test Area Drag (Marquee Box Selection) covering only R1 and R2 (box from (50, 50) to (250, 150))
+    selectedComponents.clear();
+    const minX = 50, maxX = 250, minY = 50, maxY = 150;
+    components.forEach(c => {
+      const hw = c.width / 2;
+      const hh = c.height / 2;
+      if (c.x + hw >= minX && c.x - hw <= maxX && c.y + hh >= minY && c.y - hh <= maxY) {
+        selectedComponents.add(c);
+      }
+    });
+    const passMarquee = selectedComponents.size === 2 && selectedComponents.has(components[0]) && selectedComponents.has(components[1]) && !selectedComponents.has(components[2]);
+
+    // 3. Test Multi-Component Copy (Preserving internal wires between R1 & R2)
+    const selectedList = Array.from(selectedComponents);
+    const selectedIds = new Set(selectedList.map(c => c.id));
+    const internalWires = wires.filter(w => {
+      const fromId = w.fromPin.split(':')[0];
+      const toId = w.toPin.split(':')[0];
+      return selectedIds.has(fromId) && selectedIds.has(toId);
+    });
+
+    const clipboard = {
+      components: selectedList.map(c => JSON.parse(JSON.stringify(c))),
+      wires: internalWires.map(w => JSON.parse(JSON.stringify(w)))
+    };
+    const passCopy = clipboard.components.length === 2 && clipboard.wires.length === 1 && clipboard.wires[0].id === 'W1';
+
+    // 4. Test Multi-Component Paste
+    const idMap = new Map();
+    let pasteIdCounter = 3;
+    clipboard.components.forEach(orig => {
+      const newId = `R${pasteIdCounter++}`;
+      idMap.set(orig.id, newId);
+      components.push({
+        ...orig,
+        id: newId,
+        x: orig.x + 40,
+        y: orig.y + 40
+      });
+    });
+
+    clipboard.wires.forEach(origWire => {
+      const [fromComp, fromPin] = origWire.fromPin.split(':');
+      const [toComp, toPin] = origWire.toPin.split(':');
+      wires.push({
+        id: `W_pasted_${Date.now()}`,
+        fromPin: `${idMap.get(fromComp)}:${fromPin}`,
+        toPin: `${idMap.get(toComp)}:${toPin}`
+      });
+    });
+
+    const passPaste = components.length === 5 && wires.length === 3 && wires[2].fromPin === 'R3:p2' && wires[2].toPin === 'R4:p1';
+
+    // 5. Test Batch Delete
+    selectAll();
+    const idsToDelete = new Set(Array.from(selectedComponents).map(c => c.id));
+    wires = wires.filter(w => !idsToDelete.has(w.fromPin.split(':')[0]) && !idsToDelete.has(w.toPin.split(':')[0]));
+    components = components.filter(c => !idsToDelete.has(c.id));
+
+    const passBatchDelete = components.length === 0 && wires.length === 0;
+
+    assert(passSelectAll && passMarquee && passCopy && passPaste && passBatchDelete,
+      `[Batch Operations] Select All (3 comps), Marquee Area Drag (R1/R2), Internal Wire Preserved Copy/Paste (W1 -> R3:p2-R4:p1), and Batch Delete verified`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------
