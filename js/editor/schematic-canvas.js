@@ -684,7 +684,9 @@ export class SchematicCanvas {
           compHit.type === ComponentTypes.PUSH_BUTTON ||
           compHit.type === ComponentTypes.PUSH_BUTTON_NC ||
           compHit.type === ComponentTypes.SPST_SWITCH ||
-          compHit.type === ComponentTypes.SPDT_SWITCH
+          compHit.type === ComponentTypes.SPDT_SWITCH ||
+          compHit.type === ComponentTypes.DIGITAL_CONSTANT ||
+          compHit.type === ComponentTypes.DIGITAL_SWITCH
         ) {
           this.triggerComponentPulse(compHit);
         }
@@ -1098,6 +1100,17 @@ export class SchematicCanvas {
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
     const comp = this.findComponentAt(worldPos.x, worldPos.y);
     if (comp) {
+      if (comp.type === ComponentTypes.TEXT_LABEL || comp.type === ComponentTypes.ANNOTATION) {
+        const newText = prompt('Enter circuit title / annotation text:', comp.params?.text || comp.name);
+        if (newText !== null) {
+          comp.params = comp.params || {};
+          comp.params.text = newText;
+          comp.name = newText;
+          this.notifyModified();
+          this.render();
+        }
+        return;
+      }
       this.selectComponent(comp);
       setTimeout(() => {
         const firstInput = document.querySelector('#propertiesContent input.prop-param-input, #propertiesContent #propNameInput');
@@ -1416,6 +1429,9 @@ export class SchematicCanvas {
       comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
     } else if (comp.type === ComponentTypes.SPDT_SWITCH) {
       comp.params.position = comp.params.position === 1 ? 2 : 1;
+      comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
+    } else if (comp.type === ComponentTypes.DIGITAL_CONSTANT || comp.type === ComponentTypes.DIGITAL_SWITCH) {
+      comp.params.state = (comp.params.state === 1 || comp.params.state === true) ? 0 : 1;
       comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
     }
 
@@ -2716,6 +2732,88 @@ export class SchematicCanvas {
         break;
       }
 
+      case ComponentTypes.DIGITAL_CONSTANT:
+      case ComponentTypes.DIGITAL_SWITCH: {
+        const state = (p.state === 1 || p.state === true || p.closed === true) ? 1 : 0;
+        const w = 34;
+        const h = 20;
+
+        // Outer chassis box
+        ctx.beginPath();
+        ctx.rect(-w / 2, -h / 2, w, h);
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fill();
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        // Active state indicator sub-box
+        ctx.beginPath();
+        ctx.rect(-w / 2 + 10, -h / 2 + 2, w - 12, h - 4);
+        ctx.fillStyle = state ? '#1e293b' : '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = state ? '#0f172a' : '#cbd5e1';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Digit 0 or 1
+        ctx.font = 'bold 11px -apple-system, sans-serif';
+        ctx.fillStyle = state ? '#ffffff' : '#334155';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(state ? '1' : '0', -w / 2 + 10 + (w - 12) / 2, 0);
+
+        // Terminal lead
+        ctx.beginPath();
+        ctx.moveTo(w / 2, 0);
+        ctx.lineTo(w / 2 + 4, 0);
+        ctx.strokeStyle = '#2b2d2f';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // Visual click/pulse ripple
+        if (comp.pulseAnimation) {
+          const elapsed = performance.now() - comp.pulseAnimation.startTime;
+          if (elapsed < comp.pulseAnimation.duration) {
+            const ratio = elapsed / comp.pulseAnimation.duration;
+            ctx.save();
+            ctx.strokeStyle = `rgba(3, 181, 133, ${1 - ratio})`;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+            ctx.restore();
+          }
+        }
+        break;
+      }
+
+      case ComponentTypes.TEXT_LABEL:
+      case ComponentTypes.ANNOTATION: {
+        const text = p.text || 'Circuit Title';
+        const fontSize = p.fontSize || 13;
+        const isBold = p.bold !== false;
+        const color = p.color || '#334155';
+
+        ctx.font = `${isBold ? 'bold ' : ''}${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Lato", sans-serif`;
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 0, 0);
+
+        // If selected, draw dashed outline
+        if (this.selectedComponents.has(comp)) {
+          const metrics = ctx.measureText(text);
+          const w = Math.max(metrics.width + 16, 60);
+          const h = fontSize + 10;
+          ctx.save();
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(-w / 2, -h / 2, w, h);
+          ctx.restore();
+        }
+        break;
+      }
+
       case ComponentTypes.SPDT_SWITCH: {
         ctx.beginPath();
         ctx.moveTo(-25, 0); ctx.lineTo(-12, 0);
@@ -3003,6 +3101,10 @@ export class SchematicCanvas {
   }
 
   renderLabels(ctx, comp) {
+    if (comp.type === ComponentTypes.TEXT_LABEL || comp.type === ComponentTypes.ANNOTATION) {
+      return;
+    }
+
     if (comp.type === ComponentTypes.NODE || comp.type === ComponentTypes.JUNCTION) {
       if (!comp.params?.label) return;
       ctx.save();

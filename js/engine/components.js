@@ -209,9 +209,15 @@ export const ComponentTypes = {
   DPDT_SWITCH: 'DPDT_SWITCH',
   PUSH_BUTTON: 'PUSH_BUTTON',
   PUSH_BUTTON_NC: 'PUSH_BUTTON_NC',
+  DIGITAL_CONSTANT: 'DIGITAL_CONSTANT',
+  DIGITAL_SWITCH: 'DIGITAL_SWITCH',
   DIP_SWITCH_4: 'DIP_SWITCH_4',
   RELAY_SPDT: 'RELAY_SPDT',
   RELAY_DPDT: 'RELAY_DPDT',
+
+  // Annotations & Text Notes
+  TEXT_LABEL: 'TEXT_LABEL',
+  ANNOTATION: 'ANNOTATION',
 
   // Electromechanical
   DC_MOTOR: 'DC_MOTOR',
@@ -1109,7 +1115,7 @@ export const ComponentDefinitions = {
     name: '2-Input AND Gate',
     type: ComponentTypes.AND_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_AND',
+    prefix: 'U',
     width: 50, height: 40,
     pins: [
       { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
@@ -1123,7 +1129,7 @@ export const ComponentDefinitions = {
     name: '2-Input OR Gate',
     type: ComponentTypes.OR_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_OR',
+    prefix: 'U',
     width: 50, height: 40,
     pins: [
       { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
@@ -1137,7 +1143,7 @@ export const ComponentDefinitions = {
     name: 'NOT Inverter Gate',
     type: ComponentTypes.NOT_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_NOT',
+    prefix: 'U',
     width: 40, height: 30,
     pins: [
       { id: 'in', name: 'A', x: -20, y: 0, dir: 'left' },
@@ -1150,7 +1156,7 @@ export const ComponentDefinitions = {
     name: '2-Input NAND Gate',
     type: ComponentTypes.NAND_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_NAND',
+    prefix: 'U',
     width: 50, height: 40,
     pins: [
       { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
@@ -1164,7 +1170,7 @@ export const ComponentDefinitions = {
     name: '2-Input NOR Gate',
     type: ComponentTypes.NOR_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_NOR',
+    prefix: 'U',
     width: 50, height: 40,
     pins: [
       { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
@@ -1178,7 +1184,7 @@ export const ComponentDefinitions = {
     name: '2-Input XOR Gate',
     type: ComponentTypes.XOR_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_XOR',
+    prefix: 'U',
     width: 50, height: 40,
     pins: [
       { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
@@ -1192,7 +1198,7 @@ export const ComponentDefinitions = {
     name: '2-Input XNOR Gate',
     type: ComponentTypes.XNOR_GATE,
     category: ComponentCategory.LOGIC_GATES,
-    prefix: 'U_XNOR',
+    prefix: 'U',
     width: 50, height: 40,
     pins: [
       { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
@@ -1470,6 +1476,47 @@ export const ComponentDefinitions = {
     pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
     params: { closed: true },
     paramSchema: [{ key: 'closed', label: 'Closed State', type: 'boolean', default: true }]
+  },
+  [ComponentTypes.DIGITAL_CONSTANT]: {
+    name: 'Interactive Digital Constant (DG / Switch)',
+    type: ComponentTypes.DIGITAL_CONSTANT,
+    category: ComponentCategory.SWITCHES,
+    prefix: 'DG',
+    width: 36, height: 24,
+    pins: [{ id: 'out', name: 'OUT', x: 18, y: 0, dir: 'right' }],
+    params: { state: 0, vHigh: 5.0, vLow: 0.0 },
+    paramSchema: [
+      { key: 'state', label: 'Logic State (0 or 1)', type: 'select', options: [0, 1], default: 0 },
+      { key: 'vHigh', label: 'Logic High Level (V)', type: 'number', unit: 'V', default: 5.0 }
+    ]
+  },
+  [ComponentTypes.DIGITAL_SWITCH]: {
+    name: 'Interactive Digital Switch (DG)',
+    type: ComponentTypes.DIGITAL_SWITCH,
+    category: ComponentCategory.SWITCHES,
+    prefix: 'DG',
+    width: 36, height: 24,
+    pins: [{ id: 'out', name: 'OUT', x: 18, y: 0, dir: 'right' }],
+    params: { state: 0, vHigh: 5.0, vLow: 0.0 },
+    paramSchema: [
+      { key: 'state', label: 'Logic State (0 or 1)', type: 'select', options: [0, 1], default: 0 },
+      { key: 'vHigh', label: 'Logic High Level (V)', type: 'number', unit: 'V', default: 5.0 }
+    ]
+  },
+  [ComponentTypes.TEXT_LABEL]: {
+    name: 'Text Annotation / Circuit Title',
+    type: ComponentTypes.TEXT_LABEL,
+    category: ComponentCategory.PASSIVES,
+    prefix: 'TXT',
+    width: 140, height: 28,
+    pins: [],
+    params: { text: 'Circuit Title', fontSize: 13, bold: true, color: '#334155' },
+    paramSchema: [
+      { key: 'text', label: 'Annotation Text / Title', type: 'string', default: 'Circuit Title' },
+      { key: 'fontSize', label: 'Font Size (px)', type: 'number', default: 13 },
+      { key: 'bold', label: 'Bold Font', type: 'boolean', default: true },
+      { key: 'color', label: 'Text Color', type: 'string', default: '#334155' }
+    ]
   },
   [ComponentTypes.RELAY_SPDT]: {
     name: 'Electromechanical Relay (SPDT)',

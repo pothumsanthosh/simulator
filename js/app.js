@@ -200,6 +200,16 @@ class SwitchaApp {
         presetKey: 'halfAdder',
         components: [],
         wires: []
+      },
+      {
+        id: 'circuit_starter_nor_suite',
+        name: 'Universal Logic: NOR Gate Equivalents',
+        description: 'Complete digital logic laboratory: NOT, OR, AND, and XOR gates constructed entirely from 2-input NOR gates with DG interactive switches and LED indicators.',
+        author: 'Switcha Studio',
+        updatedAt: Date.now() - 1800000,
+        presetKey: 'universalNorGates',
+        components: [],
+        wires: []
       }
     ];
 
@@ -965,6 +975,12 @@ class SwitchaApp {
         return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#f8fafc" stroke="#2b2d2f" stroke-width="1.6"/><text x="12" y="14" font-size="6" text-anchor="middle" font-weight="bold" fill="#0284c7">LOGIC</text></svg>`;
 
       // 10. Switches & Relays
+      case ComponentTypes.DIGITAL_CONSTANT:
+      case ComponentTypes.DIGITAL_SWITCH:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3" fill="#0f172a" stroke="#0284c7" stroke-width="1.6"/><rect x="7" y="7" width="10" height="10" rx="1.5" fill="#1e293b" stroke="#38bdf8" stroke-width="1"/><text x="12" y="15" font-size="8" text-anchor="middle" font-weight="900" fill="#38bdf8">1</text></svg>`;
+      case ComponentTypes.TEXT_LABEL:
+      case ComponentTypes.ANNOTATION:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="2 2"/><text x="12" y="16" font-size="11" text-anchor="middle" font-weight="900" fill="#334155">T</text></svg>`;
       case ComponentTypes.SPST_SWITCH:
       case ComponentTypes.SPDT_SWITCH:
       case ComponentTypes.PUSH_BUTTON:
@@ -2077,6 +2093,41 @@ class SwitchaApp {
         `;
         break;
 
+      case 'universalNorGates':
+        innerContent = `
+          <!-- Universal NOR Gates Logic Suite -->
+          <text x="140" y="22" font-size="9" font-weight="900" fill="#0f172a" text-anchor="middle" letter-spacing="0.5px">UNIVERSAL NOR LOGIC GATES</text>
+          <rect x="25" y="42" width="34" height="24" rx="3" fill="#0f172a" stroke="#0284c7" stroke-width="1.5"/>
+          <rect x="28" y="45" width="28" height="18" rx="2" fill="#1e293b"/>
+          <text x="42" y="58" font-size="10" font-weight="900" fill="#38bdf8" text-anchor="middle">1</text>
+          <text x="42" y="38" font-size="7.5" font-weight="bold" fill="#64748b" text-anchor="middle">DG1</text>
+          <line x1="59" y1="54" x2="85" y2="54" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="85" cy="54" r="2.5" fill="#1e293b"/>
+          <line x1="85" y1="54" x2="105" y2="48" stroke="#1e293b" stroke-width="1.8"/>
+          <line x1="85" y1="54" x2="105" y2="60" stroke="#1e293b" stroke-width="1.8"/>
+          <path d="M105,42 Q115,42 125,54 Q115,66 105,66 Q108,54 105,42 Z" fill="#f8fafc" stroke="#1e293b" stroke-width="1.8"/>
+          <circle cx="128" cy="54" r="2.5" stroke="#1e293b" stroke-width="1.4" fill="#ffffff"/>
+          <text x="116" y="56" font-size="6.5" font-weight="bold" fill="#0284c7" text-anchor="middle">NOR</text>
+          <line x1="131" y1="54" x2="175" y2="54" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="175,47 187,54 175,61" fill="#ef4444" stroke="#ef4444" stroke-width="1.2"/>
+          <line x1="187" y1="47" x2="187" y2="61" stroke="#ef4444" stroke-width="2"/>
+          <text x="181" y="42" font-size="7.5" font-weight="bold" fill="#ef4444" text-anchor="middle">LED1</text>
+          <line x1="187" y1="54" x2="205" y2="54" stroke="#1e293b" stroke-width="2"/>
+          <line x1="205" y1="54" x2="205" y2="65" stroke="#1e293b" stroke-width="2"/>
+          <line x1="198" y1="65" x2="212" y2="65" stroke="#1e293b" stroke-width="2"/>
+          <rect x="25" y="85" width="115" height="18" rx="3" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+          <text x="82" y="97" font-size="7" font-weight="bold" fill="#1e40af" text-anchor="middle">NOT / OR / AND / XOR</text>
+          <rect x="150" y="85" width="115" height="60" rx="4" fill="#0f172a" stroke="#334155" stroke-width="1.2"/>
+          <text x="207" y="100" font-size="8" font-weight="bold" fill="#38bdf8" text-anchor="middle">4-NOR XOR Equivalent</text>
+          <path d="M165,115 Q172,115 180,123 Q172,131 165,131 Q167,123 165,115 Z" fill="#1e293b" stroke="#38bdf8" stroke-width="1.2"/>
+          <circle cx="182" cy="123" r="1.8" stroke="#38bdf8" stroke-width="1" fill="#0f172a"/>
+          <line x1="184" y1="123" x2="200" y2="123" stroke="#38bdf8" stroke-width="1.5"/>
+          <circle cx="215" cy="123" r="8" fill="#10b981" filter="drop-shadow(0 0 6px rgba(16,185,129,0.8))"/>
+          <text x="215" y="126" font-size="7" font-weight="bold" fill="#ffffff" text-anchor="middle">Y</text>
+          <text x="245" y="126" font-size="8" font-weight="bold" fill="#10b981">A ⊕ B</text>
+        `;
+        break;
+
       case 'rcFilter':
         innerContent = `
           <!-- RC Low-Pass Filter -->
@@ -2186,7 +2237,7 @@ class SwitchaApp {
         const matchesQuery = !query || c.name.toLowerCase().includes(query) || c.description.toLowerCase().includes(query) || c.author.toLowerCase().includes(query);
         const matchesFilter = filter === 'all' ||
           (filter === 'analog' && (c.id.includes('opamp') || c.id.includes('timer') || c.id.includes('diff') || c.id.includes('audio') || c.id.includes('transceiver'))) ||
-          (filter === 'digital' && (c.id.includes('adder') || c.id.includes('counter') || c.id.includes('ask'))) ||
+          (filter === 'digital' && (c.id.includes('adder') || c.id.includes('counter') || c.id.includes('ask') || c.id.includes('nor') || c.id.includes('gate') || c.id.includes('logic'))) ||
           (filter === 'power' && (c.id.includes('buck') || c.id.includes('bridge') || c.id.includes('boost'))) ||
           (filter === 'filters' && c.id.includes('filter'));
         return matchesQuery && matchesFilter;

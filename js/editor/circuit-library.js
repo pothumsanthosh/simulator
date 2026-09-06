@@ -588,5 +588,128 @@ export const CircuitLibrary = {
 
       canvas.fitToScreen();
     }
+  },
+
+  // 14. Universal Logic: NOR Gate Equivalents
+  universalNorGates: {
+    id: 'universal-nor-gates',
+    name: 'Universal Logic: NOR Gate Equivalents (NOT, OR, AND, XOR)',
+    description: 'Complete universal realization of NOT, OR, AND, and XOR logic gates using exclusively 2-input NOR gates with interactive DG1-DG7 digital switches and glowing LED indicators.',
+    author: 'Switcha Lab',
+    stats: { stars: 342, copies: 1205, views: 284900 },
+    load(canvas) {
+      canvas.components = [];
+      canvas.wires = [];
+
+      // ==========================================
+      // Sub-Circuit 1: NOT GATE USING NOR GATE
+      // ==========================================
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 160, 40, { text: 'NOT GATE USING NOR GATE', fontSize: 13, bold: true, color: '#475569' }, 0);
+      const dg1 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 80, 80, { state: 1, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg1.name = 'DG1';
+      const u1 = canvas.addComponent(ComponentTypes.NOR_GATE, 180, 80, { vHigh: 5.0 }, 0);
+      u1.name = 'U1';
+      const led1 = canvas.addComponent(ComponentTypes.LED, 270, 80, { color: '#ff3b30' }, 0);
+      led1.name = 'LED1';
+      const gnd1 = canvas.addComponent(ComponentTypes.GROUND, 320, 80, {}, 0);
+
+      // ==========================================
+      // Sub-Circuit 2: OR GATE USING NOR GATE
+      // ==========================================
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 180, 180, { text: 'OR GATE USING NOR GATE', fontSize: 13, bold: true, color: '#475569' }, 0);
+      const dg2 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 70, 210, { state: 0, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg2.name = 'DG2';
+      const dg3 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 70, 240, { state: 0, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg3.name = 'DG3';
+      const u2 = canvas.addComponent(ComponentTypes.NOR_GATE, 180, 225, { vHigh: 5.0 }, 0);
+      u2.name = 'U2';
+      const u3 = canvas.addComponent(ComponentTypes.NOR_GATE, 280, 225, { vHigh: 5.0 }, 0);
+      u3.name = 'U3';
+      const led2 = canvas.addComponent(ComponentTypes.LED, 370, 225, { color: '#ff3b30' }, 0);
+      led2.name = 'LED2';
+      const gnd2 = canvas.addComponent(ComponentTypes.GROUND, 420, 225, {}, 0);
+
+      // ==========================================
+      // Sub-Circuit 3: AND GATE USING NOR GATE
+      // ==========================================
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 180, 320, { text: 'AND GATE USING NOR GATE', fontSize: 13, bold: true, color: '#475569' }, 0);
+      const dg4 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 70, 360, { state: 0, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg4.name = 'DG4';
+      const dg5 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 70, 440, { state: 0, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg5.name = 'DG5';
+      const u4 = canvas.addComponent(ComponentTypes.NOR_GATE, 180, 360, { vHigh: 5.0 }, 0);
+      u4.name = 'U4';
+      const u5 = canvas.addComponent(ComponentTypes.NOR_GATE, 180, 440, { vHigh: 5.0 }, 0);
+      u5.name = 'U5';
+      const u6 = canvas.addComponent(ComponentTypes.NOR_GATE, 290, 400, { vHigh: 5.0 }, 0);
+      u6.name = 'U6';
+      const led3 = canvas.addComponent(ComponentTypes.LED, 380, 400, { color: '#ff3b30' }, 0);
+      led3.name = 'LED3';
+      const gnd3 = canvas.addComponent(ComponentTypes.GROUND, 430, 400, {}, 0);
+
+      // ==========================================
+      // Sub-Circuit 4: X-OR GATE USING NOR GATE
+      // ==========================================
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 650, 40, { text: 'X-OR GATE USING NOR GATE', fontSize: 13, bold: true, color: '#475569' }, 0);
+      const dg6 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 480, 90, { state: 0, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg6.name = 'DG6';
+      const dg7 = canvas.addComponent(ComponentTypes.DIGITAL_CONSTANT, 480, 210, { state: 0, vHigh: 5.0, vLow: 0.0 }, 0);
+      dg7.name = 'DG7';
+      const u7 = canvas.addComponent(ComponentTypes.NOR_GATE, 580, 150, { vHigh: 5.0 }, 0);
+      u7.name = 'U7';
+      const u9 = canvas.addComponent(ComponentTypes.NOR_GATE, 680, 90, { vHigh: 5.0 }, 0);
+      u9.name = 'U9';
+      const u8 = canvas.addComponent(ComponentTypes.NOR_GATE, 680, 210, { vHigh: 5.0 }, 0);
+      u8.name = 'U8';
+      const u10 = canvas.addComponent(ComponentTypes.NOR_GATE, 780, 150, { vHigh: 5.0 }, 0);
+      u10.name = 'U10';
+      const u11 = canvas.addComponent(ComponentTypes.NOR_GATE, 880, 150, { vHigh: 5.0 }, 0);
+      u11.name = 'U11';
+      const led4 = canvas.addComponent(ComponentTypes.LED, 970, 150, { color: '#ff3b30' }, 0);
+      led4.name = 'LED4';
+      const gnd4 = canvas.addComponent(ComponentTypes.GROUND, 1020, 150, {}, 0);
+
+      canvas.wires = [
+        // NOT Gate Wires
+        { id: 'w_not_in1', fromPin: `${dg1.id}:out`, toPin: `${u1.id}:in1` },
+        { id: 'w_not_in2', fromPin: `${dg1.id}:out`, toPin: `${u1.id}:in2` },
+        { id: 'w_not_out', fromPin: `${u1.id}:out`, toPin: `${led1.id}:anode` },
+        { id: 'w_not_gnd', fromPin: `${led1.id}:cathode`, toPin: `${gnd1.id}:p1` },
+
+        // OR Gate Wires
+        { id: 'w_or_in1', fromPin: `${dg2.id}:out`, toPin: `${u2.id}:in1` },
+        { id: 'w_or_in2', fromPin: `${dg3.id}:out`, toPin: `${u2.id}:in2` },
+        { id: 'w_or_mid1', fromPin: `${u2.id}:out`, toPin: `${u3.id}:in1` },
+        { id: 'w_or_mid2', fromPin: `${u2.id}:out`, toPin: `${u3.id}:in2` },
+        { id: 'w_or_out', fromPin: `${u3.id}:out`, toPin: `${led2.id}:anode` },
+        { id: 'w_or_gnd', fromPin: `${led2.id}:cathode`, toPin: `${gnd2.id}:p1` },
+
+        // AND Gate Wires
+        { id: 'w_and_in1a', fromPin: `${dg4.id}:out`, toPin: `${u4.id}:in1` },
+        { id: 'w_and_in1b', fromPin: `${dg4.id}:out`, toPin: `${u4.id}:in2` },
+        { id: 'w_and_in2a', fromPin: `${dg5.id}:out`, toPin: `${u5.id}:in1` },
+        { id: 'w_and_in2b', fromPin: `${dg5.id}:out`, toPin: `${u5.id}:in2` },
+        { id: 'w_and_u4_u6', fromPin: `${u4.id}:out`, toPin: `${u6.id}:in1` },
+        { id: 'w_and_u5_u6', fromPin: `${u5.id}:out`, toPin: `${u6.id}:in2` },
+        { id: 'w_and_out', fromPin: `${u6.id}:out`, toPin: `${led3.id}:anode` },
+        { id: 'w_and_gnd', fromPin: `${led3.id}:cathode`, toPin: `${gnd3.id}:p1` },
+
+        // XOR Gate Wires
+        { id: 'w_xor_dg6_u7', fromPin: `${dg6.id}:out`, toPin: `${u7.id}:in1` },
+        { id: 'w_xor_dg6_u9', fromPin: `${dg6.id}:out`, toPin: `${u9.id}:in1` },
+        { id: 'w_xor_dg7_u7', fromPin: `${dg7.id}:out`, toPin: `${u7.id}:in2` },
+        { id: 'w_xor_dg7_u8', fromPin: `${dg7.id}:out`, toPin: `${u8.id}:in2` },
+        { id: 'w_xor_u7_u9', fromPin: `${u7.id}:out`, toPin: `${u9.id}:in2` },
+        { id: 'w_xor_u7_u8', fromPin: `${u7.id}:out`, toPin: `${u8.id}:in1` },
+        { id: 'w_xor_u9_u10', fromPin: `${u9.id}:out`, toPin: `${u10.id}:in1` },
+        { id: 'w_xor_u8_u10', fromPin: `${u8.id}:out`, toPin: `${u10.id}:in2` },
+        { id: 'w_xor_u10_u11a', fromPin: `${u10.id}:out`, toPin: `${u11.id}:in1` },
+        { id: 'w_xor_u10_u11b', fromPin: `${u10.id}:out`, toPin: `${u11.id}:in2` },
+        { id: 'w_xor_out', fromPin: `${u11.id}:out`, toPin: `${led4.id}:anode` },
+        { id: 'w_xor_gnd', fromPin: `${led4.id}:cathode`, toPin: `${gnd4.id}:p1` }
+      ];
+
+      canvas.fitToScreen();
+    }
   }
 };

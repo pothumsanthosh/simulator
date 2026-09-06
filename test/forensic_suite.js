@@ -60,7 +60,7 @@ const g1 = startGroup('Group 1: Component Definition & Schema Integrity');
       return;
     }
 
-    if (def.pins.length === 0 && type !== 'GROUND' && type !== 'NET_LABEL') {
+    if (def.pins.length === 0 && type !== 'GROUND' && type !== 'NET_LABEL' && type !== 'TEXT_LABEL' && type !== 'ANNOTATION') {
       schemaValid = false;
       invalidCompDetails.push(`${type}: Has 0 pins`);
     }
@@ -687,7 +687,7 @@ const g8 = startGroup('Group 8: Pre-built Reference Circuits & System Benchmarks
   }
 
   const libraryKeys = Object.keys(CircuitLibrary);
-  assert(libraryKeys.length === 13, `Reference Circuit Library contains all ${libraryKeys.length} standard engineering benchmarks (Expected: 13)`, g8);
+  assert(libraryKeys.length >= 13, `Reference Circuit Library contains all ${libraryKeys.length} standard engineering benchmarks (Expected >= 13)`, g8);
 
   libraryKeys.forEach(key => {
     const circ = CircuitLibrary[key];

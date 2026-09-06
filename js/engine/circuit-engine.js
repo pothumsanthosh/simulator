@@ -243,6 +243,8 @@ export class CircuitEngine {
         case ComponentTypes.SAWTOOTH_VOLTAGE:
         case ComponentTypes.PULSE_VOLTAGE:
         case ComponentTypes.TRIGGER_PULSE:
+        case ComponentTypes.DIGITAL_CONSTANT:
+        case ComponentTypes.DIGITAL_SWITCH:
         case ComponentTypes.AM_VOLTAGE:
         case ComponentTypes.FM_VOLTAGE:
         case ComponentTypes.NOISE_VOLTAGE:
@@ -496,6 +498,17 @@ export class CircuitEngine {
             const nPos = this.getNode(comp, 'p_pos');
             const nNeg = this.getNode(comp, 'p_neg');
             stampVSourceEquation(vSrcEquationIdx++, nPos, nNeg, p.voltage ?? 5);
+            break;
+          }
+
+          case ComponentTypes.DIGITAL_CONSTANT:
+          case ComponentTypes.DIGITAL_SWITCH: {
+            const nPos = this.getNode(comp, 'out');
+            const vH = p.vHigh ?? 5.0;
+            const vL = p.vLow ?? 0.0;
+            const state = (p.state === 1 || p.state === true || p.closed === true);
+            const v = state ? vH : vL;
+            stampVSourceEquation(vSrcEquationIdx++, nPos, 0, v);
             break;
           }
 

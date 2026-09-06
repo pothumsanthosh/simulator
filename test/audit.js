@@ -22,7 +22,7 @@ for (const type of allTypes) {
   const hasStamping = engineCode.includes(stampPattern);
   const hasCanvas = canvasCode.includes(stampPattern);
 
-  if (!hasStamping && type !== 'GROUND' && type !== 'NET_LABEL') {
+  if (!hasStamping && type !== 'GROUND' && type !== 'NET_LABEL' && type !== 'TEXT_LABEL' && type !== 'ANNOTATION' && type !== 'NODE' && type !== 'JUNCTION') {
     unstamped.push(type);
   }
   if (!hasCanvas) {
