@@ -183,6 +183,20 @@ export class SchematicCanvas {
     this.canvas.style.cursor = 'crosshair';
   }
 
+  startWiringFromComponent(comp) {
+    if (!comp || !comp.pins || comp.pins.length === 0) return;
+    const pin = comp.pins[0];
+    this.wiringStartPin = {
+      comp,
+      pin,
+      pinKey: `${comp.id}:${pin.id}`,
+      pos: this.getPinWorldPos(comp, pin)
+    };
+    this.wiringCurrentPos = this.wiringStartPin.pos;
+    this.canvas.style.cursor = 'crosshair';
+    this.render();
+  }
+
   toggleNodeNumbers() {
     this.showNodeNumbers = !this.showNodeNumbers;
     this.render();
@@ -494,10 +508,38 @@ export class SchematicCanvas {
     if (e.button === 0 || e.pointerType === 'touch' || e.pointerType === 'pen') {
       // 1. Placement Mode
       if (this.mode === 'PLACE' && this.placementComponentType) {
-        this.addComponent(this.placementComponentType, worldPos.x, worldPos.y);
+        const sx = this.snapToGrid(worldPos.x);
+        const sy = this.snapToGrid(worldPos.y);
+
+        if (this.placementComponentType === ComponentTypes.NODE || this.placementComponentType === ComponentTypes.JUNCTION) {
+          const wireHit = this.findWireAt(worldPos.x, worldPos.y, 12);
+          if (wireHit) {
+            this.saveState();
+            const newNode = this.addComponent(this.placementComponentType, sx, sy);
+            if (newNode) {
+              const nodePinKey = `${newNode.id}:p1`;
+              const origFrom = wireHit.fromPin;
+              const origTo = wireHit.toPin;
+              this.wires = this.wires.filter(w => w.id !== wireHit.id);
+              this.wires.push({ id: this.generateUniqueId('W'), fromPin: origFrom, toPin: nodePinKey });
+              this.wires.push({ id: this.generateUniqueId('W'), fromPin: nodePinKey, toPin: origTo });
+            }
+            if (!e.shiftKey) {
+              this.mode = 'SELECT';
+              this.placementComponentType = null;
+              this.canvas.style.cursor = 'default';
+            }
+            this.notifyModified();
+            this.render();
+            return;
+          }
+        }
+
+        this.addComponent(this.placementComponentType, sx, sy);
         if (!e.shiftKey) {
           this.mode = 'SELECT';
           this.placementComponentType = null;
+          this.canvas.style.cursor = 'default';
         }
         return;
       }
@@ -528,17 +570,22 @@ export class SchematicCanvas {
 
         const wireHit = this.findWireAt(worldPos.x, worldPos.y, 10);
         if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
+          this.saveState();
+          const sx = this.snapToGrid(worldPos.x);
+          const sy = this.snapToGrid(worldPos.y);
+          const newNode = this.addComponent(ComponentTypes.NODE, sx, sy);
+          const nodePinKey = `${newNode.id}:p1`;
+          const origFrom = wireHit.fromPin;
+          const origTo = wireHit.toPin;
           const from = this.wiringStartPin.pinKey;
-          const to = wireHit.fromPin;
-          const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
-          if (!exists) {
-            this.saveState();
-            this.wires.push({
-              id: this.generateUniqueId('W'),
-              fromPin: from,
-              toPin: to
-            });
-          }
+
+          // Split existing wire into 2 segments through the new node
+          this.wires = this.wires.filter(w => w.id !== wireHit.id);
+          this.wires.push({ id: this.generateUniqueId('W'), fromPin: origFrom, toPin: nodePinKey });
+          this.wires.push({ id: this.generateUniqueId('W'), fromPin: nodePinKey, toPin: origTo });
+          // Connect active wire branch to the node
+          this.wires.push({ id: this.generateUniqueId('W'), fromPin: from, toPin: nodePinKey });
+
           this.wiringStartPin = null;
           this.wiringCurrentPos = null;
           this.hoveredTargetPin = null;
@@ -765,17 +812,20 @@ export class SchematicCanvas {
 
       const wireHit = this.findWireAt(worldPos.x, worldPos.y, 12);
       if (wireHit && wireHit.fromPin !== this.wiringStartPin.pinKey && wireHit.toPin !== this.wiringStartPin.pinKey) {
+        this.saveState();
+        const sx = this.snapToGrid(worldPos.x);
+        const sy = this.snapToGrid(worldPos.y);
+        const newNode = this.addComponent(ComponentTypes.NODE, sx, sy);
+        const nodePinKey = `${newNode.id}:p1`;
+        const origFrom = wireHit.fromPin;
+        const origTo = wireHit.toPin;
         const from = this.wiringStartPin.pinKey;
-        const to = wireHit.fromPin;
-        const exists = this.wires.some(w => (w.fromPin === from && w.toPin === to) || (w.fromPin === to && w.toPin === from));
-        if (!exists) {
-          this.saveState();
-          this.wires.push({
-            id: this.generateUniqueId('W'),
-            fromPin: from,
-            toPin: to
-          });
-        }
+
+        this.wires = this.wires.filter(w => w.id !== wireHit.id);
+        this.wires.push({ id: this.generateUniqueId('W'), fromPin: origFrom, toPin: nodePinKey });
+        this.wires.push({ id: this.generateUniqueId('W'), fromPin: nodePinKey, toPin: origTo });
+        this.wires.push({ id: this.generateUniqueId('W'), fromPin: from, toPin: nodePinKey });
+
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
         this.hoveredTargetPin = null;
@@ -867,6 +917,14 @@ export class SchematicCanvas {
     } else if (!isCtrlOrCmd && (e.key === 'n' || e.key === 'N')) {
       e.preventDefault();
       this.toggleNodeNumbers();
+    } else if (!isCtrlOrCmd && (e.key === 'j' || e.key === 'J')) {
+      e.preventDefault();
+      this.setPlacementMode(ComponentTypes.NODE);
+    } else if (!isCtrlOrCmd && (e.key === 'w' || e.key === 'W')) {
+      e.preventDefault();
+      if (this.selectedComponent) {
+        this.startWiringFromComponent(this.selectedComponent);
+      }
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       this.removeSelected();
@@ -1446,6 +1504,20 @@ export class SchematicCanvas {
         ctx.font = 'bold 8px sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(p.label || 'NET', 3, -4);
+        break;
+      }
+
+      case ComponentTypes.NODE:
+      case ComponentTypes.JUNCTION: {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
         break;
       }
 
@@ -2293,6 +2365,17 @@ export class SchematicCanvas {
   }
 
   renderLabels(ctx, comp) {
+    if (comp.type === ComponentTypes.NODE || comp.type === ComponentTypes.JUNCTION) {
+      if (!comp.params?.label) return;
+      ctx.save();
+      ctx.font = 'bold 9px Lato, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#0284c7';
+      ctx.fillText(comp.params.label, comp.x, comp.y - 8);
+      ctx.restore();
+      return;
+    }
+
     const p = comp.params || {};
     const effHeight = ((comp.rotation || 0) % 180 !== 0) ? (comp.width || 40) : (comp.height || 40);
 

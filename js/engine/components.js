@@ -240,6 +240,8 @@ export const ComponentTypes = {
   POWER_15V: 'POWER_15V',
   POWER_NEG15V: 'POWER_NEG15V',
   NET_LABEL: 'NET_LABEL',
+  NODE: 'NODE',
+  JUNCTION: 'JUNCTION',
   TEST_POINT: 'TEST_POINT',
   BUS_ENTRY: 'BUS_ENTRY',
 
@@ -1393,6 +1395,34 @@ export const ComponentDefinitions = {
     pins: [{ id: 'p1', name: 'PIN', x: 0, y: 10, dir: 'bottom' }],
     params: { label: 'NET1' },
     paramSchema: [{ key: 'label', label: 'Net Name', type: 'string', default: 'NET1' }]
+  },
+  [ComponentTypes.NODE]: {
+    name: 'Junction Node (Multi-Wire Hub)',
+    type: ComponentTypes.NODE,
+    category: ComponentCategory.POWER_SYMBOLS,
+    prefix: 'NODE',
+    width: 14, height: 14,
+    pins: [
+      { id: 'p1', name: 'N', x: 0, y: 0, dir: 'all' }
+    ],
+    params: { label: '' },
+    paramSchema: [
+      { key: 'label', label: 'Node Label (Optional)', type: 'string', default: '' }
+    ]
+  },
+  [ComponentTypes.JUNCTION]: {
+    name: 'Junction / Tie Point',
+    type: ComponentTypes.JUNCTION,
+    category: ComponentCategory.POWER_SYMBOLS,
+    prefix: 'J',
+    width: 14, height: 14,
+    pins: [
+      { id: 'p1', name: 'J', x: 0, y: 0, dir: 'all' }
+    ],
+    params: { label: '' },
+    paramSchema: [
+      { key: 'label', label: 'Junction Label (Optional)', type: 'string', default: '' }
+    ]
   },
 
   // =================== 14. METERS & PROBES ===================

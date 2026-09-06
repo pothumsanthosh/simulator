@@ -417,6 +417,10 @@ class MultisimApp {
       case ComponentTypes.NET_LABEL:
         return `<svg viewBox="0 0 24 24"><path d="M12,18 L12,8 M8,12 L12,6 L16,12" stroke="#e11d48" stroke-width="2" fill="none"/><text x="12" y="22" font-size="5" text-anchor="middle" font-weight="bold" fill="#e11d48">VCC</text></svg>`;
 
+      case ComponentTypes.NODE:
+      case ComponentTypes.JUNCTION:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#0f172a" stroke="#0284c7" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="7" stroke="#0284c7" stroke-width="1.5"/><line x1="12" y1="17" x2="12" y2="22" stroke="#0284c7" stroke-width="1.5"/><line x1="2" y1="12" x2="7" y2="12" stroke="#0284c7" stroke-width="1.5"/><line x1="17" y1="12" x2="22" y2="12" stroke="#0284c7" stroke-width="1.5"/></svg>`;
+
       // 15. Probes & Meters
       case ComponentTypes.PROBE_V:
         return `<svg viewBox="0 0 24 24"><path d="M12,20 L6,10 L6,4 L18,4 L18,10 Z" fill="#03b585"/><text x="12" y="10" font-size="7" fill="#fff" text-anchor="middle" font-weight="bold">V</text></svg>`;
@@ -463,6 +467,13 @@ class MultisimApp {
       if (e.target.value) {
         this.loadCircuitPreset(e.target.value);
       }
+    });
+
+    document.getElementById('btnAddNodeToolbar')?.addEventListener('click', () => {
+      this.canvas.setPlacementMode(ComponentTypes.NODE);
+    });
+    document.getElementById('btnAddNode')?.addEventListener('click', () => {
+      this.canvas.setPlacementMode(ComponentTypes.NODE);
     });
 
     document.getElementById('btnUndo').addEventListener('click', () => this.canvas.undo());
@@ -710,6 +721,61 @@ class MultisimApp {
     const comp = selection.item;
     const def = ComponentDefinitions[comp.type];
     if (!def) return;
+
+    if (comp.type === ComponentTypes.NODE || comp.type === ComponentTypes.JUNCTION) {
+      const pinKey = `${comp.id}:p1`;
+      const nodeId = this.engine?.pinToNodeMap?.get(pinKey);
+      const volt = (nodeId !== undefined && this.engine.nodeVoltages) ? this.engine.nodeVoltages[nodeId] : null;
+      const voltStr = volt !== null && !isNaN(volt) && isFinite(volt) ? formatValueWithPrefix(volt, 'V') : '0.00 V';
+      const connectedWires = this.canvas.wires.filter(w => w.fromPin === pinKey || w.toPin === pinKey);
+
+      container.innerHTML = `
+        <div class="property-group">
+          <label class="property-label">Connection Node</label>
+          <div style="font-size: 15px; font-weight: 700; color: #0284c7;">${comp.name} (Multi-Wire Hub)</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">SPICE Electrical Node</label>
+          <div style="font-size: 16px; font-weight: 700; color: ${nodeId === 0 ? '#10b981' : '#6366f1'};">
+            Node ${nodeId === 0 ? '0 (Ground Reference)' : (nodeId !== undefined ? nodeId : 'Unconnected')}
+          </div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">Live Node Voltage</label>
+          <div style="font-size: 16px; font-weight: 700; color: #0f172a;">${voltStr}</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">Connected Branches</label>
+          <div style="font-size: 13px; font-weight: 600; color: #334155;">${connectedWires.length} wires connected</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">Custom Net Label (Optional)</label>
+          <input type="text" class="property-input prop-param-input" data-key="label" value="${comp.params?.label || ''}" placeholder="e.g. V_MID, CLK, DATA"/>
+        </div>
+        <button class="btn btn-primary" id="btnPropWireFromNode" style="width: 100%; margin-top: 10px; font-size: 12px; font-weight: 700;" title="Click to draw a wire branch from this node (W)">
+          ⚡ Draw Wire from this Node
+        </button>
+        <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--border-color);"/>
+        <button class="btn btn-outline" id="btnPropDeleteNode" style="color: #e11d48; width: 100%;" title="Delete Node (Del)">🗑 Delete Node</button>
+      `;
+
+      document.getElementById('btnPropWireFromNode')?.addEventListener('click', () => {
+        this.canvas.startWiringFromComponent(comp);
+      });
+
+      document.getElementById('btnPropDeleteNode')?.addEventListener('click', () => {
+        this.canvas.removeComponent(comp);
+      });
+
+      container.querySelectorAll('.prop-param-input').forEach(input => {
+        input.addEventListener('input', () => {
+          comp.params[input.dataset.key] = input.value;
+          this.canvas.notifyModified();
+          this.canvas.render();
+        });
+      });
+      return;
+    }
 
     let html = `
       <div class="property-group">

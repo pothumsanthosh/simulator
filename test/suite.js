@@ -222,6 +222,43 @@ console.log('\n[5/5] Rectified Models & Bug Fix Verification');
   assert(wires.length === 1 && wires[0].id === 'w3', `Single component wire cleanup verified (Remaining wires: ${wires.length}, Expected: 1)`);
 }
 
+{
+  // Test E: Junction Node Multi-Wire Hub & Netlist Resolution
+  const eng = new CircuitEngine();
+  const v1 = { id: 'V1', type: 'DC_VOLTAGE', pins: [{ id: 'p_pos' }, { id: 'p_neg' }], params: { voltage: 10 } };
+  const r1 = { id: 'R1', type: 'RESISTOR', pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 1000 } };
+  const r2 = { id: 'R2', type: 'RESISTOR', pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 2000 } };
+  const r3 = { id: 'R3', type: 'RESISTOR', pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 3000 } };
+  const nodeHub = { id: 'NODE1', type: 'NODE', pins: [{ id: 'p1' }], params: {} };
+  const gnd = { id: 'GND', type: 'GROUND', pins: [{ id: 'p1' }], params: {} };
+
+  // 4 wires all meeting at NODE1:p1
+  const wires = [
+    { id: 'w1', fromPin: 'V1:p_pos', toPin: 'R1:p1' },
+    { id: 'w2', fromPin: 'R1:p2', toPin: 'NODE1:p1' },
+    { id: 'w3', fromPin: 'NODE1:p1', toPin: 'R2:p1' },
+    { id: 'w4', fromPin: 'NODE1:p1', toPin: 'R3:p1' },
+    { id: 'w5', fromPin: 'V1:p_neg', toPin: 'GND:p1' },
+    { id: 'w6', fromPin: 'R2:p2', toPin: 'GND:p1' },
+    { id: 'w7', fromPin: 'R3:p2', toPin: 'GND:p1' }
+  ];
+
+  eng.setCircuit([v1, r1, r2, r3, nodeHub, gnd], wires);
+  eng.step(1e-4);
+
+  const nodeIndex = eng.pinToNodeMap.get('NODE1:p1');
+  const r1p2Node = eng.pinToNodeMap.get('R1:p2');
+  const r2p1Node = eng.pinToNodeMap.get('R2:p1');
+  const r3p1Node = eng.pinToNodeMap.get('R3:p1');
+
+  assert(nodeIndex !== undefined && nodeIndex === r1p2Node && nodeIndex === r2p1Node && nodeIndex === r3p1Node,
+    `Junction Node successfully connected 4 wires into unified SPICE node ${nodeIndex}`);
+  
+  // Theoretical node voltage: R_parallel = (2k * 3k) / (2k + 3k) = 1.2k. V_node = 10 * (1.2k / (1k + 1.2k)) = 5.4545V
+  const vNode = eng.nodeVoltages[nodeIndex];
+  assert(Math.abs(vNode - 5.4545) < 0.05, `Multi-wire Junction Node voltage = ${vNode.toFixed(4)}V (Expected: 5.4545V)`);
+}
+
 console.log('\n----------------------------------------------------');
 console.log(`TOTAL RESULTS: ${passCount} Passed, ${failCount} Failed.`);
 if (failCount > 0) process.exit(1);
