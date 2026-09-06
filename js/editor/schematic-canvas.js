@@ -53,22 +53,21 @@ export class SchematicCanvas {
     this.wiringCurrentPos = null;
 
     // Dragging & Panning & Multi-touch Gestures (Bare Hands)
-    this.isDragging = false;
-    this.dragCandidate = false;
-    this.hasMovedPastThreshold = false;
-    this.dragHistorySaved = false;
-    this.dragPointerId = null;
+    this.drag = {
+      active: false,
+      pointerId: null,
+      startWorld: null,
+      initialPositions: new Map(),
+      moved: false
+    };
+    this.dragStartScreen = { x: 0, y: 0 };
     this.isPanning = false;
     this.isPinching = false;
     this.isBoxSelecting = false;
     this.dragStartX = 0;
     this.dragStartY = 0;
-    this.dragStartScreen = { x: 0, y: 0 };
-    this.dragStartWorld = { x: 0, y: 0 };
     this.boxSelectStart = { x: 0, y: 0 };
     this.boxSelectCurrent = { x: 0, y: 0 };
-    this.draggedComponent = null;
-    this.compInitialPositions = new Map();
     this.activePointers = new Map();
     this.initialPinchDist = 0;
     this.initialPinchZoom = 1.0;
@@ -127,7 +126,11 @@ export class SchematicCanvas {
 
     window.addEventListener('blur', () => {
       this.activePointers.clear();
-      this.isDragging = false;
+      this.drag.active = false;
+      this.drag.pointerId = null;
+      this.drag.startWorld = null;
+      this.drag.initialPositions.clear();
+      this.drag.moved = false;
       this.isPanning = false;
       this.isPinching = false;
       this.isBoxSelecting = false;
@@ -503,8 +506,7 @@ export class SchematicCanvas {
     // Multi-Touch (Bare Hands Two-Finger Pinch Zoom & Pan)
     if (this.activePointers.size === 2 && e.pointerType === 'touch') {
       this.isPinching = true;
-      this.isDragging = false;
-      this.dragCandidate = false;
+      this.drag.active = false;
       this.isPanning = false;
       this.isBoxSelecting = false;
       this.wiringStartPin = null;
@@ -536,8 +538,7 @@ export class SchematicCanvas {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       this.state = CanvasState.PANNING_CANVAS;
       this.isPanning = true;
-      this.isDragging = false;
-      this.dragCandidate = false;
+      this.drag.active = false;
       this.dragStartX = e.clientX;
       this.dragStartY = e.clientY;
       return;
@@ -585,27 +586,23 @@ export class SchematicCanvas {
           if (this.onPlacementChange) this.onPlacementChange(null);
         }
         if (newComp) {
-          this.isDragging = true;
-          this.dragCandidate = true;
-          this.hasMovedPastThreshold = false;
-          this.dragHistorySaved = true;
-          this.dragPointerId = e.pointerId;
+          this.drag.active = true;
+          this.drag.pointerId = e.pointerId;
+          this.drag.startWorld = { x: worldPos.x, y: worldPos.y };
+          this.dragStartScreen = { x: e.clientX, y: e.clientY };
+          this.drag.initialPositions.clear();
+          this.drag.initialPositions.set(newComp.id, { x: newComp.x, y: newComp.y });
+          this.drag.moved = false;
           this.isPanning = false;
           this.isBoxSelecting = false;
-          this.dragStartX = worldPos.x;
-          this.dragStartY = worldPos.y;
-          this.dragStartScreen = { x: e.clientX, y: e.clientY };
-          this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
-          this.compInitialPositions.clear();
-          this.compInitialPositions.set(newComp, { x: newComp.x, y: newComp.y });
           this.state = CanvasState.DRAGGING_COMPONENT;
+          try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
         }
         return;
       }
 
       // 2. Wiring in progress: Target pin or wire click
       if (this.wiringStartPin) {
-        // Generous 14px target pin grab for effortless connection
         const pinHit = this.findPinAt(worldPos.x, worldPos.y, 14);
         if (pinHit && pinHit.pinKey !== this.wiringStartPin.pinKey) {
           const from = this.wiringStartPin.pinKey;
@@ -639,11 +636,9 @@ export class SchematicCanvas {
           const origTo = wireHit.toPin;
           const from = this.wiringStartPin.pinKey;
 
-          // Split existing wire into 2 segments through the new node
           this.wires = this.wires.filter(w => w.id !== wireHit.id);
           this.wires.push({ id: this.generateUniqueId('W'), fromPin: origFrom, toPin: nodePinKey });
           this.wires.push({ id: this.generateUniqueId('W'), fromPin: nodePinKey, toPin: origTo });
-          // Connect active wire branch to the node
           this.wires.push({ id: this.generateUniqueId('W'), fromPin: from, toPin: nodePinKey });
 
           this.wiringStartPin = null;
@@ -655,7 +650,6 @@ export class SchematicCanvas {
           return;
         }
 
-        // Clicked elsewhere while wiring was active -> cancel wiring
         this.wiringStartPin = null;
         this.wiringCurrentPos = null;
         this.hoveredTargetPin = null;
@@ -667,11 +661,7 @@ export class SchematicCanvas {
       // 3. Component Selection & Direct Dragging (Priority over pin click, generous 20px hit radius)
       const compHit = this.findComponentAt(worldPos.x, worldPos.y, 20);
       if (compHit) {
-        this.isPanning = false;
-        this.isBoxSelecting = false;
-        this.isPinching = false;
-        this.wiringStartPin = null;
-        this.wiringCurrentPos = null;
+        console.log('COMPONENT DOWN', compHit?.id);
 
         // Toggle interactive switch components
         if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON) {
@@ -684,53 +674,60 @@ export class SchematicCanvas {
           this.render();
         }
 
-        if (e.shiftKey) {
-          if (this.selectedComponents.has(compHit)) {
-            this.selectedComponents.delete(compHit);
-            if (this.selectedComponent === compHit) {
-              this.selectedComponent = this.selectedComponents.size > 0 ? Array.from(this.selectedComponents)[0] : null;
-            }
-          } else {
-            this.selectedComponents.add(compHit);
-            this.selectedComponent = compHit;
-          }
-        } else {
+        // Select component
+        if (!e.shiftKey) {
           if (!this.selectedComponents.has(compHit)) {
             this.selectedComponents.clear();
-            this.selectedComponents.add(compHit);
-            this.selectedComponent = compHit;
           }
         }
 
-        this.selectWire(null);
-        this.isDragging = true;
-        this.dragCandidate = true;
-        this.hasMovedPastThreshold = false;
-        this.dragHistorySaved = false;
-        this.dragPointerId = e.pointerId;
-        this.dragStartX = worldPos.x;
-        this.dragStartY = worldPos.y;
-        this.dragStartScreen = { x: e.clientX, y: e.clientY };
-        this.dragStartWorld = { x: worldPos.x, y: worldPos.y };
-        this.state = CanvasState.SELECTING;
+        this.selectedComponents.add(compHit);
+        this.selectedComponent = compHit;
+        this.selectedWire = null;
 
-        this.compInitialPositions.clear();
-        this.selectedComponents.forEach(c => {
-          this.compInitialPositions.set(c, { x: c.x, y: c.y });
+        // Start drag
+        this.drag.active = true;
+        this.drag.pointerId = e.pointerId;
+        this.drag.startWorld = {
+          x: worldPos.x,
+          y: worldPos.y
+        };
+        this.dragStartScreen = {
+          x: e.clientX,
+          y: e.clientY
+        };
+
+        this.drag.initialPositions.clear();
+
+        this.selectedComponents.forEach(component => {
+          this.drag.initialPositions.set(component.id, {
+            x: component.x,
+            y: component.y
+          });
         });
+
+        this.drag.moved = false;
+
+        this.state = CanvasState.DRAGGING_COMPONENT;
+
+        this.isPanning = false;
+        this.isBoxSelecting = false;
+
+        try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
 
         if (this.onSelectionChange) {
           this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
         }
+
         this.render();
+
         return;
       }
 
-      // 4. Pin Click to Start Wiring (Specific to protruding pin tips outside body)
+      // 4. Pin Click to Start Wiring
       const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
       if (pinHit) {
-        this.isDragging = false;
-        this.dragCandidate = false;
+        this.drag.active = false;
         this.isPanning = false;
         this.state = CanvasState.WIRING;
         this.wiringStartPin = pinHit;
@@ -742,8 +739,7 @@ export class SchematicCanvas {
       // 5. Wire Click
       const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
       if (wireHit) {
-        this.isDragging = false;
-        this.dragCandidate = false;
+        this.drag.active = false;
         this.isPanning = false;
         this.state = CanvasState.IDLE;
         this.selectWire(wireHit);
@@ -751,8 +747,7 @@ export class SchematicCanvas {
       }
 
       // 6. Empty Canvas Click -> Marquee Selection or Pan
-      this.isDragging = false;
-      this.dragCandidate = false;
+      this.drag.active = false;
       if (e.shiftKey) {
         this.isPanning = false;
         this.isBoxSelecting = true;
@@ -806,33 +801,49 @@ export class SchematicCanvas {
 
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
+    // HIGHEST PRIORITY: Authoritative Component Dragging
+    if (
+      this.drag.active &&
+      e.pointerId === this.drag.pointerId
+    ) {
+      console.log('DRAG MOVE', this.drag.active, e.pointerId, this.drag.pointerId);
+
+      const dx = worldPos.x - this.drag.startWorld.x;
+      const dy = worldPos.y - this.drag.startWorld.y;
+
+      const screenDX = e.clientX - this.dragStartScreen.x;
+      const screenDY = e.clientY - this.dragStartScreen.y;
+
+      const distance = Math.hypot(screenDX, screenDY);
+
+      // Small movement threshold
+      if (distance > 2) {
+        if (!this.drag.moved) {
+          // Save undo state ONCE
+          this.saveState();
+          this.drag.moved = true;
+        }
+
+        this.selectedComponents.forEach(component => {
+          const initial = this.drag.initialPositions.get(component.id);
+          if (!initial) return;
+
+          component.x = this.snapToGrid(initial.x + dx);
+          component.y = this.snapToGrid(initial.y + dy);
+          console.log('NEW POSITION', component.x, component.y);
+        });
+
+        this.render();
+      }
+
+      return;
+    }
+
     // Placement Mode Hover Ghost Tracking
     if (this.mode === 'PLACE' && this.placementComponentType) {
       this.placementHoverPos = worldPos;
       this.render();
       return;
-    }
-
-    // Direct Dragging Priority: Move selected components with mouse or touch
-    if (this.isDragging && this.selectedComponents.size > 0) {
-      const screenDist = Math.hypot(e.clientX - this.dragStartScreen.x, e.clientY - this.dragStartScreen.y);
-      if (screenDist > 2 || this.hasMovedPastThreshold) {
-        this.hasMovedPastThreshold = true;
-        if (!this.dragHistorySaved) {
-          this.saveState();
-          this.dragHistorySaved = true;
-        }
-        this.state = CanvasState.DRAGGING_COMPONENT;
-        const dx = worldPos.x - this.dragStartWorld.x;
-        const dy = worldPos.y - this.dragStartWorld.y;
-        this.selectedComponents.forEach(c => {
-          const initPos = this.compInitialPositions.get(c) || { x: c.x, y: c.y };
-          c.x = this.snapToGrid(initPos.x + dx);
-          c.y = this.snapToGrid(initPos.y + dy);
-        });
-        this.render();
-        return;
-      }
     }
 
     if (this.isPanning) {
@@ -853,7 +864,6 @@ export class SchematicCanvas {
     }
 
     if (this.wiringStartPin) {
-      // Magnetic target pin snapping (16px radius)
       const targetPinHit = this.findPinAt(worldPos.x, worldPos.y, 16);
       if (targetPinHit && targetPinHit.pinKey !== this.wiringStartPin.pinKey) {
         this.wiringCurrentPos = targetPinHit.pos;
@@ -882,8 +892,38 @@ export class SchematicCanvas {
   }
 
   handlePointerUp(e) {
-    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     this.activePointers.delete(e.pointerId);
+
+    // HIGHEST PRIORITY: Authoritative Component Drag Release
+    if (
+      this.drag.active &&
+      e.pointerId === this.drag.pointerId
+    ) {
+      const moved = this.drag.moved;
+
+      this.drag.active = false;
+      this.drag.pointerId = null;
+      this.drag.startWorld = null;
+      this.drag.initialPositions.clear();
+
+      this.state = CanvasState.IDLE;
+
+      try {
+        this.canvas.releasePointerCapture(e.pointerId);
+      } catch (error) {
+        // Ignore if pointer capture already released
+      }
+
+      if (moved) {
+        this.notifyModified();
+      }
+
+      this.render();
+
+      return;
+    }
+
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
 
     this.isPinching = false;
     this.isPanning = false;
@@ -939,19 +979,6 @@ export class SchematicCanvas {
       }
     }
 
-    if (this.isDragging) {
-      this.isDragging = false;
-      this.dragCandidate = false;
-      if (this.hasMovedPastThreshold && this.dragHistorySaved) {
-        this.notifyModified();
-      }
-      this.compInitialPositions.clear();
-      this.hasMovedPastThreshold = false;
-      this.dragHistorySaved = false;
-      this.state = CanvasState.IDLE;
-      this.render();
-    }
-    this.dragCandidate = false;
     this.state = CanvasState.IDLE;
 
     if (this.isBoxSelecting) {
@@ -975,22 +1002,40 @@ export class SchematicCanvas {
   }
 
   handlePointerCancel(e) {
-    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     this.activePointers.delete(e.pointerId);
 
-    if (this.isDragging && this.dragHistorySaved) {
-      for (const [c, initPos] of this.compInitialPositions.entries()) {
-        c.x = initPos.x;
-        c.y = initPos.y;
+    if (
+      this.drag.active &&
+      e.pointerId === this.drag.pointerId
+    ) {
+      if (this.drag.moved) {
+        this.selectedComponents.forEach(component => {
+          const initial = this.drag.initialPositions.get(component.id);
+          if (initial) {
+            component.x = initial.x;
+            component.y = initial.y;
+          }
+        });
+        this.undo();
       }
-      this.undo();
+
+      this.drag.active = false;
+      this.drag.pointerId = null;
+      this.drag.startWorld = null;
+      this.drag.initialPositions.clear();
+      this.drag.moved = false;
+
+      this.state = CanvasState.IDLE;
+
+      try {
+        this.canvas.releasePointerCapture(e.pointerId);
+      } catch (error) {}
+
+      this.render();
+      return;
     }
 
-    this.isDragging = false;
-    this.dragCandidate = false;
-    this.hasMovedPastThreshold = false;
-    this.dragHistorySaved = false;
-    this.compInitialPositions.clear();
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     this.isPanning = false;
     this.isPinching = false;
     this.isBoxSelecting = false;
@@ -1145,11 +1190,15 @@ export class SchematicCanvas {
     this.mode = 'SELECT';
     this.placementComponentType = null;
     this.placementHoverPos = null;
-    this.isDragging = false;
-    this.dragCandidate = false;
+    this.drag.active = false;
+    this.drag.pointerId = null;
+    this.drag.startWorld = null;
+    this.drag.initialPositions.clear();
+    this.drag.moved = false;
     this.isPanning = false;
     this.isPinching = false;
     this.isBoxSelecting = false;
+    this.state = CanvasState.IDLE;
     this.canvas.style.cursor = 'default';
     if (this.onPlacementChange) this.onPlacementChange(null);
     this.render();
@@ -1168,8 +1217,10 @@ export class SchematicCanvas {
 
   selectWire(wire) {
     this.selectedWire = wire;
-    this.selectedComponent = null;
-    this.selectedComponents.clear();
+    if (wire) {
+      this.selectedComponent = null;
+      this.selectedComponents.clear();
+    }
     if (this.onSelectionChange) this.onSelectionChange({ type: 'wire', item: wire });
     this.render();
   }
