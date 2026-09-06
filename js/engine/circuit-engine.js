@@ -242,6 +242,7 @@ export class CircuitEngine {
         case ComponentTypes.TRIANGLE_VOLTAGE:
         case ComponentTypes.SAWTOOTH_VOLTAGE:
         case ComponentTypes.PULSE_VOLTAGE:
+        case ComponentTypes.TRIGGER_PULSE:
         case ComponentTypes.AM_VOLTAGE:
         case ComponentTypes.FM_VOLTAGE:
         case ComponentTypes.NOISE_VOLTAGE:
@@ -568,19 +569,39 @@ export class CircuitEngine {
             break;
           }
 
-          case ComponentTypes.PULSE_VOLTAGE: {
+          case ComponentTypes.PULSE_VOLTAGE:
+          case ComponentTypes.TRIGGER_PULSE: {
             const nPos = this.getNode(comp, 'p_pos');
             const nNeg = this.getNode(comp, 'p_neg');
-            const v1 = p.v1 ?? 0;
-            const v2 = p.v2 ?? 5;
+            const v1 = p.v1 ?? (p.vLow ?? 0);
+            const v2 = p.v2 ?? (p.vHigh ?? 5);
             const tDelay = Math.max(p.tDelay ?? 0, 0);
             const tRise = Math.max(p.tRise ?? 1e-6, 1e-12);
             const tFall = Math.max(p.tFall ?? 1e-6, 1e-12);
-            const tWidth = Math.max(p.tWidth ?? 1e-3, 1e-12);
-            const period = p.period !== undefined ? Math.max(p.period, 0) : 2e-3;
+            const tWidth = Math.max(p.tWidth ?? (p.pulseWidth ?? 1e-3), 1e-12);
+            const period = p.period !== undefined ? Math.max(p.period, 0) : (comp.type === ComponentTypes.TRIGGER_PULSE ? 0 : 2e-3);
 
             let v = v1;
-            if (this.time >= tDelay) {
+
+            // 1. Interactive Manual Trigger (Fired by user click / spacebar / UI button)
+            if (p.lastTriggerTime !== undefined) {
+              const tRel = this.time - p.lastTriggerTime;
+              if (tRel >= 0 && tRel < (tRise + tWidth + tFall + 1e-9)) {
+                if (tRel < tRise) {
+                  v = v1 + (v2 - v1) * (tRel / tRise);
+                } else if (tRel < tRise + tWidth) {
+                  v = v2;
+                } else if (tRel < tRise + tWidth + tFall) {
+                  const tInFall = tRel - (tRise + tWidth);
+                  v = v2 + (v1 - v2) * (tInFall / tFall);
+                } else {
+                  v = v1;
+                }
+              } else {
+                v = v1;
+              }
+            } else if (this.time >= tDelay) {
+              // 2. Scheduled Periodic or Single Pulse
               if (period > 0) {
                 const tRel = (this.time - tDelay) % period;
                 if (tRel < tRise) {
@@ -596,15 +617,17 @@ export class CircuitEngine {
               } else {
                 // Single-shot trigger pulse (period = 0)
                 const tRel = this.time - tDelay;
-                if (tRel < tRise) {
-                  v = v1 + (v2 - v1) * (tRel / tRise);
-                } else if (tRel < tRise + tWidth) {
-                  v = v2;
-                } else if (tRel < tRise + tWidth + tFall) {
-                  const tInFall = tRel - (tRise + tWidth);
-                  v = v2 + (v1 - v2) * (tInFall / tFall);
-                } else {
-                  v = v1;
+                if (tRel >= 0) {
+                  if (tRel < tRise) {
+                    v = v1 + (v2 - v1) * (tRel / tRise);
+                  } else if (tRel < tRise + tWidth) {
+                    v = v2;
+                  } else if (tRel < tRise + tWidth + tFall) {
+                    const tInFall = tRel - (tRise + tWidth);
+                    v = v2 + (v1 - v2) * (tInFall / tFall);
+                  } else {
+                    v = v1;
+                  }
                 }
               }
             }

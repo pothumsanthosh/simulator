@@ -384,6 +384,8 @@ class MultisimApp {
       case ComponentTypes.CLOCK_VOLTAGE:
       case ComponentTypes.PULSE_VOLTAGE:
         return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M7,14 L7,9 L12,9 L12,15 L17,15 L17,10" stroke="#0284c7" stroke-width="1.5" fill="none"/></svg>`;
+      case ComponentTypes.TRIGGER_PULSE:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#10b981" stroke="#047857" stroke-width="1.5"/><path d="M13,6 L8,13 L12,13 L11,18 L16,11 L12,11 Z" fill="#ffffff"/></svg>`;
       case ComponentTypes.TRIANGLE_VOLTAGE:
       case ComponentTypes.SAWTOOTH_VOLTAGE:
       case ComponentTypes.AM_VOLTAGE:
@@ -1014,6 +1016,31 @@ class MultisimApp {
       </div>
     `;
 
+    const isInteractiveTrigger =
+      comp.type === ComponentTypes.PULSE_VOLTAGE ||
+      comp.type === ComponentTypes.TRIGGER_PULSE ||
+      comp.type === ComponentTypes.PUSH_BUTTON ||
+      comp.type === ComponentTypes.PUSH_BUTTON_NC ||
+      comp.type === ComponentTypes.SPST_SWITCH ||
+      comp.type === ComponentTypes.SPDT_SWITCH;
+
+    if (isInteractiveTrigger) {
+      let btnLabel = '⚡ Fire Trigger Pulse';
+      if (comp.type === ComponentTypes.PUSH_BUTTON || comp.type === ComponentTypes.PUSH_BUTTON_NC) {
+        btnLabel = '🔘 Press Push Button (Momentary Pulse)';
+      } else if (comp.type === ComponentTypes.SPST_SWITCH || comp.type === ComponentTypes.SPDT_SWITCH) {
+        btnLabel = '🔌 Toggle Switch State';
+      }
+
+      html += `
+        <div class="property-group" style="margin-top: 10px;">
+          <button class="btn btn-primary" id="btnFireTriggerPulse" style="width: 100%; padding: 10px; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #0284c7, #06b6d4); box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);" title="Trigger / Toggle Component Pulse (Click or Spacebar)">
+            ${btnLabel} <span style="opacity: 0.8; font-size: 11px;">(Space)</span>
+          </button>
+        </div>
+      `;
+    }
+
     if (def.paramSchema && def.paramSchema.length > 0) {
       html += `<hr style="margin: 16px 0; border: none; border-top: 1px solid var(--border-color);"/>`;
 
@@ -1120,6 +1147,22 @@ class MultisimApp {
 
       input.addEventListener('input', handleUpdate);
       input.addEventListener('change', handleUpdate);
+    });
+
+    document.getElementById('btnFireTriggerPulse')?.addEventListener('click', () => {
+      this.canvas.triggerComponentPulse(comp);
+      const btn = document.getElementById('btnFireTriggerPulse');
+      if (btn) {
+        const origText = btn.innerHTML;
+        btn.innerHTML = '⚡ Pulse Fired!';
+        btn.style.background = '#10b981';
+        setTimeout(() => {
+          if (btn) {
+            btn.innerHTML = origText;
+            btn.style.background = 'linear-gradient(135deg, #0284c7, #06b6d4)';
+          }
+        }, 400);
+      }
     });
 
     document.getElementById('btnPropRotate')?.addEventListener('click', () => this.canvas.rotateSelected(90));

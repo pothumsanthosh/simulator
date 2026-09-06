@@ -677,15 +677,16 @@ export class SchematicCanvas {
       if (compHit) {
         console.log('COMPONENT DOWN', compHit?.id);
 
-        // Toggle interactive switch components
-        if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON || compHit.type === ComponentTypes.PUSH_BUTTON_NC) {
-          compHit.params.closed = !compHit.params.closed;
-          this.notifyModified();
-          this.render();
-        } else if (compHit.type === ComponentTypes.SPDT_SWITCH) {
-          compHit.params.position = compHit.params.position === 1 ? 2 : 1;
-          this.notifyModified();
-          this.render();
+        // Trigger or toggle interactive components immediately on click
+        if (
+          compHit.type === ComponentTypes.PULSE_VOLTAGE ||
+          compHit.type === ComponentTypes.TRIGGER_PULSE ||
+          compHit.type === ComponentTypes.PUSH_BUTTON ||
+          compHit.type === ComponentTypes.PUSH_BUTTON_NC ||
+          compHit.type === ComponentTypes.SPST_SWITCH ||
+          compHit.type === ComponentTypes.SPDT_SWITCH
+        ) {
+          this.triggerComponentPulse(compHit);
         }
 
         // Select component
@@ -1134,6 +1135,21 @@ export class SchematicCanvas {
       if (this.selectedComponent) {
         this.startWiringFromComponent(this.selectedComponent);
       }
+    } else if (e.key === ' ' || e.code === 'Space') {
+      if (this.selectedComponent) {
+        const comp = this.selectedComponent;
+        if (
+          comp.type === ComponentTypes.PULSE_VOLTAGE ||
+          comp.type === ComponentTypes.TRIGGER_PULSE ||
+          comp.type === ComponentTypes.PUSH_BUTTON ||
+          comp.type === ComponentTypes.PUSH_BUTTON_NC ||
+          comp.type === ComponentTypes.SPST_SWITCH ||
+          comp.type === ComponentTypes.SPDT_SWITCH
+        ) {
+          e.preventDefault();
+          this.triggerComponentPulse(comp);
+        }
+      }
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       this.removeSelected();
@@ -1376,6 +1392,39 @@ export class SchematicCanvas {
 
   notifyModified() {
     if (this.onCircuitModified) this.onCircuitModified(this.components, this.wires);
+  }
+
+  triggerComponentPulse(comp) {
+    if (!comp) return;
+    comp.params = comp.params || {};
+
+    if (comp.type === ComponentTypes.PULSE_VOLTAGE || comp.type === ComponentTypes.TRIGGER_PULSE) {
+      const now = this.engine ? this.engine.time : 0;
+      comp.params.lastTriggerTime = now;
+      comp.pulseAnimation = { startTime: performance.now(), duration: 450 };
+    } else if (comp.type === ComponentTypes.PUSH_BUTTON || comp.type === ComponentTypes.PUSH_BUTTON_NC) {
+      const defaultState = (comp.type === ComponentTypes.PUSH_BUTTON_NC);
+      comp.params.closed = !defaultState;
+      comp.pulseAnimation = { startTime: performance.now(), duration: 300 };
+      setTimeout(() => {
+        comp.params.closed = defaultState;
+        this.notifyModified();
+        this.render();
+      }, 150);
+    } else if (comp.type === ComponentTypes.SPST_SWITCH) {
+      comp.params.closed = !comp.params.closed;
+      comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
+    } else if (comp.type === ComponentTypes.SPDT_SWITCH) {
+      comp.params.position = comp.params.position === 1 ? 2 : 1;
+      comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
+    }
+
+    this.notifyModified();
+    this.render();
+
+    if (this.onPulseTriggered) {
+      this.onPulseTriggered(comp);
+    }
   }
 
   fitToScreen() {
@@ -1773,6 +1822,25 @@ export class SchematicCanvas {
       ctx.scale(comp.flipX ? -1 : 1, comp.flipY ? -1 : 1);
     }
 
+    if (comp.pulseAnimation) {
+      const elapsed = performance.now() - comp.pulseAnimation.startTime;
+      const prog = Math.min(elapsed / comp.pulseAnimation.duration, 1.0);
+      if (prog < 1.0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, 20 + prog * 24, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(6, 182, 212, ${1 - prog})`;
+        ctx.lineWidth = 3.5 * (1 - prog);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(6, 182, 212, ${(1 - prog) * 0.25})`;
+        ctx.fill();
+        ctx.restore();
+        requestAnimationFrame(() => this.render());
+      } else {
+        comp.pulseAnimation = null;
+      }
+    }
+
     this.drawSymbol(ctx, comp);
 
     ctx.restore();
@@ -1948,6 +2016,35 @@ export class SchematicCanvas {
         ctx.moveTo(0, 18); ctx.lineTo(0, 30);
         ctx.moveTo(-10, 6); ctx.lineTo(-10, -6); ctx.lineTo(-2, -6); ctx.lineTo(-2, 6); ctx.lineTo(10, 6);
         ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.TRIGGER_PULSE: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fillStyle = '#f0fdf4';
+        ctx.fill();
+        ctx.strokeStyle = '#059669';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -18);
+        ctx.moveTo(0, 18); ctx.lineTo(0, 30);
+        ctx.stroke();
+
+        // Inner trigger button circle
+        ctx.beginPath();
+        ctx.arc(0, 0, 11, 0, Math.PI * 2);
+        ctx.fillStyle = '#10b981';
+        ctx.fill();
+        ctx.strokeStyle = '#047857';
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚡', 0, 0);
         break;
       }
 

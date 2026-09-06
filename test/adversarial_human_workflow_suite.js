@@ -2009,6 +2009,43 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(passDiacAndTFF,
       `[DIAC & T-FlipFlop] DIAC OFF (${vOff.toFixed(2)}V), DIAC ON (${vOn.toFixed(2)}V), T-FF Toggle 0->1 (${q1.toFixed(1)}V) and 1->0 (${q2.toFixed(1)}V) on clock trigger pulses`, g10);
   }
+
+  // 10.26 Interactive Manual Trigger Pulse On-Demand Click Firing
+  {
+    const engine = new CircuitEngine();
+    const trigSrc = { id: 'VTRIG', type: ComponentTypes.TRIGGER_PULSE, params: { vHigh: 5.0, vLow: 0.0, pulseWidth: 0.001 } };
+    const rLoad = { id: 'RL', type: ComponentTypes.RESISTOR, params: { resistance: 1000 } };
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+
+    const wires = [
+      { fromPin: 'VTRIG:p_pos', toPin: 'RL:p1' },
+      { fromPin: 'RL:p2', toPin: 'GND1:p1' },
+      { fromPin: 'VTRIG:p_neg', toPin: 'GND1:p1' }
+    ];
+
+    engine.setCircuit([trigSrc, rLoad, gnd], wires);
+
+    // Initial state: Not triggered -> Vout = 0V
+    engine.time = 0.5;
+    engine.step(1e-5);
+    const nLoad = engine.getNode(rLoad, 'p1');
+    const vBefore = engine.nodeVoltages[nLoad];
+
+    // User clicks Trigger Pulse on canvas / UI at t = 0.5s
+    trigSrc.params.lastTriggerTime = 0.5;
+    engine.time = 0.5005; // 0.5ms into pulse (pulseWidth = 1ms)
+    engine.step(1e-5);
+    const vDuring = engine.nodeVoltages[nLoad];
+
+    // After pulse duration (t = 0.502s > 0.5s + 1ms) -> returns to 0V
+    engine.time = 0.502;
+    engine.step(1e-5);
+    const vAfter = engine.nodeVoltages[nLoad];
+
+    const passManualTrigger = vBefore < 0.1 && vDuring > 4.5 && vAfter < 0.1;
+    assert(passManualTrigger,
+      `[Interactive Trigger] Manual Click Trigger: Rest (${vBefore.toFixed(2)}V) -> Fired Peak (${vDuring.toFixed(2)}V) -> Rest Post-Pulse (${vAfter.toFixed(2)}V)`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

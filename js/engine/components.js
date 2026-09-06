@@ -34,6 +34,7 @@ export const ComponentTypes = {
   TRIANGLE_VOLTAGE: 'TRIANGLE_VOLTAGE',
   SAWTOOTH_VOLTAGE: 'SAWTOOTH_VOLTAGE',
   PULSE_VOLTAGE: 'PULSE_VOLTAGE',
+  TRIGGER_PULSE: 'TRIGGER_PULSE',
   AM_VOLTAGE: 'AM_VOLTAGE',
   FM_VOLTAGE: 'FM_VOLTAGE',
   NOISE_VOLTAGE: 'NOISE_VOLTAGE',
@@ -440,6 +441,23 @@ export const ComponentDefinitions = {
       { key: 'tFall', label: 'Fall Time (TF)', type: 'number', unit: 's', default: 1e-6 },
       { key: 'tWidth', label: 'Pulse Width (PW)', type: 'number', unit: 's', default: 1e-3 },
       { key: 'period', label: 'Period (PER / 0 for single pulse)', type: 'number', unit: 's', default: 2e-3 }
+    ]
+  },
+  [ComponentTypes.TRIGGER_PULSE]: {
+    name: 'Manual Trigger Pulse Button',
+    type: ComponentTypes.TRIGGER_PULSE,
+    category: ComponentCategory.SOURCES,
+    prefix: 'V_TRIG',
+    width: 50, height: 60,
+    pins: [
+      { id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' },
+      { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }
+    ],
+    params: { vHigh: 5, vLow: 0, pulseWidth: 1e-3, tRise: 1e-6, tFall: 1e-6 },
+    paramSchema: [
+      { key: 'vHigh', label: 'Pulsed Voltage (V)', type: 'number', unit: 'V', default: 5 },
+      { key: 'vLow', label: 'Rest Voltage (V)', type: 'number', unit: 'V', default: 0 },
+      { key: 'pulseWidth', label: 'Pulse Width (PW)', type: 'number', unit: 's', default: 1e-3 }
     ]
   },
   [ComponentTypes.AM_VOLTAGE]: {
