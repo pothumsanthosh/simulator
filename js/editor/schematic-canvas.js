@@ -372,8 +372,8 @@ export class SchematicCanvas {
       const dy = worldY - comp.y;
       const localX = dx * cos - dy * sin;
       const localY = dx * sin + dy * cos;
-      const hw = ((comp.width || 40) / 2) + 6;
-      const hh = ((comp.height || 40) / 2) + 6;
+      const hw = Math.max(((comp.width || 40) / 2) + 12, 20);
+      const hh = Math.max(((comp.height || 40) / 2) + 12, 20);
       if (Math.abs(localX) <= hw && Math.abs(localY) <= hh) {
         return comp;
       }
@@ -602,18 +602,15 @@ export class SchematicCanvas {
         return;
       }
 
-      // 3. Pin Click to Start Wiring (Specific 8px pin tip tolerance)
-      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
-      if (pinHit) {
-        this.wiringStartPin = pinHit;
-        this.wiringCurrentPos = pinHit.pos;
-        this.render();
-        return;
-      }
-
-      // 4. Component Selection & Dragging
+      // 3. Component Selection & Direct Dragging (Priority over pin click)
       const compHit = this.findComponentAt(worldPos.x, worldPos.y);
       if (compHit) {
+        this.isPanning = false;
+        this.isBoxSelecting = false;
+        this.isPinching = false;
+        this.wiringStartPin = null;
+        this.wiringCurrentPos = null;
+
         // Toggle interactive switch components
         if (compHit.type === ComponentTypes.SPST_SWITCH || compHit.type === ComponentTypes.PUSH_BUTTON) {
           compHit.params.closed = !compHit.params.closed;
@@ -660,15 +657,30 @@ export class SchematicCanvas {
         return;
       }
 
+      // 4. Pin Click to Start Wiring (Specific to protruding pin tips outside body)
+      const pinHit = this.findPinAt(worldPos.x, worldPos.y, 8);
+      if (pinHit) {
+        this.isDragging = false;
+        this.isPanning = false;
+        this.wiringStartPin = pinHit;
+        this.wiringCurrentPos = pinHit.pos;
+        this.render();
+        return;
+      }
+
       // 5. Wire Click
       const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
       if (wireHit) {
+        this.isDragging = false;
+        this.isPanning = false;
         this.selectWire(wireHit);
         return;
       }
 
       // 6. Empty Canvas Click -> Marquee Selection or Pan
+      this.isDragging = false;
       if (e.shiftKey) {
+        this.isPanning = false;
         this.isBoxSelecting = true;
         this.boxSelectStart = worldPos;
         this.boxSelectCurrent = worldPos;
@@ -717,17 +729,7 @@ export class SchematicCanvas {
 
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
-    if (this.isPanning) {
-      const dx = e.clientX - this.dragStartX;
-      const dy = e.clientY - this.dragStartY;
-      this.panX += dx;
-      this.panY += dy;
-      this.dragStartX = e.clientX;
-      this.dragStartY = e.clientY;
-      this.render();
-      return;
-    }
-
+    // Direct Dragging Priority: Move selected components with mouse or touch
     if (this.isDragging && this.selectedComponents.size > 0) {
       const dx = worldPos.x - this.dragStartX;
       const dy = worldPos.y - this.dragStartY;
@@ -736,6 +738,17 @@ export class SchematicCanvas {
         c.x = this.snapToGrid(initPos.x + dx);
         c.y = this.snapToGrid(initPos.y + dy);
       });
+      this.render();
+      return;
+    }
+
+    if (this.isPanning) {
+      const dx = e.clientX - this.dragStartX;
+      const dy = e.clientY - this.dragStartY;
+      this.panX += dx;
+      this.panY += dy;
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
       this.render();
       return;
     }
@@ -779,12 +792,8 @@ export class SchematicCanvas {
     try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     this.activePointers.delete(e.pointerId);
 
-    if (this.activePointers.size === 0) {
-      this.isPinching = false;
-      this.isPanning = false;
-    } else if (this.activePointers.size === 1) {
-      this.isPinching = false;
-    }
+    this.isPinching = false;
+    this.isPanning = false;
 
     // Drag-to-Connect Wiring Support (Pin-to-Pin and Pin-to-Wire)
     if (this.wiringStartPin) {
