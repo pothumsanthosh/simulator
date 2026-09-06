@@ -1565,6 +1565,39 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(snappedX === 260 && snappedY === 200,
       `[Palette Drop] Drag-and-Drop from sidebar cleanly places ${droppedType} at exact snapped grid world coordinates (260, 200)`, g10);
   }
+
+  // 10.18 Node Number Option & Live Voltage Badges
+  {
+    const eng = new CircuitEngine();
+    const v1 = { id: 'V1', type: ComponentTypes.DC_VOLTAGE, params: { voltage: 5.0 } };
+    const r1 = { id: 'R1', type: ComponentTypes.RESISTOR, params: { resistance: 1000 } };
+    const r2 = { id: 'R2', type: ComponentTypes.RESISTOR, params: { resistance: 1000 } };
+    const gnd = { id: 'GND', type: ComponentTypes.GROUND, params: {} };
+
+    const wires = [
+      { fromPin: 'V1:p_neg', toPin: 'GND:p1' },
+      { fromPin: 'R2:p2', toPin: 'GND:p1' },
+      { fromPin: 'V1:p_pos', toPin: 'R1:p1' },
+      { fromPin: 'R1:p2', toPin: 'R2:p1' }
+    ];
+
+    eng.setCircuit([v1, r1, r2, gnd], wires);
+    eng.step(1e-4);
+
+    const gndNode = eng.pinToNodeMap.get('GND:p1');
+    const v1Node = eng.pinToNodeMap.get('V1:p_pos');
+    const midNode = eng.pinToNodeMap.get('R1:p2');
+
+    const gndVoltage = eng.nodeVoltages[gndNode];
+    const v1Voltage = eng.nodeVoltages[v1Node];
+    const midVoltage = eng.nodeVoltages[midNode];
+
+    const passNodes = (gndNode === 0) && (v1Node > 0) && (midNode > 0) && (v1Node !== midNode);
+    const passVoltages = Math.abs(gndVoltage - 0.0) < 1e-4 && Math.abs(v1Voltage - 5.0) < 1e-4 && Math.abs(midVoltage - 2.5) < 1e-4;
+
+    assert(passNodes && passVoltages,
+      `[Node Option] SPICE Node Mapping (GND=0, V1=Node ${v1Node} (5.0V), Mid=Node ${midNode} (2.5V)) accurately resolved for on-canvas node badges`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

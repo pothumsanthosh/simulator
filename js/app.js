@@ -478,6 +478,16 @@ class MultisimApp {
     document.getElementById('btnZoomOut').addEventListener('click', () => this.canvas.zoomOut());
     document.getElementById('btnZoomReset').addEventListener('click', () => this.canvas.resetZoom());
 
+    const toggleNodesHandler = () => {
+      const isShown = this.canvas.toggleNodeNumbers();
+      const btn1 = document.getElementById('btnToggleNodes');
+      const btn2 = document.getElementById('btnToggleNodesToolbar');
+      if (btn1) btn1.classList.toggle('active', isShown);
+      if (btn2) btn2.classList.toggle('active', isShown);
+    };
+    document.getElementById('btnToggleNodes')?.addEventListener('click', toggleNodesHandler);
+    document.getElementById('btnToggleNodesToolbar')?.addEventListener('click', toggleNodesHandler);
+
     document.querySelectorAll('.view-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
@@ -650,8 +660,50 @@ class MultisimApp {
     const container = document.getElementById('propertiesContent');
     if (!container) return;
 
+    if (selection && selection.type === 'wire' && selection.item) {
+      const wire = selection.item;
+      const nodeId = this.engine?.pinToNodeMap?.get(wire.fromPin);
+      const volt = (nodeId !== undefined && this.engine.nodeVoltages) ? this.engine.nodeVoltages[nodeId] : null;
+      const voltStr = volt !== null && !isNaN(volt) && isFinite(volt) ? formatValueWithPrefix(volt, 'V') : '0.00 V';
+
+      container.innerHTML = `
+        <div class="property-group">
+          <label class="property-label">Connection Type</label>
+          <div style="font-size: 14px; font-weight: 700; color: #007aff;">Wire ${wire.id}</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">SPICE Electrical Node</label>
+          <div style="font-size: 16px; font-weight: 700; color: ${nodeId === 0 ? '#10b981' : '#6366f1'};">
+            Node ${nodeId === 0 ? '0 (Ground Reference)' : (nodeId !== undefined ? nodeId : 'Unconnected')}
+          </div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">Live Node Voltage</label>
+          <div style="font-size: 16px; font-weight: 700; color: #0f172a;">${voltStr}</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">From Terminal</label>
+          <div style="font-size: 12px; color: var(--text-muted); font-family: monospace;">${wire.fromPin}</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">To Terminal</label>
+          <div style="font-size: 12px; color: var(--text-muted); font-family: monospace;">${wire.toPin}</div>
+        </div>
+        <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--border-color);"/>
+        <button class="btn btn-outline" id="btnPropDeleteWire" style="color: #e11d48; width: 100%;" title="Delete Wire (Del)">🗑 Delete Wire</button>
+      `;
+
+      document.getElementById('btnPropDeleteWire')?.addEventListener('click', () => {
+        this.canvas.wires = this.canvas.wires.filter(w => w.id !== wire.id);
+        this.canvas.selectWire(null);
+        this.canvas.notifyModified();
+        this.canvas.render();
+      });
+      return;
+    }
+
     if (!selection || selection.type !== 'component' || !selection.item) {
-      container.innerHTML = `<p class="no-selection-msg">Select a component on the schematic to inspect and edit its parameters.</p>`;
+      container.innerHTML = `<p class="no-selection-msg">Select a component or wire on the schematic to inspect and edit its parameters.</p>`;
       return;
     }
 

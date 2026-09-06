@@ -31,6 +31,7 @@ export class SchematicCanvas {
     this.selectedWire = null;
     this.hoveredPin = null;
     this.hoveredComponent = null;
+    this.showNodeNumbers = true;
 
     // Interaction Modes
     this.mode = 'SELECT';
@@ -180,6 +181,12 @@ export class SchematicCanvas {
     this.mode = 'PLACE';
     this.placementComponentType = type;
     this.canvas.style.cursor = 'crosshair';
+  }
+
+  toggleNodeNumbers() {
+    this.showNodeNumbers = !this.showNodeNumbers;
+    this.render();
+    return this.showNodeNumbers;
   }
 
   removeComponent(comp) {
@@ -857,6 +864,9 @@ export class SchematicCanvas {
     } else if (!isCtrlOrCmd && (e.key === 'v' || e.key === 'V')) {
       e.preventDefault();
       this.flipSelected('y');
+    } else if (!isCtrlOrCmd && (e.key === 'n' || e.key === 'N')) {
+      e.preventDefault();
+      this.toggleNodeNumbers();
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       this.removeSelected();
@@ -1228,6 +1238,72 @@ export class SchematicCanvas {
         ctx.fill();
       }
     });
+
+    // 2.2 Render Node Numbers & Live Voltage Badges (Show Node Option)
+    if (this.showNodeNumbers && this.engine && this.engine.pinToNodeMap) {
+      const renderedNets = new Set();
+      this.wires.forEach(wire => {
+        const nodeId = this.engine.pinToNodeMap.get(wire.fromPin);
+        if (nodeId === undefined || renderedNets.has(nodeId)) return;
+        renderedNets.add(nodeId);
+
+        const waypoints = this.getWireWaypoints(wire);
+        if (waypoints.length < 2) return;
+
+        // Midpoint of the primary wire span
+        let bestSeg = { p1: waypoints[0], p2: waypoints[1], len: Math.hypot(waypoints[1].x - waypoints[0].x, waypoints[1].y - waypoints[0].y) };
+        for (let i = 1; i < waypoints.length - 1; i++) {
+          const l = Math.hypot(waypoints[i + 1].x - waypoints[i].x, waypoints[i + 1].y - waypoints[i].y);
+          if (l > bestSeg.len) {
+            bestSeg = { p1: waypoints[i], p2: waypoints[i + 1], len: l };
+          }
+        }
+
+        const midX = (bestSeg.p1.x + bestSeg.p2.x) / 2;
+        const midY = (bestSeg.p1.y + bestSeg.p2.y) / 2;
+        const isSelected = this.selectedWire === wire;
+
+        const label = nodeId === 0 ? '0 (GND)' : `${nodeId}`;
+        let voltStr = '';
+        if (this.engine.nodeVoltages && this.engine.nodeVoltages[nodeId] !== undefined) {
+          const v = this.engine.nodeVoltages[nodeId];
+          if (!isNaN(v) && isFinite(v)) {
+            voltStr = formatValueWithPrefix(v, 'V');
+          }
+        }
+
+        const displayText = isSelected && voltStr ? `Node ${label}: ${voltStr}` : `${label}`;
+
+        ctx.save();
+        ctx.font = 'bold 8.5px "Roboto Mono", monospace';
+        const textWidth = ctx.measureText(displayText).width;
+        const padX = 4;
+        const boxW = textWidth + padX * 2;
+        const boxH = 14;
+
+        // Draw pill badge
+        ctx.fillStyle = isSelected ? '#eff6ff' : (nodeId === 0 ? '#ecfdf5' : '#f8fafc');
+        ctx.strokeStyle = isSelected ? '#3b82f6' : (nodeId === 0 ? '#10b981' : '#94a3b8');
+        ctx.lineWidth = 1.0;
+
+        ctx.beginPath();
+        const rx = midX - boxW / 2;
+        const ry = midY - boxH / 2 - 8;
+        if (ctx.roundRect) {
+          ctx.roundRect(rx, ry, boxW, boxH, 3);
+        } else {
+          ctx.rect(rx, ry, boxW, boxH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = isSelected ? '#1d4ed8' : (nodeId === 0 ? '#047857' : '#334155');
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displayText, midX, ry + boxH / 2);
+        ctx.restore();
+      });
+    }
   }
 
   renderPins(ctx, vpLeft, vpTop, vpRight, vpBottom) {
