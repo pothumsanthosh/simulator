@@ -224,14 +224,22 @@ export const ComponentTypes = {
   SPEAKER: 'SPEAKER',
   BUZZER: 'BUZZER',
   LAMP: 'LAMP',
+  LIGHT: 'LAMP',
+  BULB: 'LAMP',
 
   // Opto & Displays
   OPTOCOUPLER: 'OPTOCOUPLER',
   SEVEN_SEGMENT: 'SEVEN_SEGMENT',
+  SEVEN_SEG_DISPLAY: 'SEVEN_SEGMENT',
   SEVEN_SEGMENT_DUAL: 'SEVEN_SEGMENT_DUAL',
   SEVEN_SEGMENT_QUAD: 'SEVEN_SEGMENT_QUAD',
   BARGRAPH_LED: 'BARGRAPH_LED',
   HEX_DISPLAY: 'HEX_DISPLAY',
+
+  // Aliases for Switches & Analog
+  SWITCH_SPST: 'SPST_SWITCH',
+  TOGGLE_SWITCH: 'SPDT_SWITCH',
+  OP_AMP: 'OPAMP',
 
   // Sensors
   TEMP_SENSOR_LM35: 'TEMP_SENSOR_LM35',
@@ -1575,6 +1583,56 @@ export const ComponentDefinitions = {
     paramSchema: [{ key: 'color', label: 'Display Color', type: 'select', options: ['#ff3b30', '#03b585', '#007aff', '#ff9500'], default: '#ff3b30' }]
   },
 
+  [ComponentTypes.LAMP]: {
+    name: 'Incandescent Lamp / Light Bulb',
+    type: ComponentTypes.LAMP,
+    category: ComponentCategory.OPTO_DISPLAYS,
+    prefix: 'LAMP',
+    width: 40, height: 40,
+    pins: [
+      { id: 'p1', name: '1', x: -20, y: 0, dir: 'left' },
+      { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }
+    ],
+    params: { ratedVoltage: 9, ratedPower: 2, nominalR: 40.5 },
+    paramSchema: [
+      { key: 'ratedVoltage', label: 'Rated Voltage (V)', type: 'number', unit: 'V', default: 9, step: 0.5 },
+      { key: 'ratedPower', label: 'Rated Power (W)', type: 'number', unit: 'W', default: 2, step: 0.1 },
+      { key: 'nominalR', label: 'Resistance (Cold)', type: 'number', unit: 'Ω', default: 40.5, step: 1 }
+    ]
+  },
+  [ComponentTypes.BUZZER]: {
+    name: 'Piezo Buzzer / Sounder',
+    type: ComponentTypes.BUZZER,
+    category: ComponentCategory.ELECTROMECHANICAL,
+    prefix: 'BZ',
+    width: 40, height: 40,
+    pins: [
+      { id: 'p1', name: '+', x: -20, y: 0, dir: 'left' },
+      { id: 'p2', name: '-', x: 20, y: 0, dir: 'right' }
+    ],
+    params: { resistance: 50, frequency: 2400 },
+    paramSchema: [
+      { key: 'resistance', label: 'Impedance', type: 'number', unit: 'Ω', default: 50 },
+      { key: 'frequency', label: 'Resonant Frequency', type: 'number', unit: 'Hz', default: 2400 }
+    ]
+  },
+  [ComponentTypes.DC_MOTOR]: {
+    name: 'DC Motor',
+    type: ComponentTypes.DC_MOTOR,
+    category: ComponentCategory.ELECTROMECHANICAL,
+    prefix: 'M',
+    width: 40, height: 40,
+    pins: [
+      { id: 'p1', name: '+', x: -20, y: 0, dir: 'left' },
+      { id: 'p2', name: '-', x: 20, y: 0, dir: 'right' }
+    ],
+    params: { resistance: 12, rpm: 3000 },
+    paramSchema: [
+      { key: 'resistance', label: 'Armature Resistance', type: 'number', unit: 'Ω', default: 12 },
+      { key: 'rpm', label: 'Rated RPM', type: 'number', default: 3000 }
+    ]
+  },
+
   // =================== 13. POWER SYMBOLS & NET LABELS ===================
   [ComponentTypes.POWER_VCC]: {
     name: 'Power Rail (+5V VCC)',
@@ -1705,3 +1763,12 @@ export const ComponentDefinitions = {
     params: {}, paramSchema: []
   }
 };
+
+// Aliases mapping in ComponentDefinitions for maximum compatibility
+ComponentDefinitions.SWITCH_SPST = ComponentDefinitions[ComponentTypes.SPST_SWITCH];
+ComponentDefinitions.TOGGLE_SWITCH = ComponentDefinitions[ComponentTypes.SPDT_SWITCH];
+ComponentDefinitions.SEVEN_SEG_DISPLAY = ComponentDefinitions[ComponentTypes.SEVEN_SEGMENT];
+ComponentDefinitions.LIGHT = ComponentDefinitions[ComponentTypes.LAMP];
+ComponentDefinitions.BULB = ComponentDefinitions[ComponentTypes.LAMP];
+ComponentDefinitions.OP_AMP = ComponentDefinitions[ComponentTypes.OPAMP];
+

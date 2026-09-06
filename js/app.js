@@ -165,7 +165,7 @@ class SwitchaApp {
           { id: 'txt1', type: ComponentTypes.TEXT_LABEL, x: 340, y: 50, params: { text: 'INTERACTIVE SWITCH & LED LAMP', fontSize: 14, bold: true, color: '#334155' }, rotation: 0, flipX: false, flipY: false },
           { id: 'v1', type: ComponentTypes.DC_VOLTAGE, x: 120, y: 220, params: { voltage: 9 }, rotation: 0, flipX: false, flipY: false },
           { id: 'gnd1', type: ComponentTypes.GROUND, x: 120, y: 340, params: {}, rotation: 0, flipX: false, flipY: false },
-          { id: 'sw1', type: ComponentTypes.SWITCH_SPST, x: 260, y: 140, params: { closed: true, name: 'Main Power' }, rotation: 0, flipX: false, flipY: false },
+          { id: 'sw1', type: ComponentTypes.SPST_SWITCH, x: 260, y: 140, params: { closed: true, name: 'Main Power' }, rotation: 0, flipX: false, flipY: false },
           { id: 'lamp1', type: ComponentTypes.LAMP, x: 420, y: 140, params: { ratedVoltage: 9, ratedPower: 2 }, rotation: 0, flipX: false, flipY: false },
           { id: 'r1', type: ComponentTypes.RESISTOR, x: 340, y: 260, params: { resistance: 330 }, rotation: 0, flipX: false, flipY: false },
           { id: 'led1', type: ComponentTypes.LED, x: 440, y: 260, params: { color: '#ff3b30' }, rotation: 0, flipX: false, flipY: false },
@@ -990,11 +990,14 @@ class SwitchaApp {
         return `<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="#2b2d2f"/><circle cx="19" cy="12" r="2" fill="#2b2d2f"/><line x1="5" y1="12" x2="16" y2="6" stroke="#2b2d2f" stroke-width="2"/></svg>`;
 
       // 11. Electromechanical & Motors
+      case ComponentTypes.LAMP:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="11" r="7" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.6"/><path d="M10,18 L14,18 M11,20 L13,20" stroke="#64748b" stroke-width="1.5"/><path d="M9,9 L15,13 M9,13 L15,9" stroke="#f59e0b" stroke-width="1.4"/></svg>`;
       case ComponentTypes.DC_MOTOR:
       case ComponentTypes.STEPPER_MOTOR:
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#2b2d2f" stroke-width="1.8" fill="#f8fafc"/><text x="12" y="15" font-size="8" text-anchor="middle" font-weight="bold" fill="#0284c7">M</text></svg>`;
       case ComponentTypes.BUZZER:
       case ComponentTypes.SPEAKER:
-        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#2b2d2f" stroke-width="1.8" fill="none"/><text x="12" y="15" font-size="8" text-anchor="middle" font-weight="bold" fill="#e11d48">M</text></svg>`;
+        return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#2b2d2f" stroke-width="1.8" fill="#f8fafc"/><path d="M9,9 L9,15 M12,7 L12,17 M15,9 L15,15" stroke="#e11d48" stroke-width="1.5"/></svg>`;
 
       // 12. Opto & Displays
       case ComponentTypes.SEVEN_SEGMENT:

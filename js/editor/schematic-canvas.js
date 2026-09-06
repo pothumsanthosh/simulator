@@ -691,7 +691,9 @@ export class SchematicCanvas {
           compHit.type === ComponentTypes.PUSH_BUTTON ||
           compHit.type === ComponentTypes.PUSH_BUTTON_NC ||
           compHit.type === ComponentTypes.SPST_SWITCH ||
+          compHit.type === 'SWITCH_SPST' ||
           compHit.type === ComponentTypes.SPDT_SWITCH ||
+          compHit.type === 'TOGGLE_SWITCH' ||
           compHit.type === ComponentTypes.DIGITAL_CONSTANT ||
           compHit.type === ComponentTypes.DIGITAL_SWITCH
         ) {
@@ -1434,10 +1436,10 @@ export class SchematicCanvas {
         this.notifyModified();
         this.render();
       }, 150);
-    } else if (comp.type === ComponentTypes.SPST_SWITCH) {
+    } else if (comp.type === ComponentTypes.SPST_SWITCH || comp.type === 'SWITCH_SPST') {
       comp.params.closed = !comp.params.closed;
       comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
-    } else if (comp.type === ComponentTypes.SPDT_SWITCH) {
+    } else if (comp.type === ComponentTypes.SPDT_SWITCH || comp.type === 'TOGGLE_SWITCH') {
       comp.params.position = comp.params.position === 1 ? 2 : 1;
       comp.pulseAnimation = { startTime: performance.now(), duration: 250 };
     } else if (comp.type === ComponentTypes.DIGITAL_CONSTANT || comp.type === ComponentTypes.DIGITAL_SWITCH) {
@@ -2376,12 +2378,39 @@ export class SchematicCanvas {
       case ComponentTypes.SCHOTTKY:
       case ComponentTypes.ZENER:
       case ComponentTypes.LED: {
+        let isLit = false;
+        let vDrop = 0;
+        const ledColor = comp.params?.color || '#ff3b30';
+
+        if (comp.type === ComponentTypes.LED && this.engine && this.engine.nodeVoltages) {
+          const nA = this.engine.getNode(comp, 'anode');
+          const nK = this.engine.getNode(comp, 'cathode');
+          const vA = nA !== -1 ? (this.engine.nodeVoltages[nA] || 0) : 0;
+          const vK = nK !== -1 ? (this.engine.nodeVoltages[nK] || 0) : 0;
+          vDrop = vA - vK;
+          isLit = vDrop >= 1.4;
+        }
+
+        if (isLit) {
+          // Radiant glowing illumination halo around active LED
+          ctx.save();
+          const radGlow = ctx.createRadialGradient(0, 0, 2, 0, 0, 28);
+          radGlow.addColorStop(0, ledColor);
+          radGlow.addColorStop(0.4, ledColor.startsWith('#') ? `${ledColor}99` : 'rgba(255, 59, 48, 0.6)');
+          radGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = radGlow;
+          ctx.beginPath();
+          ctx.arc(0, 0, 28, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
         ctx.beginPath();
         ctx.moveTo(-20, 0); ctx.lineTo(-8, 0);
         ctx.moveTo(8, 0); ctx.lineTo(20, 0);
         ctx.moveTo(-8, -12); ctx.lineTo(8, 0); ctx.lineTo(-8, 12);
         ctx.closePath();
-        ctx.fillStyle = '#e11d48';
+        ctx.fillStyle = isLit ? ledColor : (comp.type === ComponentTypes.LED ? ledColor : '#e11d48');
         ctx.fill();
         ctx.stroke();
 
@@ -2396,10 +2425,17 @@ export class SchematicCanvas {
         ctx.stroke();
 
         if (comp.type === ComponentTypes.LED) {
+          ctx.save();
           ctx.beginPath();
+          ctx.strokeStyle = isLit ? ledColor : '#2b2d2f';
+          ctx.lineWidth = isLit ? 2.2 : 1.5;
           ctx.moveTo(2, -12); ctx.lineTo(10, -20);
           ctx.moveTo(8, -12); ctx.lineTo(16, -20);
+          // Arrow heads
+          ctx.moveTo(7, -20); ctx.lineTo(10, -20); ctx.lineTo(10, -17);
+          ctx.moveTo(13, -20); ctx.lineTo(16, -20); ctx.lineTo(16, -17);
           ctx.stroke();
+          ctx.restore();
         }
         break;
       }
@@ -2534,6 +2570,7 @@ export class SchematicCanvas {
       }
 
       case ComponentTypes.OPAMP:
+      case ComponentTypes.OP_AMP:
       case ComponentTypes.COMPARATOR: {
         ctx.beginPath();
         // Input and Output Lead lines
@@ -2707,7 +2744,8 @@ export class SchematicCanvas {
         break;
       }
 
-      case ComponentTypes.SPST_SWITCH: {
+      case ComponentTypes.SPST_SWITCH:
+      case ComponentTypes.SWITCH_SPST: {
         ctx.beginPath();
         ctx.moveTo(-20, 0); ctx.lineTo(-10, 0);
         ctx.moveTo(10, 0); ctx.lineTo(20, 0);
@@ -2752,21 +2790,33 @@ export class SchematicCanvas {
         const w = 34;
         const h = 20;
 
+        if (state) {
+          // Vibrant active green glow aura around switch
+          ctx.save();
+          ctx.fillStyle = 'rgba(3, 181, 133, 0.25)';
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 4) : ctx.rect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
+          ctx.fill();
+          ctx.restore();
+        }
+
         // Outer chassis box
         ctx.beginPath();
-        ctx.rect(-w / 2, -h / 2, w, h);
-        ctx.fillStyle = '#f1f5f9';
+        if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, 3);
+        else ctx.rect(-w / 2, -h / 2, w, h);
+        ctx.fillStyle = state ? '#03b585' : '#f1f5f9';
         ctx.fill();
-        ctx.strokeStyle = '#64748b';
+        ctx.strokeStyle = state ? '#028562' : '#64748b';
         ctx.lineWidth = 1.6;
         ctx.stroke();
 
         // Active state indicator sub-box
         ctx.beginPath();
-        ctx.rect(-w / 2 + 10, -h / 2 + 2, w - 12, h - 4);
-        ctx.fillStyle = state ? '#1e293b' : '#ffffff';
+        if (ctx.roundRect) ctx.roundRect(-w / 2 + 10, -h / 2 + 2, w - 12, h - 4, 2);
+        else ctx.rect(-w / 2 + 10, -h / 2 + 2, w - 12, h - 4);
+        ctx.fillStyle = state ? '#02674c' : '#ffffff';
         ctx.fill();
-        ctx.strokeStyle = state ? '#0f172a' : '#cbd5e1';
+        ctx.strokeStyle = state ? '#014d38' : '#cbd5e1';
         ctx.lineWidth = 1.2;
         ctx.stroke();
 
@@ -2834,7 +2884,8 @@ export class SchematicCanvas {
         break;
       }
 
-      case ComponentTypes.SPDT_SWITCH: {
+      case ComponentTypes.SPDT_SWITCH:
+      case ComponentTypes.TOGGLE_SWITCH: {
         ctx.beginPath();
         ctx.moveTo(-25, 0); ctx.lineTo(-12, 0);
         ctx.moveTo(12, -15); ctx.lineTo(25, -15);
@@ -3025,7 +3076,123 @@ export class SchematicCanvas {
         break;
       }
 
-      case ComponentTypes.SEVEN_SEGMENT: {
+      case ComponentTypes.LAMP:
+      case ComponentTypes.LIGHT:
+      case ComponentTypes.BULB: {
+        let isLit = false;
+        let vLamp = 0;
+        if (this.engine && this.engine.nodeVoltages) {
+          const n1 = this.engine.getNode(comp, 'p1');
+          const n2 = this.engine.getNode(comp, 'p2');
+          const v1 = n1 !== -1 ? (this.engine.nodeVoltages[n1] || 0) : 0;
+          const v2 = n2 !== -1 ? (this.engine.nodeVoltages[n2] || 0) : 0;
+          vLamp = Math.abs(v1 - v2);
+          isLit = vLamp >= 0.4;
+        }
+
+        const ratedV = comp.params?.ratedVoltage || 9;
+        const brightness = Math.min(Math.max(vLamp / ratedV, 0), 1.5);
+
+        // Terminal leads
+        ctx.beginPath();
+        ctx.moveTo(-20, 0); ctx.lineTo(-14, 0);
+        ctx.moveTo(14, 0); ctx.lineTo(20, 0);
+        ctx.strokeStyle = '#2b2d2f';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        if (isLit && brightness > 0.05) {
+          // Radiant luminous halo around light bulb
+          ctx.save();
+          const glowRadius = Math.min(22 + brightness * 18, 48);
+          const bulbGlow = ctx.createRadialGradient(0, 0, 4, 0, 0, glowRadius);
+          bulbGlow.addColorStop(0, 'rgba(254, 240, 138, 0.95)');
+          bulbGlow.addColorStop(0.35, 'rgba(251, 191, 36, 0.7)');
+          bulbGlow.addColorStop(0.7, 'rgba(245, 158, 11, 0.25)');
+          bulbGlow.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          ctx.fillStyle = bulbGlow;
+          ctx.beginPath();
+          ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Radiant light emission flares
+          ctx.strokeStyle = `rgba(251, 191, 36, ${Math.min(brightness * 0.85, 0.95)})`;
+          ctx.lineWidth = 1.5;
+          const numRays = 8;
+          for (let r = 0; r < numRays; r++) {
+            const angle = (r * Math.PI * 2) / numRays;
+            const r1 = 17;
+            const r2 = 22 + brightness * 6;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
+            ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Glass bulb circular envelope
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.fillStyle = isLit ? `rgba(254, 243, 199, ${Math.min(0.4 + brightness * 0.5, 0.95)})` : '#f8fafc';
+        ctx.fill();
+        ctx.strokeStyle = isLit ? '#d97706' : '#2b2d2f';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // Internal filament cross / loop
+        ctx.beginPath();
+        ctx.moveTo(-9, -9); ctx.lineTo(9, 9);
+        ctx.moveTo(-9, 9); ctx.lineTo(9, -9);
+        ctx.strokeStyle = isLit ? '#ffffff' : '#64748b';
+        ctx.lineWidth = isLit ? 2.2 : 1.5;
+        if (isLit) {
+          ctx.save();
+          ctx.shadowColor = '#f59e0b';
+          ctx.shadowBlur = 8;
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case ComponentTypes.BUZZER: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.strokeStyle = '#2b2d2f';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        // Sound waves
+        ctx.beginPath();
+        ctx.moveTo(-6, -6); ctx.lineTo(-6, 6);
+        ctx.moveTo(0, -9); ctx.lineTo(0, 9);
+        ctx.moveTo(6, -6); ctx.lineTo(6, 6);
+        ctx.stroke();
+        break;
+      }
+
+      case ComponentTypes.DC_MOTOR: {
+        ctx.beginPath();
+        ctx.arc(0, 0, 16, 0, Math.PI * 2);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.strokeStyle = '#2b2d2f';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#0284c7';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('M', 0, 0);
+        break;
+      }
+
+      case ComponentTypes.SEVEN_SEGMENT:
+      case ComponentTypes.SEVEN_SEG_DISPLAY: {
         ctx.beginPath();
         ctx.rect(-28, -38, 56, 76);
         ctx.fillStyle = '#0f172a';

@@ -37,6 +37,9 @@ export class CircuitEngine {
     this.components = components || [];
     this.wires = wires || [];
     this.buildTopology();
+    try {
+      this.step(1e-5);
+    } catch (_) {}
   }
 
   buildTopology() {
@@ -1009,7 +1012,8 @@ export class CircuitEngine {
           }
 
           // --- ANALOG ICS & OP-AMPS ---
-          case ComponentTypes.OPAMP: {
+          case ComponentTypes.OPAMP:
+          case ComponentTypes.OP_AMP: {
             const nInv = this.getNode(comp, 'in_inv');
             const nNonInv = this.getNode(comp, 'in_noninv');
             const nOut = this.getNode(comp, 'out');
@@ -1511,6 +1515,7 @@ export class CircuitEngine {
 
           // --- SWITCHES & RELAYS ---
           case ComponentTypes.SPST_SWITCH:
+          case ComponentTypes.SWITCH_SPST:
           case ComponentTypes.PUSH_BUTTON:
           case ComponentTypes.PUSH_BUTTON_NC: {
             const n1 = this.getNode(comp, 'p1');
@@ -1520,13 +1525,43 @@ export class CircuitEngine {
             break;
           }
 
-          case ComponentTypes.SPDT_SWITCH: {
+          case ComponentTypes.SPDT_SWITCH:
+          case ComponentTypes.TOGGLE_SWITCH: {
             const nCom = this.getNode(comp, 'com');
             const nP1 = this.getNode(comp, 'p1');
             const nP2 = this.getNode(comp, 'p2');
             const pos = p.position ?? 1;
             stampConductance(nCom, nP1, pos === 1 ? 1 / 0.01 : 1e-9);
             stampConductance(nCom, nP2, pos === 2 ? 1 / 0.01 : 1e-9);
+            break;
+          }
+
+          // --- ELECTROMECHANICAL & LAMPS ---
+          case ComponentTypes.LAMP:
+          case ComponentTypes.LIGHT:
+          case ComponentTypes.BULB: {
+            const n1 = this.getNode(comp, 'p1');
+            const n2 = this.getNode(comp, 'p2');
+            const ratedV = p.ratedVoltage || 9;
+            const ratedP = p.ratedPower || 2;
+            const rNominal = p.nominalR || ((ratedV * ratedV) / ratedP) || 40.5;
+            stampConductance(n1, n2, 1 / Math.max(rNominal, 0.1));
+            break;
+          }
+
+          case ComponentTypes.BUZZER: {
+            const n1 = this.getNode(comp, 'p1');
+            const n2 = this.getNode(comp, 'p2');
+            const rBuzzer = p.resistance || 50;
+            stampConductance(n1, n2, 1 / Math.max(rBuzzer, 0.1));
+            break;
+          }
+
+          case ComponentTypes.DC_MOTOR: {
+            const n1 = this.getNode(comp, 'p1');
+            const n2 = this.getNode(comp, 'p2');
+            const rMotor = p.resistance || 12;
+            stampConductance(n1, n2, 1 / Math.max(rMotor, 0.1));
             break;
           }
 
@@ -1569,6 +1604,7 @@ export class CircuitEngine {
           }
 
           case ComponentTypes.SEVEN_SEGMENT:
+          case ComponentTypes.SEVEN_SEG_DISPLAY:
           case ComponentTypes.SEVEN_SEGMENT_DUAL:
           case ComponentTypes.SEVEN_SEGMENT_QUAD: {
             const segPins = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'dp'];
@@ -1757,5 +1793,15 @@ export class CircuitEngine {
     }
 
     return x;
+  }
+
+  getPinVoltage(comp, pinId) {
+    if (!comp || !this.nodeVoltages) return 0;
+    const node = this.getNode(comp, pinId);
+    return node !== -1 ? (this.nodeVoltages[node] || 0) : 0;
+  }
+
+  getComponentVoltage(comp, pin1 = 'p1', pin2 = 'p2') {
+    return Math.abs(this.getPinVoltage(comp, pin1) - this.getPinVoltage(comp, pin2));
   }
 }

@@ -729,5 +729,40 @@ export const CircuitLibrary = {
 
       canvas.fitToScreen();
     }
+  },
+
+  // 15. Interactive Switch & LED / Light Bulb
+  switchSpstLamp: {
+    id: 'switch-spst-lamp',
+    name: 'Interactive Switch & Light Bulb / LED Lamp',
+    description: 'Dual interactive switch setup: SPST toggle switch powering an incandescent light bulb and glowing LED indicator with 9V DC source.',
+    author: 'Switcha Studio',
+    stats: { stars: 215, copies: 840, views: 154200 },
+    load(canvas) {
+      canvas.components = [];
+      canvas.wires = [];
+
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 340, 40, { text: 'INTERACTIVE SWITCH & LIGHT BULB / LED LAMP', fontSize: 14, bold: true, color: '#334155' }, 0);
+      const v1 = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 120, 200, { voltage: 9 }, 0);
+      const gnd1 = canvas.addComponent(ComponentTypes.GROUND, 120, 320, {}, 0);
+      const sw1 = canvas.addComponent(ComponentTypes.SPST_SWITCH, 260, 140, { closed: true, name: 'Main Power' }, 0);
+      const lamp1 = canvas.addComponent(ComponentTypes.LAMP, 420, 140, { ratedVoltage: 9, ratedPower: 2 }, 0);
+      const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 340, 260, { resistance: 330 }, 0);
+      const led1 = canvas.addComponent(ComponentTypes.LED, 440, 260, { color: '#ff3b30' }, 0);
+      const pr1 = canvas.addComponent(ComponentTypes.PROBE_V, 520, 80, { color: '#03b585', label: 'V_switched' }, 0);
+
+      canvas.wires = [
+        { id: 'w1', fromPin: `${v1.id}:p_neg`, toPin: `${gnd1.id}:p1` },
+        { id: 'w2', fromPin: `${v1.id}:p_pos`, toPin: `${sw1.id}:p1` },
+        { id: 'w3', fromPin: `${sw1.id}:p2`, toPin: `${lamp1.id}:p1` },
+        { id: 'w4', fromPin: `${sw1.id}:p2`, toPin: `${r1.id}:p1` },
+        { id: 'w5', fromPin: `${sw1.id}:p2`, toPin: `${pr1.id}:tip` },
+        { id: 'w6', fromPin: `${lamp1.id}:p2`, toPin: `${gnd1.id}:p1` },
+        { id: 'w7', fromPin: `${r1.id}:p2`, toPin: `${led1.id}:anode` },
+        { id: 'w8', fromPin: `${led1.id}:cathode`, toPin: `${gnd1.id}:p1` }
+      ];
+
+      canvas.fitToScreen();
+    }
   }
 };
