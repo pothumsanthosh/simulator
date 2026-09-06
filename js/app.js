@@ -1,7 +1,7 @@
 /**
- * Multisim Live Main Application Controller
+ * ElectroSim Main Application Controller
  * Routing, Component Palette, Simulation Loop, Properties Inspector,
- * SPICE Netlist Exporter, JSON Project Persistence, and UI Bindings.
+ * SPICE Netlist Exporter, JSON Project Persistence, and PWA Offline Suite.
  */
 
 import { ComponentTypes, ComponentDefinitions, ComponentCategory, formatValueWithPrefix, parseEngineeringValue } from './engine/components.js';
@@ -10,7 +10,7 @@ import { SchematicCanvas } from './editor/schematic-canvas.js';
 import { CircuitGrapher } from './editor/grapher.js';
 import { CircuitLibrary } from './editor/circuit-library.js';
 
-class MultisimApp {
+class ElectroSimApp {
   constructor() {
     this.engine = new CircuitEngine();
     this.canvas = null;
@@ -66,10 +66,12 @@ class MultisimApp {
     // 2. Build Component Palette Sidebar
     this.buildPalette();
 
-    // 3. Setup UI Event Listeners & Router
+    // 3. Setup UI Event Listeners, PWA & Router
+    this.initPWA();
     this.initRouter();
     this.initToolbarControls();
     this.initModals();
+    this.initFeaturedCards();
     this.initDiscoverPage();
     this.initSplitGutter();
     this.initQuickSearch();
@@ -110,8 +112,6 @@ class MultisimApp {
         this.switchView('discover');
       } else if (hash.startsWith('#/features')) {
         this.switchView('features');
-      } else if (hash.startsWith('#/pricing')) {
-        this.switchView('pricing');
       } else {
         this.switchView('home');
       }
@@ -131,7 +131,6 @@ class MultisimApp {
     // Update nav links
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     if (viewName === 'features') document.getElementById('nav-features')?.classList.add('active');
-    if (viewName === 'pricing') document.getElementById('nav-pricing')?.classList.add('active');
     if (viewName === 'discover') document.getElementById('nav-circuits')?.classList.add('active');
 
     if (viewName === 'studio') {
@@ -1228,7 +1227,7 @@ class MultisimApp {
     if (nameInput) nameInput.value = preset.name;
     const select = document.getElementById('circuitPresetSelect');
     if (select) select.value = presetKey;
-    document.title = `${preset.name} - Multisim Live`;
+    document.title = `${preset.name} - ElectroSim`;
 
     setTimeout(() => {
       this.canvas.resize();
@@ -1237,6 +1236,455 @@ class MultisimApp {
       this.canvas.render();
       this.grapher.render();
     }, 50);
+  }
+
+  // --- Progressive Web App (PWA) Offline & Install Handler ---
+  initPWA() {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+          console.log('[ElectroSim] Service Worker registered successfully:', reg.scope);
+        }).catch((err) => {
+          console.warn('[ElectroSim] Service Worker registration failed:', err);
+        });
+      });
+    }
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtns = [
+        document.getElementById('btnNavInstall'),
+        document.getElementById('btnHeroInstall'),
+        document.getElementById('footerInstallLink')
+      ];
+      installBtns.forEach(btn => {
+        if (btn) btn.style.display = 'inline-flex';
+      });
+    });
+
+    const triggerInstall = () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('[ElectroSim] User accepted PWA installation');
+          }
+          deferredPrompt = null;
+        });
+      } else {
+        document.getElementById('installModal')?.classList.add('active');
+      }
+    };
+
+    document.getElementById('btnNavInstall')?.addEventListener('click', triggerInstall);
+    document.getElementById('btnHeroInstall')?.addEventListener('click', triggerInstall);
+    document.getElementById('footerInstallLink')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      triggerInstall();
+    });
+    document.getElementById('btnTriggerInstallPrompt')?.addEventListener('click', () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+      } else {
+        alert('To install ElectroSim on iOS/Safari, tap the Share icon ⎋ and select "Add to Home Screen ⊕". On desktop browsers, click the ⊕ icon in your address bar.');
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('[ElectroSim] App was successfully installed!');
+      const installBtn = document.getElementById('btnNavInstall');
+      if (installBtn) installBtn.textContent = '✓ App Installed';
+    });
+  }
+
+  // --- Featured Circuits on Homepage ---
+  initFeaturedCards() {
+    const grid = document.getElementById('featured-cards-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const featuredKeys = ['buckConverter', 'timer555', 'opAmpAmplifier', 'bridgeRectifier', 'classABAmplifier', 'binaryCounter7Seg'];
+    featuredKeys.forEach(key => {
+      const c = CircuitLibrary[key];
+      if (!c) return;
+
+      const cardEl = document.createElement('div');
+      cardEl.className = 'card';
+      cardEl.innerHTML = `
+        ${this.renderCircuitThumbnailSvg(key, 'Featured')}
+        <div class="card-body">
+          <div class="card-author-row">
+            <div class="card-avatar">${c.author.substr(0, 2).toUpperCase()}</div>
+            <div class="card-author-info">
+              <div class="card-author-name">${c.author}</div>
+              <div class="card-author-date">Verified Circuit</div>
+            </div>
+          </div>
+          <h3 class="card-title">${c.name}</h3>
+          <p class="card-desc">${c.description}</p>
+          <div class="card-stats">
+            <span class="card-stat-item">★ ${c.stats.stars}</span>
+            <span class="card-stat-item">⎘ ${c.stats.copies}</span>
+            <span class="card-stat-item">👁 ${c.stats.views.toLocaleString()}</span>
+          </div>
+          <button class="btn btn-primary card-action-btn" data-key="${key}">⚡ Simulate Circuit</button>
+        </div>
+      `;
+
+      cardEl.querySelector('button').addEventListener('click', () => {
+        this.loadCircuitPreset(key);
+        window.location.hash = '#/create';
+      });
+
+      grid.appendChild(cardEl);
+    });
+  }
+
+  // --- Rich Electronic Schematic SVG Generator for Discover & Featured Cards ---
+  renderCircuitThumbnailSvg(key, badge = 'Public') {
+    const badgeHtml = badge ? `<span class="card-badge">${badge}</span>` : '';
+    
+    const gridDef = `
+      <defs>
+        <pattern id="thumb_grid_${key}" width="16" height="16" patternUnits="userSpaceOnUse">
+          <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(203, 213, 225, 0.45)" stroke-width="0.8"/>
+        </pattern>
+      </defs>
+      <rect width="280" height="160" fill="#f8fafc"/>
+      <rect width="280" height="160" fill="url(#thumb_grid_${key})"/>
+    `;
+
+    let innerContent = '';
+
+    switch (key) {
+      case 'buckConverter':
+        innerContent = `
+          <!-- DC In (12V) -->
+          <circle cx="40" cy="80" r="15" fill="#eff6ff" stroke="#0284c7" stroke-width="2"/>
+          <text x="40" y="83" font-size="9" text-anchor="middle" font-weight="bold" fill="#0284c7">+12V</text>
+          <line x1="40" y1="65" x2="40" y2="40" stroke="#0284c7" stroke-width="2"/>
+          <line x1="40" y1="40" x2="80" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <!-- Switch / Clock -->
+          <rect x="80" y="30" width="28" height="20" rx="3" fill="#ffffff" stroke="#1e293b" stroke-width="2"/>
+          <polyline points="84,45 90,35 96,45 102,35" fill="none" stroke="#6366f1" stroke-width="1.8"/>
+          <!-- Node 1 -->
+          <line x1="108" y1="40" x2="135" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="135" cy="40" r="3.5" fill="#1e293b"/>
+          <!-- Inductor (L1) -->
+          <path d="M135,40 Q141,24 147,40 Q153,24 159,40 Q165,24 171,40 Q177,24 183,40" fill="none" stroke="#03b585" stroke-width="2.5" stroke-linecap="round"/>
+          <text x="159" y="20" font-size="8.5" text-anchor="middle" font-weight="bold" fill="#03b585">L1 220µH</text>
+          <!-- Diode (D1) -->
+          <line x1="135" y1="40" x2="135" y2="70" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="127,85 143,85 135,70" fill="#ef4444" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="125" y1="70" x2="145" y2="70" stroke="#ef4444" stroke-width="2.5"/>
+          <line x1="135" y1="85" x2="135" y2="120" stroke="#1e293b" stroke-width="2"/>
+          <!-- Node 2 Out -->
+          <line x1="183" y1="40" x2="215" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="215" cy="40" r="3.5" fill="#1e293b"/>
+          <!-- Cap (C1) -->
+          <line x1="215" y1="40" x2="215" y2="65" stroke="#1e293b" stroke-width="2"/>
+          <line x1="205" y1="65" x2="225" y2="65" stroke="#0284c7" stroke-width="2.5"/>
+          <line x1="205" y1="73" x2="225" y2="73" stroke="#0284c7" stroke-width="2.5"/>
+          <line x1="215" y1="73" x2="215" y2="120" stroke="#1e293b" stroke-width="2"/>
+          <!-- Load Resistor (RL) -->
+          <line x1="215" y1="40" x2="250" y2="40" stroke="#1e293b" stroke-width="2"/>
+          <polyline points="250,40 250,55 245,60 255,68 245,76 255,84 245,92 250,97 250,120" fill="none" stroke="#d97706" stroke-width="2"/>
+          <!-- Ground Line -->
+          <line x1="40" y1="95" x2="40" y2="120" stroke="#1e293b" stroke-width="2"/>
+          <line x1="40" y1="120" x2="250" y2="120" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="135" cy="120" r="3.5" fill="#1e293b"/>
+          <circle cx="215" cy="120" r="3.5" fill="#1e293b"/>
+          <line x1="125" y1="128" x2="145" y2="128" stroke="#1e293b" stroke-width="2.5"/>
+          <line x1="130" y1="133" x2="140" y2="133" stroke="#1e293b" stroke-width="2"/>
+          <line x1="133" y1="138" x2="137" y2="138" stroke="#1e293b" stroke-width="1.5"/>
+          <line x1="135" y1="120" x2="135" y2="128" stroke="#1e293b" stroke-width="2"/>
+          <!-- Output Probe Tag -->
+          <rect x="195" y="10" width="75" height="18" rx="4" fill="#03b585" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"/>
+          <text x="232" y="23" font-size="8.5" text-anchor="middle" font-weight="bold" fill="#ffffff">V_out: 5.0V DC</text>
+        `;
+        break;
+
+      case 'timer555':
+        innerContent = `
+          <!-- 555 Timer Astable Schematic -->
+          <rect x="95" y="35" width="90" height="90" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+          <text x="140" y="80" font-size="11.5" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="0.5px">555 TIMER</text>
+          <circle cx="106" cy="46" r="3" fill="#64748b"/>
+          <text x="105" y="60" font-size="8" fill="#94a3b8">8:VCC</text>
+          <text x="105" y="80" font-size="8" fill="#94a3b8">7:DIS</text>
+          <text x="105" y="100" font-size="8" fill="#94a3b8">6:THR</text>
+          <text x="105" y="115" font-size="8" fill="#94a3b8">2:TRG</text>
+          <text x="175" y="60" font-size="8" fill="#94a3b8" text-anchor="end">4:RST</text>
+          <text x="175" y="80" font-size="8" fill="#38bdf8" font-weight="bold" text-anchor="end">3:OUT</text>
+          <text x="175" y="115" font-size="8" fill="#94a3b8" text-anchor="end">1:GND</text>
+          <polyline points="45,45 55,45 60,40 68,50 76,40 84,50 92,45 95,45" fill="none" stroke="#d97706" stroke-width="2"/>
+          <text x="70" y="32" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">RA 10k</text>
+          <line x1="185" y1="75" x2="205" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <polyline points="205,75 210,75 214,70 220,80 226,70 232,80 236,75 242,75" fill="none" stroke="#d97706" stroke-width="1.8"/>
+          <polygon points="242,67 254,75 242,83" fill="#ef4444" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="254" y1="67" x2="254" y2="83" stroke="#ef4444" stroke-width="2"/>
+          <line x1="248" y1="63" x2="255" y2="55" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="254" y1="63" x2="261" y2="55" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="254" y1="75" x2="265" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <line x1="265" y1="75" x2="265" y2="130" stroke="#1e293b" stroke-width="2"/>
+          <rect x="185" y="105" width="85" height="24" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.5"/>
+          <polyline points="190,122 205,122 205,112 225,112 225,122 245,122 245,112 265,112" fill="none" stroke="#03b585" stroke-width="2"/>
+        `;
+        break;
+
+      case 'classABAmplifier':
+        innerContent = `
+          <!-- Class-AB Audio Amplifier Schematic -->
+          <line x1="40" y1="25" x2="240" y2="25" stroke="#ef4444" stroke-width="2"/>
+          <text x="45" y="18" font-size="9" font-weight="bold" fill="#ef4444">+15V VCC</text>
+          <line x1="40" y1="135" x2="240" y2="135" stroke="#0284c7" stroke-width="2"/>
+          <text x="45" y="150" font-size="9" font-weight="bold" fill="#0284c7">-15V VEE</text>
+          <circle cx="130" cy="50" r="14" fill="#ffffff" stroke="#1e293b" stroke-width="1.8"/>
+          <line x1="122" y1="42" x2="122" y2="58" stroke="#1e293b" stroke-width="2.5"/>
+          <line x1="110" y1="50" x2="122" y2="50" stroke="#1e293b" stroke-width="2"/>
+          <line x1="122" y1="45" x2="135" y2="35" stroke="#1e293b" stroke-width="2"/>
+          <line x1="135" y1="35" x2="135" y2="25" stroke="#1e293b" stroke-width="2"/>
+          <line x1="122" y1="55" x2="135" y2="65" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="132,60 137,67 129,66" fill="#1e293b"/>
+          <text x="150" y="48" font-size="8.5" font-weight="bold" fill="#1e293b">Q1 NPN</text>
+          <polygon points="106,62 114,62 110,70" fill="#f59e0b"/>
+          <polygon points="106,78 114,78 110,86" fill="#f59e0b"/>
+          <line x1="110" y1="50" x2="110" y2="98" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="130" cy="110" r="14" fill="#ffffff" stroke="#1e293b" stroke-width="1.8"/>
+          <line x1="122" y1="102" x2="122" y2="118" stroke="#1e293b" stroke-width="2.5"/>
+          <line x1="110" y1="110" x2="122" y2="110" stroke="#1e293b" stroke-width="2"/>
+          <line x1="122" y1="115" x2="135" y2="125" stroke="#1e293b" stroke-width="2"/>
+          <line x1="135" y1="125" x2="135" y2="135" stroke="#1e293b" stroke-width="2"/>
+          <line x1="122" y1="105" x2="135" y2="95" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="124,103 129,97 131,104" fill="#1e293b"/>
+          <text x="150" y="118" font-size="8.5" font-weight="bold" fill="#1e293b">Q2 PNP</text>
+          <line x1="135" y1="65" x2="135" y2="95" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="135" cy="80" r="3.5" fill="#1e293b"/>
+          <line x1="135" y1="80" x2="190" y2="80" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="190,72 202,72 214,60 214,100 202,88 190,88" fill="#03b585" stroke="#0f172a" stroke-width="1.8"/>
+          <path d="M218,72 Q224,80 218,88 M222,66 Q232,80 222,94" fill="none" stroke="#03b585" stroke-width="2" stroke-linecap="round"/>
+          <text x="202" y="114" font-size="8.5" font-weight="bold" fill="#03b585" text-anchor="middle">8Ω Hi-Fi</text>
+        `;
+        break;
+
+      case 'binaryCounter7Seg':
+        innerContent = `
+          <!-- 4-Bit Counter with 7-Segment Display -->
+          <rect x="25" y="40" width="85" height="80" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <text x="67" y="65" font-size="10" font-weight="bold" fill="#38bdf8" text-anchor="middle">74LS90</text>
+          <text x="67" y="78" font-size="8" fill="#94a3b8" text-anchor="middle">4-BIT COUNTER</text>
+          <text x="35" y="98" font-size="8" font-weight="bold" fill="#10b981">CLK ∿</text>
+          <text x="95" y="60" font-size="8" fill="#94a3b8">QA</text>
+          <text x="95" y="75" font-size="8" fill="#94a3b8">QB</text>
+          <text x="95" y="90" font-size="8" fill="#94a3b8">QC</text>
+          <text x="95" y="105" font-size="8" fill="#94a3b8">QD</text>
+          <path d="M110,57 H155 L165,60" fill="none" stroke="#6366f1" stroke-width="2"/>
+          <path d="M110,72 H155 L165,75" fill="none" stroke="#6366f1" stroke-width="2"/>
+          <path d="M110,87 H155 L165,90" fill="none" stroke="#6366f1" stroke-width="2"/>
+          <path d="M110,102 H155 L165,105" fill="none" stroke="#6366f1" stroke-width="2"/>
+          <rect x="175" y="30" width="80" height="100" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="2.5" filter="drop-shadow(0 4px 12px rgba(16,185,129,0.25))"/>
+          <rect x="195" y="42" width="40" height="7" rx="2" fill="#10b981"/>
+          <rect x="190" y="47" width="7" height="30" rx="2" fill="#10b981"/>
+          <rect x="233" y="47" width="7" height="30" rx="2" fill="#1e293b"/>
+          <rect x="195" y="74" width="40" height="7" rx="2" fill="#10b981"/>
+          <rect x="233" y="79" width="7" height="30" rx="2" fill="#10b981"/>
+          <rect x="190" y="79" width="7" height="30" rx="2" fill="#1e293b"/>
+          <rect x="195" y="107" width="40" height="7" rx="2" fill="#10b981"/>
+          <circle cx="248" cy="111" r="3.5" fill="#10b981"/>
+          <text x="215" y="125" font-size="8" font-weight="bold" fill="#10b981" text-anchor="middle">DECIMAL: 5</text>
+        `;
+        break;
+
+      case 'butterworthFilter':
+        innerContent = `
+          <!-- Butterworth Sallen-Key Filter -->
+          <polygon points="120,40 180,75 120,110" fill="#f8fafc" stroke="#03b585" stroke-width="2.5"/>
+          <text x="135" y="60" font-size="14" font-weight="bold" fill="#ef4444">-</text>
+          <text x="135" y="95" font-size="14" font-weight="bold" fill="#0284c7">+</text>
+          <line x1="180" y1="75" x2="250" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="215" cy="75" r="3.5" fill="#1e293b"/>
+          <path d="M215,75 V28 H100 V55 H120" fill="none" stroke="#6366f1" stroke-width="2"/>
+          <polyline points="40,90 60,90 65,85 73,95 81,85 89,95 95,90 120,90" fill="none" stroke="#d97706" stroke-width="2"/>
+          <text x="75" y="78" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">R1, R2</text>
+          <rect x="25" y="110" width="85" height="36" rx="4" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+          <path d="M30,122 H65 Q75,122 80,132 L95,142" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+          <text x="67" y="142" font-size="7.5" font-weight="bold" fill="#94a3b8" text-anchor="middle">fc = 1.0 kHz (-3dB)</text>
+        `;
+        break;
+
+      case 'amTransceiver':
+        innerContent = `
+          <!-- AM Modulator & Envelope Demodulator -->
+          <circle cx="75" cy="75" r="24" fill="#ffffff" stroke="#6366f1" stroke-width="2.5"/>
+          <line x1="60" y1="60" x2="90" y2="90" stroke="#6366f1" stroke-width="2.5"/>
+          <line x1="60" y1="90" x2="90" y2="60" stroke="#6366f1" stroke-width="2.5"/>
+          <text x="75" y="42" font-size="8" font-weight="bold" fill="#6366f1" text-anchor="middle">Audio + Carrier</text>
+          <line x1="99" y1="75" x2="135" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="135,67 150,75 135,83" fill="#ef4444" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="150" y1="67" x2="150" y2="83" stroke="#ef4444" stroke-width="2"/>
+          <line x1="150" y1="75" x2="190" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="190" cy="75" r="3.5" fill="#1e293b"/>
+          <line x1="190" y1="75" x2="190" y2="115" stroke="#1e293b" stroke-width="2"/>
+          <line x1="180" y1="115" x2="200" y2="115" stroke="#0284c7" stroke-width="2"/>
+          <rect x="180" y="25" width="85" height="42" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.5"/>
+          <path d="M185,46 Q195,30 205,46 T225,46 T245,46 T260,46" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="222" y="62" font-size="7.5" font-weight="bold" fill="#03b585" text-anchor="middle">Recovered Audio</text>
+        `;
+        break;
+
+      case 'opAmpAmplifier':
+        innerContent = `
+          <!-- Non-Inverting Op-Amp Amplifier -->
+          <polygon points="110,40 175,75 110,110" fill="#ffffff" stroke="#0284c7" stroke-width="2.5"/>
+          <text x="124" y="60" font-size="14" font-weight="bold" fill="#ef4444">-</text>
+          <text x="124" y="98" font-size="14" font-weight="bold" fill="#0284c7">+</text>
+          <circle cx="45" cy="92" r="14" fill="#eff6ff" stroke="#0284c7" stroke-width="2"/>
+          <path d="M38,92 Q41,84 45,92 T52,92" fill="none" stroke="#0284c7" stroke-width="2"/>
+          <line x1="59" y1="92" x2="110" y2="92" stroke="#1e293b" stroke-width="2"/>
+          <text x="45" y="120" font-size="8" font-weight="bold" fill="#0284c7" text-anchor="middle">100mV AC</text>
+          <line x1="175" y1="75" x2="245" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="210" cy="75" r="3.5" fill="#1e293b"/>
+          <path d="M210,75 V28 H95 V55 H110" fill="none" stroke="#d97706" stroke-width="2"/>
+          <text x="150" y="22" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">Rf = 100kΩ</text>
+          <rect x="200" y="100" width="70" height="22" rx="4" fill="#03b585"/>
+          <text x="235" y="115" font-size="9" font-weight="bold" fill="#ffffff" text-anchor="middle">Gain: +11x</text>
+        `;
+        break;
+
+      case 'bridgeRectifier':
+        innerContent = `
+          <!-- Full-Wave Bridge Rectifier -->
+          <polygon points="110,40 150,75 110,110 70,75" fill="#f8fafc" stroke="#334155" stroke-width="2"/>
+          <polygon points="85,60 95,50 85,45" fill="#f59e0b"/>
+          <polygon points="125,50 135,60 135,45" fill="#f59e0b"/>
+          <polygon points="85,90 95,100 85,105" fill="#f59e0b"/>
+          <polygon points="125,100 135,90 135,105" fill="#f59e0b"/>
+          <line x1="30" y1="55" x2="70" y2="75" stroke="#0284c7" stroke-width="2"/>
+          <line x1="30" y1="95" x2="110" y2="110" stroke="#0284c7" stroke-width="2"/>
+          <text x="35" y="45" font-size="8" font-weight="bold" fill="#0284c7">120V AC</text>
+          <line x1="110" y1="40" x2="190" y2="40" stroke="#ef4444" stroke-width="2"/>
+          <line x1="150" y1="75" x2="190" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <rect x="195" y="45" width="75" height="45" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.5"/>
+          <path d="M200,80 Q208,60 216,80 Q224,60 232,80 Q240,60 248,80 Q256,60 264,80" fill="none" stroke="#f59e0b" stroke-width="2"/>
+          <text x="232" y="56" font-size="7.5" font-weight="bold" fill="#03b585" text-anchor="middle">Full-Wave DC</text>
+        `;
+        break;
+
+      case 'halfAdder':
+        innerContent = `
+          <!-- Digital Logic: Half Adder -->
+          <text x="25" y="55" font-size="10" font-weight="bold" fill="#6366f1">A: 1</text>
+          <text x="25" y="105" font-size="10" font-weight="bold" fill="#6366f1">B: 1</text>
+          <path d="M60,40 Q75,40 90,55 Q75,70 60,70 Q70,55 60,40" fill="#f8fafc" stroke="#0284c7" stroke-width="2"/>
+          <path d="M54,40 Q64,55 54,70" fill="none" stroke="#0284c7" stroke-width="2"/>
+          <line x1="90" y1="55" x2="180" y2="55" stroke="#1e293b" stroke-width="2"/>
+          <text x="75" y="58" font-size="8" font-weight="bold" fill="#0284c7">XOR</text>
+          <path d="M60,90 H80 A15,15 0 0,1 80,120 H60 Z" fill="#f8fafc" stroke="#03b585" stroke-width="2"/>
+          <line x1="95" y1="105" x2="180" y2="105" stroke="#1e293b" stroke-width="2"/>
+          <text x="72" y="108" font-size="8" font-weight="bold" fill="#03b585">AND</text>
+          <rect x="185" y="42" width="80" height="24" rx="4" fill="#0284c7"/>
+          <text x="225" y="58" font-size="9" font-weight="bold" fill="#ffffff" text-anchor="middle">Sum (S) = 0</text>
+          <rect x="185" y="92" width="80" height="24" rx="4" fill="#03b585"/>
+          <text x="225" y="108" font-size="9" font-weight="bold" fill="#ffffff" text-anchor="middle">Carry (C) = 1</text>
+        `;
+        break;
+
+      case 'rcFilter':
+        innerContent = `
+          <!-- RC Low-Pass Filter -->
+          <circle cx="45" cy="80" r="16" fill="#eff6ff" stroke="#0284c7" stroke-width="2"/>
+          <path d="M38,80 Q41,72 45,80 T52,80" fill="none" stroke="#0284c7" stroke-width="2"/>
+          <line x1="61" y1="80" x2="95" y2="80" stroke="#1e293b" stroke-width="2"/>
+          <polyline points="95,80 100,80 105,73 115,87 125,73 135,87 140,80 145,80" fill="none" stroke="#d97706" stroke-width="2.5"/>
+          <text x="120" y="65" font-size="9" font-weight="bold" fill="#d97706" text-anchor="middle">R = 1.0 kΩ</text>
+          <line x1="145" y1="80" x2="185" y2="80" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="185" cy="80" r="3.5" fill="#1e293b"/>
+          <line x1="185" y1="80" x2="185" y2="105" stroke="#1e293b" stroke-width="2"/>
+          <line x1="175" y1="105" x2="195" y2="105" stroke="#03b585" stroke-width="2.5"/>
+          <line x1="175" y1="112" x2="195" y2="112" stroke="#03b585" stroke-width="2.5"/>
+          <text x="215" y="112" font-size="8" font-weight="bold" fill="#03b585">C = 1.0µF</text>
+          <line x1="185" y1="80" x2="225" y2="80" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="225" cy="80" r="5" fill="#ef4444"/>
+          <rect x="200" y="35" width="70" height="22" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.2"/>
+          <text x="235" y="49" font-size="8" font-weight="bold" fill="#38bdf8" text-anchor="middle">τ = 1.00 ms</text>
+        `;
+        break;
+
+      case 'bjtDifferentialPair':
+        innerContent = `
+          <!-- BJT Differential Pair Amplifier -->
+          <circle cx="85" cy="70" r="14" fill="#ffffff" stroke="#1e293b" stroke-width="1.8"/>
+          <circle cx="175" cy="70" r="14" fill="#ffffff" stroke="#1e293b" stroke-width="1.8"/>
+          <line x1="85" y1="56" x2="85" y2="30" stroke="#1e293b" stroke-width="2"/>
+          <line x1="175" y1="56" x2="175" y2="30" stroke="#1e293b" stroke-width="2"/>
+          <line x1="85" y1="84" x2="130" y2="110" stroke="#1e293b" stroke-width="2"/>
+          <line x1="175" y1="84" x2="130" y2="110" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="130" cy="110" r="3.5" fill="#1e293b"/>
+          <circle cx="130" cy="130" r="10" fill="#f8fafc" stroke="#6366f1" stroke-width="1.8"/>
+          <text x="130" y="133" font-size="8" font-weight="bold" fill="#6366f1" text-anchor="middle">I_EE</text>
+          <text x="85" y="22" font-size="8" font-weight="bold" fill="#ef4444" text-anchor="middle">V_out1</text>
+          <text x="175" y="22" font-size="8" font-weight="bold" fill="#ef4444" text-anchor="middle">V_out2</text>
+        `;
+        break;
+
+      case 'rcLadderStress':
+        innerContent = `
+          <!-- High-Density R-C Ladder Stress Benchmark -->
+          <line x1="30" y1="50" x2="250" y2="50" stroke="#1e293b" stroke-width="2"/>
+          <line x1="30" y1="120" x2="250" y2="120" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="70" cy="50" r="3" fill="#1e293b"/>
+          <line x1="70" y1="50" x2="70" y2="120" stroke="#03b585" stroke-width="2" stroke-dasharray="3 3"/>
+          <circle cx="110" cy="50" r="3" fill="#1e293b"/>
+          <line x1="110" y1="50" x2="110" y2="120" stroke="#03b585" stroke-width="2" stroke-dasharray="3 3"/>
+          <circle cx="150" cy="50" r="3" fill="#1e293b"/>
+          <line x1="150" y1="50" x2="150" y2="120" stroke="#03b585" stroke-width="2" stroke-dasharray="3 3"/>
+          <circle cx="190" cy="50" r="3" fill="#1e293b"/>
+          <line x1="190" y1="50" x2="190" y2="120" stroke="#03b585" stroke-width="2" stroke-dasharray="3 3"/>
+          <circle cx="230" cy="50" r="3" fill="#1e293b"/>
+          <line x1="230" y1="50" x2="230" y2="120" stroke="#03b585" stroke-width="2" stroke-dasharray="3 3"/>
+          <rect x="75" y="75" width="130" height="26" rx="4" fill="#0f172a" stroke="#6366f1" stroke-width="1.5"/>
+          <text x="140" y="91" font-size="8.5" font-weight="bold" fill="#38bdf8" text-anchor="middle">53 Comps / 77 Wires</text>
+        `;
+        break;
+
+      case 'askModulationDemodulation':
+        innerContent = `
+          <!-- ASK Modulation & Demodulation -->
+          <rect x="25" y="30" width="60" height="30" rx="4" fill="#eff6ff" stroke="#6366f1" stroke-width="1.8"/>
+          <text x="55" y="48" font-size="8" font-weight="bold" fill="#6366f1" text-anchor="middle">Bitstream</text>
+          <line x1="85" y1="45" x2="115" y2="45" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="130" cy="45" r="15" fill="#ffffff" stroke="#0284c7" stroke-width="2"/>
+          <text x="130" y="48" font-size="8" font-weight="bold" fill="#0284c7" text-anchor="middle">MOD</text>
+          <rect x="160" y="25" width="105" height="40" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.5"/>
+          <path d="M165,45 Q170,35 175,45 T185,45 H205 Q210,35 215,45 T225,45 Q230,35 235,45 T245,45 H260" fill="none" stroke="#38bdf8" stroke-width="1.8"/>
+          <rect x="90" y="95" width="100" height="35" rx="4" fill="#ffffff" stroke="#10b981" stroke-width="2"/>
+          <text x="140" y="116" font-size="8.5" font-weight="bold" fill="#0f172a" text-anchor="middle">Envelope Demodulator</text>
+        `;
+        break;
+
+      default:
+        innerContent = `
+          <!-- Default Electronic Schematic -->
+          <rect x="50" y="45" width="80" height="70" rx="6" fill="#ffffff" stroke="#03b585" stroke-width="2"/>
+          <polyline points="70,80 80,80 85,72 95,88 105,72 110,80 120,80" fill="none" stroke="#d97706" stroke-width="2"/>
+          <line x1="130" y1="80" x2="180" y2="80" stroke="#1e293b" stroke-width="2"/>
+          <polygon points="180,65 210,80 180,95" fill="#f8fafc" stroke="#0284c7" stroke-width="2"/>
+          <circle cx="210" cy="80" r="4" fill="#ef4444"/>
+        `;
+        break;
+    }
+
+    return `
+      <div class="card-thumbnail">
+        ${badgeHtml}
+        <svg viewBox="0 0 280 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          ${gridDef}
+          ${innerContent}
+        </svg>
+      </div>
+    `;
   }
 
   // --- Discover Page Population ---
@@ -1251,8 +1699,8 @@ class MultisimApp {
       const filtered = circuits.filter(c => {
         const matchesQuery = !query || c.name.toLowerCase().includes(query) || c.description.toLowerCase().includes(query) || c.author.toLowerCase().includes(query);
         const matchesFilter = filter === 'all' ||
-          (filter === 'analog' && (c.id.includes('opamp') || c.id.includes('timer') || c.id.includes('diff'))) ||
-          (filter === 'digital' && (c.id.includes('adder') || c.id.includes('counter'))) ||
+          (filter === 'analog' && (c.id.includes('opamp') || c.id.includes('timer') || c.id.includes('diff') || c.id.includes('audio') || c.id.includes('transceiver'))) ||
+          (filter === 'digital' && (c.id.includes('adder') || c.id.includes('counter') || c.id.includes('ask'))) ||
           (filter === 'power' && (c.id.includes('buck') || c.id.includes('bridge') || c.id.includes('boost'))) ||
           (filter === 'filters' && c.id.includes('filter'));
         return matchesQuery && matchesFilter;
@@ -1262,13 +1710,7 @@ class MultisimApp {
         const cardEl = document.createElement('div');
         cardEl.className = 'card';
         cardEl.innerHTML = `
-          <div class="card-thumbnail">
-            <span class="card-badge">Public</span>
-            <svg viewBox="0 0 100 60" width="140" height="84">
-              <rect x="20" y="15" width="60" height="30" fill="#f8fafc" stroke="#57b685" stroke-width="2" rx="4"/>
-              <text x="50" y="34" font-size="8" text-anchor="middle" fill="#1e293b" font-weight="bold">${c.name.split('(')[0].trim()}</text>
-            </svg>
-          </div>
+          ${this.renderCircuitThumbnailSvg(c.key, 'Public')}
           <div class="card-body">
             <div class="card-author-row">
               <div class="card-avatar">${c.author.substr(0, 2).toUpperCase()}</div>
@@ -1332,8 +1774,6 @@ class MultisimApp {
 
     document.getElementById('btnOpenLogin')?.addEventListener('click', () => openModal('loginModal'));
     document.getElementById('btnOpenSignup')?.addEventListener('click', () => openModal('signupModal'));
-    document.getElementById('btnPlanPremium')?.addEventListener('click', () => openModal('signupModal'));
-    document.getElementById('btnPlanAcademic')?.addEventListener('click', () => openModal('signupModal'));
     document.getElementById('nav-shortcuts')?.addEventListener('click', (e) => {
       e.preventDefault();
       openModal('shortcutsModal');
@@ -1368,7 +1808,7 @@ class MultisimApp {
             if (data.name) {
               const nameInput = document.getElementById('circuitNameInput');
               if (nameInput) nameInput.value = data.name;
-              document.title = `${data.name} - Multisim Live`;
+              document.title = `${data.name} - ElectroSim`;
             }
             this.engine.reset();
             this.engine.setCircuit(this.canvas.components, this.canvas.wires);
@@ -1397,7 +1837,7 @@ class MultisimApp {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${data.name.replace(/\s+/g, '_').toLowerCase()}.multisim.json`;
+      a.download = `${data.name.replace(/\s+/g, '_').toLowerCase()}.electrosim.json`;
       a.click();
       URL.revokeObjectURL(url);
       closeModal('exportModal');
@@ -1408,7 +1848,7 @@ class MultisimApp {
       const dataUrl = this.canvas.canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = dataUrl;
-      a.download = `multisim_schematic_${Date.now()}.png`;
+      a.download = `electrosim_schematic_${Date.now()}.png`;
       a.click();
       closeModal('exportModal');
     });
@@ -1427,7 +1867,7 @@ class MultisimApp {
 
     document.getElementById('signupForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('Welcome to Multisim Live! Your free account is created.');
+      alert('Welcome to ElectroSim! Your free account is created.');
       closeModal('signupModal');
     });
   }
@@ -1435,5 +1875,5 @@ class MultisimApp {
 
 // Start Application on DOM Load
 window.addEventListener('DOMContentLoaded', () => {
-  window.app = new MultisimApp();
+  window.app = new ElectroSimApp();
 });

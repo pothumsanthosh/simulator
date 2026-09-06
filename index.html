@@ -4,9 +4,15 @@
   <meta charset="utf-8"/>
   <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Multisim Live Online Circuit Simulator</title>
-  <meta name="description" content="Multisim Live is a free, online circuit simulator that includes SPICE software, which lets you create, learn and share circuits and electronics online." />
-  <link rel="icon" href="https://www.multisim.com/static/images/favicon.ico" type="image/x-icon"/>
+  <title>ElectroSim - Online Interactive SPICE Circuit Simulator</title>
+  <meta name="description" content="ElectroSim is a free, modern online circuit simulator with interactive SPICE engine, schematic capture, oscilloscope grapher, and PWA download for laptop and phone." />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml"/>
+  <link rel="apple-touch-icon" href="icons/icon.svg"/>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#03b585"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,9 +21,9 @@
 </head>
 <body>
 
-  <!-- Top Announcement Notice (Multisim Live EOL / Transition Notice) -->
+  <!-- Top Announcement Notice (ElectroSim Welcome Banner) -->
   <div class="topbar--announcement" id="topAnnouncement">
-    <span>The Future of Multisim is on the Desktop. On September 15, 2026, the Multisim Live online simulator will be shut down. Read more about this transition <a href="https://support.digilent.com/hc/en-us/articles/41178584173979-Multisim-Live-EOL-Letter" target="_blank" rel="noopener noreferrer">here</a></span>
+    <span>⚡ <strong>Welcome to ElectroSim 2.0</strong> — High-Performance SPICE Circuit Simulator with Schematic Capture & Real-Time Oscilloscope. Ready to install on Laptop, Desktop & Mobile!</span>
     <button class="announcement-close" id="btnCloseAnnouncement" title="Dismiss announcement">✕</button>
   </div>
 
@@ -25,20 +31,26 @@
   <header class="topbar">
     <div class="topbar-container">
       <div class="topbar-left">
-        <a href="#/" class="branding-link" title="Multisim Live Home">
-          <!-- Official Multisim Live SVG Logo -->
-          <svg id="multisim_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 137 38">
-            <style>.logo-st0{fill:#57b685}.logo-st1{fill:#626366}</style>
-            <path class="logo-st0" d="M29.7 11c-.2.4-.7.7-1.2.7-.8 0-1.4-.6-1.4-1.4 0-.8.6-1.4 1.4-1.4.5 0 .9.3 1.2.7h4.4V4H4.5v3.4h18.6c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v8.1h2.6v-5h13.1c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H8.6v3.8h14.6c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v3.8h8.1c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v3.8H14c.2-.4.7-.7 1.2-.7.8 0 1.4.6 1.4 1.4s-.6 1.4-1.4 1.4c-.5 0-.9-.3-1.2-.7H4.5v4.5h15.6v-9.2c-.4-.2-.7-.7-.7-1.2 0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4c0 .5-.3.9-.7 1.2v9.2h3.3v-7c-.4-.2-.7-.7-.7-1.2 0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4c0 .5-.3.9-.7 1.2v7h3.3V23.1c-.4-.2-.7-.7-.7-1.2 0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4c0 .5-.3.9-.7 1.2v10.3h3.3V16.2h-3.7c-.2.4-.7.7-1.2.7-.8 0-1.4-.6-1.4-1.4s.6-1.4 1.4-1.4c.5 0 .9.3 1.2.7h3.7v-3.9l-4.5.1z"/>
-            <path class="logo-st1" d="M38.9 12.4h2.5L45 23.3l3.7-10.9h2.5v12.8h-1.7v-7.6-1.3-1.9l-3.7 10.8h-1.7l-3.7-10.8V25.2h-1.7V12.4zM55.2 16v6.2c0 .5.1.9.2 1.2.3.6.8.8 1.5.8 1.1 0 1.8-.5 2.2-1.5.2-.5.3-1.2.3-2.2V16H61v9.4h-1.5V24c-.2.4-.4.7-.7.9-.6.5-1.3.7-2.1.7-1.3 0-2.2-.4-2.7-1.3-.3-.5-.4-1.1-.4-1.9V16h1.6zM63.2 12.6h1.6v12.8h-1.6V12.6zM68.1 13.4h1.6V16h1.5v1.3h-1.5v6.1c0 .3.1.5.3.7.1.1.3.1.6.1h.5v1.2c-.2.1-.4.1-.6.1h-.6c-.7 0-1.2-.2-1.5-.6-.3-.4-.4-.9-.4-1.5v-6.2h-1.3V16H68v-2.6zM73.1 12.6h1.6v1.8h-1.6v-1.8zm0 3.5h1.6v9.3h-1.6v-9.3zM77 22.5c0 .5.2.9.4 1.2.4.5 1.1.8 2.1.8.6 0 1.1-.1 1.6-.4.5-.3.7-.6.7-1.2 0-.4-.2-.7-.5-.9-.2-.1-.7-.3-1.4-.4l-1.3-.3c-.8-.2-1.4-.4-1.8-.7-.7-.4-1-1-1-1.8 0-.9.3-1.6 1-2.2.6-.5 1.5-.8 2.6-.8 1.4 0 2.5.4 3.1 1.2.4.5.6 1.1.6 1.7h-1.5c0-.4-.2-.7-.4-1-.4-.4-1-.6-1.9-.6-.6 0-1.1.1-1.4.3-.3.2-.5.5-.5.9s.2.7.6 1c.2.1.6.3 1.1.4l1.1.3c1.2.3 1.9.5 2.3.8.6.4.9 1 .9 1.9 0 .8-.3 1.6-1 2.2s-1.6.9-2.9.9c-1.4 0-2.4-.3-3-.9-.6-.6-.9-1.4-.9-2.3H77zM85 12.6h1.6v1.8H85v-1.8zm0 3.5h1.6v9.3H85v-9.3zM89 16h1.6v1.3c.4-.5.7-.8 1-1 .5-.4 1.1-.5 1.8-.5s1.3.2 1.8.6c.3.2.5.5.7.9.3-.5.8-.9 1.2-1.1.5-.2 1-.4 1.6-.4 1.3 0 2.1.5 2.6 1.4.2.5.4 1.1.4 2v6.2h-1.6v-6.5c0-.6-.2-1.1-.5-1.3-.3-.2-.7-.3-1.1-.3-.6 0-1.2.2-1.6.6-.4.4-.7 1.1-.7 2.1v5.4h-1.6v-6.1c0-.6-.1-1.1-.2-1.4-.2-.4-.7-.7-1.3-.7-.6 0-1.1.2-1.6.7-.5.5-.7 1.3-.7 2.5v5H89V16z"/>
-            <path class="logo-st0" d="M104.5 12.6h1.7v11.3h6.4v1.5h-8.2V12.6zM113.9 12.6h1.6v1.8h-1.6v-1.8zm0 3.5h1.6v9.3h-1.6v-9.3zM119.4 16l2.5 7.6 2.6-7.6h1.7l-3.5 9.4H121l-3.5-9.4h1.9zM133.2 16.3c.6.3 1.1.7 1.4 1.2.3.5.5 1 .6 1.7.1.4.1 1.1.1 2.1h-6.8c0 1 .3 1.7.7 2.3.4.6 1.1.9 1.9.9.8 0 1.5-.3 2-.8.3-.3.5-.7.6-1.1h1.5c0 .3-.2.7-.4 1.1s-.5.8-.8 1c-.5.5-1.1.8-1.8.9-.4.1-.8.1-1.3.1-1.2 0-2.1-.4-2.9-1.3-.8-.8-1.2-2-1.2-3.6 0-1.5.4-2.7 1.2-3.7.8-.9 1.9-1.4 3.2-1.4.8.1 1.4.3 2 .6zm.6 3.7c-.1-.7-.2-1.2-.4-1.6-.4-.8-1.1-1.1-2.1-1.1-.7 0-1.3.3-1.8.8s-.7 1.2-.8 2h5.1z"/>
+        <a href="#/" class="branding-link" title="ElectroSim Home">
+          <!-- ElectroSim Modern Vector Logo -->
+          <svg id="electrosim_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 38" height="34" width="auto">
+            <defs>
+              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#03b585"/>
+                <stop offset="100%" stop-color="#0284c7"/>
+              </linearGradient>
+            </defs>
+            <rect x="2" y="4" width="30" height="30" rx="8" fill="url(#logoGrad)"/>
+            <path d="M7 19 H13 L16 11 L20 27 L23 15 L26 19 H29" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="7" cy="19" r="2" fill="#ffffff"/>
+            <circle cx="29" cy="19" r="2" fill="#ffffff"/>
+            <text x="38" y="25" font-family="'Lato', -apple-system, sans-serif" font-size="20" font-weight="900" fill="#2b2d2f" letter-spacing="-0.5px">Electro<tspan fill="#03b585">Sim</tspan></text>
           </svg>
         </a>
 
         <nav class="nav">
           <ul class="nav-list">
             <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
-            <li class="nav-item"><a href="#/pricing" class="nav-link" id="nav-pricing">Pricing</a></li>
             <li class="nav-item nav-item--dropdown">
               <a href="#/discover" class="nav-link" id="nav-circuits">Circuits ▾</a>
               <div class="nav-dropdown-menu">
@@ -54,6 +66,7 @@
       </div>
 
       <div class="topbar-right">
+        <button class="btn btn-outline" id="btnNavInstall" title="Download and install ElectroSim on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
         <a href="#/create" class="btn btn-launch-sim">⚡ Launch Simulator</a>
         <button class="btn btn-invis" id="btnOpenLogin">Log in</button>
         <button class="btn btn-primary" id="btnOpenSignup">Sign up</button>
@@ -72,11 +85,12 @@
       <section class="banner--home">
         <div class="banner-content">
           <span class="banner-badge">Interactive SPICE In Your Browser</span>
-          <h1 class="banner-title">Discover Electronics</h1>
-          <p class="banner-subtitle">with Online SPICE Simulation</p>
+          <h1 class="banner-title">ElectroSim Studio</h1>
+          <p class="banner-subtitle">Fast, Interactive SPICE Circuit Simulation on Desktop, Laptop & Mobile</p>
           <div class="banner-actions">
-            <a href="#/create" class="btn btn-primary btn-xlarge">⚡ Launch Simulator Studio</a>
+            <a href="#/create" class="btn btn-primary btn-xlarge">⚡ Launch Simulator</a>
             <a href="#/discover" class="btn btn-secondary btn-xlarge">Explore Circuits</a>
+            <button class="btn btn-outline btn-xlarge" id="btnHeroInstall" style="color: #ffffff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1);">📲 Download for Laptop & Phone</button>
           </div>
         </div>
       </section>
@@ -319,16 +333,16 @@
       <footer class="footer">
         <div class="footer-container">
           <div>
-            <p>&copy; 2026 National Instruments Corp. All rights reserved.</p>
+            <p>&copy; 2026 ElectroSim. All rights reserved. Open-source interactive SPICE electronic simulation suite.</p>
             <div class="footer-links">
               <a href="#/features">Features</a>
-              <a href="#/pricing">Pricing</a>
               <a href="#/discover">Public Circuits</a>
-              <a href="https://support.digilent.com" target="_blank" rel="noopener noreferrer">Support</a>
+              <a href="#/create">Simulator Studio</a>
+              <a href="#" id="footerInstallLink">📲 Download App</a>
             </div>
           </div>
           <div>
-            <span style="font-weight: bold; color: #57b685;">NI Multisim Live</span>
+            <span style="font-weight: bold; color: #03b585; font-size: 15px;">⚡ ElectroSim</span>
           </div>
         </div>
       </footer>
@@ -695,70 +709,52 @@
       </div>
     </div>
 
-    <!-- ====================================================================
-         VIEW 5: PRICING PAGE
-         ==================================================================== -->
-    <div class="view-page" id="view-pricing">
-      <div class="pricing-container">
-        <div class="pricing-header">
-          <h1 class="section-title" style="font-size: 38px; margin-bottom: 12px;">Choose Your Multisim Plan</h1>
-          <p class="section-subtitle" style="font-size: 18px;">Empowering students, hobbyists, and university engineering departments.</p>
-        </div>
-
-        <div class="pricing-cards">
-          <div class="pricing-card">
-            <h3 class="plan-name">Free Tier</h3>
-            <div class="plan-price">$0 <span>/ forever</span></div>
-            <p style="font-size: 13px; color: var(--text-muted);">For students & makers learning fundamentals.</p>
-            <ul class="plan-features">
-              <li>Full Browser Schematic Capture</li>
-              <li>Interactive SPICE Simulation</li>
-              <li>Public Community Circuits</li>
-              <li>Basic Grapher & Probes</li>
-            </ul>
-            <a href="#/create" class="btn btn-primary" style="margin-top: auto;">Start for Free</a>
-          </div>
-
-          <div class="pricing-card featured-plan">
-            <span class="plan-badge">Most Popular</span>
-            <h3 class="plan-name">Premium</h3>
-            <div class="plan-price">$6.99 <span>/ month</span></div>
-            <p style="font-size: 13px; color: var(--text-muted);">For electrical engineers & advanced designers.</p>
-            <ul class="plan-features">
-              <li>Unlimited Private Circuit Files</li>
-              <li>Advanced Transient & AC Sweeps</li>
-              <li>High-Resolution Grapher Export</li>
-              <li>Expanded IC & Semiconductor Models</li>
-            </ul>
-            <button class="btn btn-primary" id="btnPlanPremium" style="margin-top: auto;">Get Premium</button>
-          </div>
-
-          <div class="pricing-card">
-            <h3 class="plan-name">Academic Group</h3>
-            <div class="plan-price">$49 <span>/ seat / year</span></div>
-            <p style="font-size: 13px; color: var(--text-muted);">For universities, schools & lab instructors.</p>
-            <ul class="plan-features">
-              <li>Classroom Assignment Management</li>
-              <li>Shared Lab Workspaces</li>
-              <li>LMS & Canvas Integration</li>
-              <li>Priority Educational Support</li>
-            </ul>
-            <button class="btn btn-outline" id="btnPlanAcademic" style="margin-top: auto;">Contact Sales</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- ====================================================================
        MODALS
        ==================================================================== -->
+  <!-- Install App Modal (PWA Download for Laptop & Phone) -->
+  <div class="modal-overlay" id="installModal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">📲</span> Install ElectroSim
+        </h3>
+        <button class="modal-close" data-close="installModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="width: 64px; height: 64px; margin: 0 auto 12px; background: linear-gradient(135deg, #03b585, #0284c7); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(3, 181, 133, 0.3);">
+            <svg viewBox="0 0 32 32" width="36" height="36">
+              <path d="M4 16 H10 L13 8 L18 24 L21 12 L24 16 H28" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h4 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">ElectroSim Web App</h4>
+          <p style="font-size: 13px; color: var(--text-muted);">Install on Windows, Mac, Linux, Android, iPhone or iPad for instant offline simulation!</p>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.6;">
+          <p style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">💡 How to Install on Any Device:</p>
+          <ul style="padding-left: 18px; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px;">
+            <li><strong>💻 Laptop / Desktop (Chrome, Edge, Brave):</strong> Click the <em>"Install"</em> button below, or click the ⊕ install icon in your browser address bar.</li>
+            <li><strong>📱 iPhone & iPad (Safari):</strong> Tap the <strong>Share</strong> button <span style="font-size: 14px;">⎋</span>, scroll down and tap <strong>"Add to Home Screen ⊕"</strong>.</li>
+            <li><strong>🤖 Android (Chrome):</strong> Tap the <strong>Menu (⋮)</strong>, then tap <strong>"Install App"</strong> or <strong>"Add to Home screen"</strong>.</li>
+          </ul>
+        </div>
+
+        <button class="btn btn-primary btn-large" id="btnTriggerInstallPrompt" style="width: 100%; font-weight: 700; font-size: 15px;">
+          ⬇️ Install ElectroSim Now
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Login Modal -->
   <div class="modal-overlay" id="loginModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Log in to Multisim Live</h3>
+        <h3 class="modal-title">Log in to ElectroSim</h3>
         <button class="modal-close" data-close="loginModal">&times;</button>
       </div>
       <div class="modal-body">

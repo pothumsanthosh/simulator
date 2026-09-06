@@ -1,0 +1,32 @@
+{
+  "name": "ElectroSim - Interactive SPICE Circuit Simulator",
+  "short_name": "ElectroSim",
+  "description": "Professional SPICE electronic circuit simulation and schematic capture in your browser. Install on Laptop, Desktop, and Mobile.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#03b585",
+  "categories": ["education", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Launch Simulator",
+      "url": "./index.html#/create",
+      "description": "Open circuit schematic capture and SPICE simulator studio"
+    },
+    {
+      "name": "Discover Circuits",
+      "url": "./index.html#/discover",
+      "description": "Explore and simulate pre-built reference electronics circuits"
+    }
+  ]
+}

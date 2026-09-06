@@ -8,6 +8,7 @@ const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
@@ -43,7 +44,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Multisim Live duplicate server running at:`);
+  console.log(`⚡ ElectroSim Studio Server running at:`);
   console.log(`  > http://localhost:${PORT}/`);
   console.log(`  > http://127.0.0.1:${PORT}/`);
 });
