@@ -107,9 +107,16 @@ export class SchematicCanvas {
 
     // Pointer Events (Unified Touchscreen "Bare Hands", Stylus & Mouse)
     this.canvas.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
-    this.canvas.addEventListener('pointermove', (e) => this.handlePointerMove(e));
-    this.canvas.addEventListener('pointerup', (e) => this.handlePointerUp(e));
-    this.canvas.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
+    window.addEventListener('pointermove', (e) => this.handlePointerMove(e));
+    window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
+    window.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
+    window.addEventListener('blur', () => {
+      this.activePointers.clear();
+      this.isDragging = false;
+      this.isPanning = false;
+      this.isPinching = false;
+      this.isBoxSelecting = false;
+    });
 
     this.canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
     this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
@@ -535,11 +542,20 @@ export class SchematicCanvas {
           }
         }
 
-        this.addComponent(this.placementComponentType, sx, sy);
+        const newComp = this.addComponent(this.placementComponentType, sx, sy);
         if (!e.shiftKey) {
           this.mode = 'SELECT';
           this.placementComponentType = null;
           this.canvas.style.cursor = 'default';
+        }
+        if (newComp) {
+          this.isDragging = true;
+          this.isPanning = false;
+          this.isBoxSelecting = false;
+          this.dragStartX = worldPos.x;
+          this.dragStartY = worldPos.y;
+          this.compInitialPositions.clear();
+          this.compInitialPositions.set(newComp, { x: newComp.x, y: newComp.y });
         }
         return;
       }
