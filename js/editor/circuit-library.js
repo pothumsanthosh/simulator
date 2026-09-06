@@ -505,5 +505,88 @@ export const CircuitLibrary = {
 
       canvas.fitToScreen();
     }
+  },
+
+  // 13. ASK Modulation and Demodulation (Amplitude Shift Keying)
+  askModulationDemodulation: {
+    id: 'ask-modulation-demodulation',
+    name: 'ASK Modulation and Demodulation',
+    description: 'Binary Amplitude Shift Keying (ASK) transceiver with 50 kHz RF carrier, 500 Hz digital message, NPN transistor modulator, diode envelope detector, and Op-Amp comparator slicer.',
+    author: 'CommunicationSystemsLab',
+    stats: { stars: 240, copies: 1120, views: 289000 },
+    load(canvas) {
+      canvas.components = [];
+      canvas.wires = [];
+
+      // 1. Sources & Grounds
+      const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 360, {}, 0);
+      const vMsg = canvas.addComponent(ComponentTypes.CLOCK_VOLTAGE, 100, 140, { vHigh: 10, vLow: 0, frequency: 500, dutyCycle: 50 }, 0);
+      const vCarrier = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 100, 260, { amplitude: 5, frequency: 50000 }, 0);
+
+      // 2. Modulator (NPN Transistor Switch)
+      const rBase = canvas.addComponent(ComponentTypes.RESISTOR, 180, 140, { resistance: 1000 }, 0);
+      const qMod = canvas.addComponent(ComponentTypes.BJT_NPN, 260, 200, { beta: 200 }, 0);
+      const rEmit = canvas.addComponent(ComponentTypes.RESISTOR, 260, 300, { resistance: 2200 }, 90);
+
+      // 3. Demodulator (Envelope Detector)
+      const dEnv = canvas.addComponent(ComponentTypes.SCHOTTKY, 340, 200, { forwardDrop: 0.25 }, 0);
+      const rFilter = canvas.addComponent(ComponentTypes.RESISTOR, 420, 280, { resistance: 2200 }, 90);
+      const cFilter = canvas.addComponent(ComponentTypes.CAPACITOR, 480, 280, { capacitance: 1e-8 }, 90);
+      const rCoupling = canvas.addComponent(ComponentTypes.RESISTOR, 540, 200, { resistance: 2200 }, 0);
+
+      // 4. Comparator / Slicer (Demodulated Binary Output Slicer)
+      const opSlicer = canvas.addComponent(ComponentTypes.OPAMP, 640, 200, { openLoopGain: 100000, vSatPos: 5, vSatNeg: -5 }, 0);
+      const rRef1 = canvas.addComponent(ComponentTypes.RESISTOR, 600, 100, { resistance: 10000 }, 90);
+      const rRef2 = canvas.addComponent(ComponentTypes.RESISTOR, 600, 280, { resistance: 1500 }, 90);
+      const vRefSupply = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 540, 100, { voltage: 5 }, 0);
+
+      const rOut = canvas.addComponent(ComponentTypes.RESISTOR, 740, 200, { resistance: 1000 }, 0);
+      const dClamp = canvas.addComponent(ComponentTypes.ZENER, 800, 280, { zenerVoltage: 5.1 }, 90);
+
+      // 5. Multi-Color Measurement Probes matching Multisim Live (PR4 Purple, PR2 Cyan, PR1 Green)
+      const prMsg = canvas.addComponent(ComponentTypes.PROBE_V, 100, 60, { color: '#a855f7', label: 'PR4: V(1) Msg' }, 0);
+      const prMod = canvas.addComponent(ComponentTypes.PROBE_V, 260, 100, { color: '#06b6d4', label: 'PR2: V(3) ASK' }, 0);
+      const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 800, 120, { color: '#10b981', label: 'PR1: V(8) Out' }, 0);
+
+      // 6. Wiring Topology
+      canvas.wires = [
+        // Grounds
+        { id: 'w_gnd_msg', fromPin: `${vMsg.id}:p_neg`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_car', fromPin: `${vCarrier.id}:p_neg`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_emit', fromPin: `${rEmit.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_rf', fromPin: `${rFilter.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_cf', fromPin: `${cFilter.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_ref', fromPin: `${rRef2.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_vref', fromPin: `${vRefSupply.id}:p_neg`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_clamp', fromPin: `${dClamp.id}:anode`, toPin: `${gnd.id}:p1` },
+
+        // Modulator Stage
+        { id: 'w_msg_rbase', fromPin: `${vMsg.id}:p_pos`, toPin: `${rBase.id}:p1` },
+        { id: 'w_msg_pr', fromPin: `${vMsg.id}:p_pos`, toPin: `${prMsg.id}:tip` },
+        { id: 'w_rbase_q', fromPin: `${rBase.id}:p2`, toPin: `${qMod.id}:base` },
+        { id: 'w_car_q', fromPin: `${vCarrier.id}:p_pos`, toPin: `${qMod.id}:collector` },
+        { id: 'w_q_emit', fromPin: `${qMod.id}:emitter`, toPin: `${rEmit.id}:p1` },
+        { id: 'w_q_pr', fromPin: `${qMod.id}:emitter`, toPin: `${prMod.id}:tip` },
+        { id: 'w_q_denv', fromPin: `${qMod.id}:emitter`, toPin: `${dEnv.id}:anode` },
+
+        // Demodulator Filter Stage
+        { id: 'w_denv_rf', fromPin: `${dEnv.id}:cathode`, toPin: `${rFilter.id}:p1` },
+        { id: 'w_denv_cf', fromPin: `${dEnv.id}:cathode`, toPin: `${cFilter.id}:p1` },
+        { id: 'w_denv_rc', fromPin: `${dEnv.id}:cathode`, toPin: `${rCoupling.id}:p1` },
+
+        // Comparator Slicer Stage
+        { id: 'w_rc_op', fromPin: `${rCoupling.id}:p2`, toPin: `${opSlicer.id}:in_noninv` },
+        { id: 'w_vref_r1', fromPin: `${vRefSupply.id}:p_pos`, toPin: `${rRef1.id}:p1` },
+        { id: 'w_r1_r2', fromPin: `${rRef1.id}:p2`, toPin: `${rRef2.id}:p1` },
+        { id: 'w_ref_op', fromPin: `${rRef1.id}:p2`, toPin: `${opSlicer.id}:in_inv` },
+
+        // Output Clamping & Probe
+        { id: 'w_op_rout', fromPin: `${opSlicer.id}:out`, toPin: `${rOut.id}:p1` },
+        { id: 'w_rout_d', fromPin: `${rOut.id}:p2`, toPin: `${dClamp.id}:cathode` },
+        { id: 'w_rout_pr', fromPin: `${rOut.id}:p2`, toPin: `${prOut.id}:tip` }
+      ];
+
+      canvas.fitToScreen();
+    }
   }
 };

@@ -687,7 +687,7 @@ const g8 = startGroup('Group 8: Pre-built Reference Circuits & System Benchmarks
   }
 
   const libraryKeys = Object.keys(CircuitLibrary);
-  assert(libraryKeys.length === 12, `Reference Circuit Library contains all ${libraryKeys.length} standard engineering benchmarks (Expected: 12)`, g8);
+  assert(libraryKeys.length === 13, `Reference Circuit Library contains all ${libraryKeys.length} standard engineering benchmarks (Expected: 13)`, g8);
 
   libraryKeys.forEach(key => {
     const circ = CircuitLibrary[key];
