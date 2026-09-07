@@ -528,11 +528,50 @@ class SwitchaApp {
     const searchInput = document.getElementById('myCircuitsSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
-        this.renderMyCircuits(e.target.value.toLowerCase().trim());
+        this.renderWorkspaceProjects(e.target.value.toLowerCase().trim());
+      });
+    }
+
+    const clearBtn = document.getElementById('btnClearWorkspace');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        if (confirm('Are you sure you want to clear all your saved custom circuits and reset your workspace to default presets?')) {
+          await this.clearAllCustomCircuits();
+        }
       });
     }
 
     this.renderMyCircuits();
+  }
+
+  async clearAllCustomCircuits() {
+    // 1. Reset localStorage to default starter circuits
+    try {
+      localStorage.removeItem('switcha_my_circuits');
+      localStorage.removeItem('switcha_my_models');
+      localStorage.removeItem('switcha_my_scripts');
+    } catch (_) {}
+
+    // 2. Clear IndexedDB stores if available
+    if (window.SwitchaStorage && window.SwitchaStorage.db) {
+      try {
+        const db = window.SwitchaStorage.db;
+        ['circuits', 'models', 'scripts'].forEach(storeName => {
+          if (db.objectStoreNames.contains(storeName)) {
+            const tx = db.transaction(storeName, 'readwrite');
+            tx.objectStore(storeName).clear();
+          }
+        });
+      } catch (_) {}
+    }
+
+    this.activeMyCircuitId = null;
+    this.activeModelId = null;
+
+    // 3. Re-seed default starter circuits
+    this.getMyCircuits();
+    await this.renderWorkspaceProjects();
+    this.showToast('🧹 All custom saved circuits cleared and reset to defaults!', 'success');
   }
 
   renderMyCircuits(filterQuery = '') {
