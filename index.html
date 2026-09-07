@@ -9,6 +9,9 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml"/>
   <link rel="apple-touch-icon" href="icons/icon.svg"/>
   <link rel="manifest" href="manifest.json"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="theme-color" content="#03b585"/>
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -54,8 +57,11 @@
 
         <nav class="nav">
           <ul class="nav-list">
+            <li class="nav-item"><a href="#/create" class="nav-link" id="nav-circuits-env" style="font-weight: 700; color: #03b585;">🔌 Circuits</a></li>
+            <li class="nav-item"><a href="#/blocks" class="nav-link" id="nav-blocks-env" style="font-weight: 700; color: #3b82f6;">🧩 Blocks</a></li>
+            <li class="nav-item"><a href="#/code" class="nav-link" id="nav-code-env" style="font-weight: 700; color: #8b5cf6;">💻 Code</a></li>
+            <li class="nav-item"><a href="#/my-circuits" class="nav-link" id="nav-my-circuits">📁 Workspace</a></li>
             <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
-            <li class="nav-item"><a href="#/my-circuits" class="nav-link" id="nav-my-circuits">📁 My Circuits</a></li>
             <li class="nav-item nav-item--dropdown">
               <a href="#/discover" class="nav-link" id="nav-circuits">Discover ▾</a>
               <div class="nav-dropdown-menu">
@@ -415,10 +421,13 @@
               <optgroup label="Analog & Audio">
                 <option value="classABAmplifier">Class-AB Push-Pull Audio Amplifier</option>
                 <option value="opAmpAmplifier">Non-Inverting Op-Amp Amplifier (11x)</option>
+                <option value="sampleAndHoldCircuit">Sample & Hold Amplifier Circuit (LF398 / ADC Front-End)</option>
                 <option value="butterworthFilter">4th-Order Butterworth Sallen-Key Filter</option>
                 <option value="rcFilter">RC Low-Pass Passive Filter</option>
               </optgroup>
               <optgroup label="Oscillators & RF">
+                <option value="rcPhaseShiftOscillator">Op-Amp RC Phase Shift Sine Wave Oscillator</option>
+                <option value="bjtAstableMultivibrator">Transistor (BJT) Astable Multivibrator</option>
                 <option value="timer555">555 Timer Astable Multivibrator</option>
                 <option value="amTransceiver">AM Modulator & Diode Detector</option>
                 <option value="askModulationDemodulation">ASK Modulation & Demodulation</option>
@@ -452,6 +461,7 @@
               <button class="quick-comp-btn" data-type="GROUND" title="Add Ground (GND)">⏚ GND</button>
               <button class="quick-comp-btn" data-type="DC_VOLTAGE" title="Add DC Voltage Source">⚡ DC</button>
               <button class="quick-comp-btn" data-type="AC_VOLTAGE" title="Add AC Voltage Source">∿ AC</button>
+              <button class="quick-comp-btn" data-type="FUNCTION_GENERATOR" title="Add Function Generator (XFG1 Multi-Waveform Signal Generator)" style="border-color: #0284c7; font-weight: 700;">🎛️ Func Gen</button>
               <button class="quick-comp-btn" data-type="TRIGGER_PULSE" title="Add Manual Trigger Pulse Button">⚡ Trig</button>
               <button class="quick-comp-btn" data-type="RESISTOR" title="Add Resistor (R)">⟿ Res</button>
               <button class="quick-comp-btn" data-type="CAPACITOR" title="Add Capacitor (C)">⫞ Cap</button>
@@ -483,6 +493,13 @@
               <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
               <button class="tool-btn" id="btnFitScreen" title="Fit Circuit to Screen (F)">⛶</button>
               <button class="tool-btn active" id="btnToggleNodesToolbar" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <!-- Lab Instruments Suite -->
+            <div class="toolbar-toolgroup">
+              <button class="tool-btn" id="btnOpenDMM" title="Digital Multimeter (DMM)" style="font-size: 11px; font-weight: 700; color: #f59e0b;">📟 DMM</button>
+              <button class="tool-btn" id="btnOpenLogicAnalyzer" title="8-Channel Logic Analyzer" style="font-size: 11px; font-weight: 700; color: #0284c7;">📊 LA</button>
+              <button class="tool-btn" id="btnOpenSpectrumAnalyzer" title="FFT Spectrum Analyzer" style="font-size: 11px; font-weight: 700; color: #8b5cf6;">📈 FFT</button>
             </div>
             <div class="toolbar-divider"></div>
             <button class="tool-btn active" id="btnToggleProperties" title="Toggle Configuration Pane (Properties)">⚙</button>
@@ -690,28 +707,148 @@
     </div>
 
     <!-- ====================================================================
-         VIEW: MY CIRCUITS (/my-circuits)
+         VIEW: SWITCHA BLOCKS DYNAMIC SYSTEMS SIMULATOR (/blocks)
+         ==================================================================== -->
+    <div class="view-page" id="view-blocks">
+      <div class="studio-wrapper blocks-wrapper">
+        <!-- Blocks Toolbar -->
+        <div class="studio-toolbar">
+          <div class="studio-toolbar-left">
+            <button class="tool-btn active" id="btnToggleBlocksPalette" title="Toggle Blocks Palette">☰</button>
+            <input type="text" class="circuit-title-input" id="blockModelNameInput" value="Untitled Model" title="Model Name"/>
+            <button class="btn btn-primary" id="btnSaveBlockModel" style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 4px;">💾 Save</button>
+            <div class="toolbar-divider"></div>
+            
+            <button class="btn-sim-run" id="btnBlocksSimToggle" title="Run / Pause Dynamic Simulation">
+              <span id="blocksSimToggleIcon">▶</span>
+              <span id="blocksSimToggleText">Run Model</span>
+            </button>
+            <button class="tool-btn" id="btnBlocksSimStep" title="Step One Time Step (dt)">⏭</button>
+            <button class="tool-btn" id="btnBlocksSimReset" title="Reset Simulation Time">⏮</button>
+            <div class="sim-time-indicator" id="blocksSimTimeDisplay" title="Simulation Time">t: 0.00 s</div>
+          </div>
+
+          <div class="studio-toolbar-center">
+            <!-- View Mode Switcher -->
+            <div class="view-mode-group">
+              <button class="view-mode-btn" data-blocks-mode="canvas">Diagram</button>
+              <button class="view-mode-btn active" data-blocks-mode="split">Split</button>
+              <button class="view-mode-btn" data-blocks-mode="scope">Scope</button>
+            </div>
+            <div class="toolbar-divider"></div>
+
+            <label style="font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 4px;">
+              Solver:
+              <select id="blocksSolverSelect" class="grapher-select" style="font-weight: 600;">
+                <option value="rk4" selected>Runge-Kutta 4th (RK4)</option>
+                <option value="euler">Forward Euler</option>
+                <option value="rk2">Midpoint (RK2)</option>
+              </select>
+            </label>
+
+            <label style="font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 4px; margin-left: 4px;">
+              dt:
+              <input type="text" id="blocksStepInput" class="grapher-input" value="0.001" style="width: 55px;"/>
+            </label>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Prebuilt Models Dropdown -->
+            <select id="blocksPresetSelect" class="grapher-select" title="Load Prebuilt System Model">
+              <option value="">-- Load Prebuilt System Model --</option>
+              <option value="dc_motor_pid">1. DC Motor Speed Control with PID</option>
+              <option value="mass_spring_damper">2. 2nd-Order Mass-Spring-Damper Dynamics</option>
+              <option value="am_radio_channel">3. AM Radio Transmitter & AWGN Channel</option>
+            </select>
+          </div>
+
+          <div class="studio-toolbar-right">
+            <button class="tool-btn" id="btnBlocksFit" title="Fit Diagram to Screen">⛶</button>
+            <button class="tool-btn" id="btnBlocksDelete" title="Delete Selected Block / Wire">🗑</button>
+            <button class="btn btn-outline" id="btnBlocksExportJSON" style="padding: 4px 8px; font-size: 11.5px;">Export .swblock</button>
+          </div>
+        </div>
+
+        <!-- Blocks Main Workspace -->
+        <div class="studio-main">
+          <!-- Left Blocks Palette Sidebar -->
+          <aside class="palette-sidebar" id="blocksPaletteSidebar">
+            <div class="palette-header-row">
+              <span class="palette-title">Block Library</span>
+              <button class="palette-collapse-btn" id="btnCollapseBlocksPalette" title="Collapse">◀</button>
+            </div>
+            <div class="palette-search">
+              <input type="text" id="blocksSearchInput" placeholder="Search blocks..."/>
+            </div>
+            <div class="palette-categories" id="blocksPaletteContainer">
+              <!-- Dynamically populated from BlockTypes -->
+            </div>
+          </aside>
+
+          <!-- Center Diagram Canvas & Scope Split Area -->
+          <div class="studio-center">
+            <div class="canvas-panel" id="blocksCanvasPanel">
+              <canvas id="blocksCanvas" class="schematic-canvas"></canvas>
+            </div>
+
+            <div class="split-gutter" id="blocksSplitGutter" title="Drag to resize"></div>
+
+            <div class="grapher-panel" id="blocksScopePanel">
+              <div id="blocksScopeContainer" style="width:100%; height:100%;"></div>
+            </div>
+          </div>
+
+          <!-- Right Properties Sidebar -->
+          <aside class="properties-sidebar" id="blocksPropertiesSidebar">
+            <div class="properties-header-row">
+              <h3 class="properties-header">Block Parameters</h3>
+              <button class="properties-close-btn" id="btnCloseBlocksProperties" title="Close">✕</button>
+            </div>
+            <div id="blocksPropertiesContent">
+              <p class="no-selection-msg">Select a block on the diagram to configure its mathematical parameters.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW: SWITCHA CODE SCIENTIFIC RUNTIME (/code)
+         ==================================================================== -->
+    <div class="view-page" id="view-code">
+      <div id="codeEnvironmentContainer" style="width: 100%; height: calc(100vh - 100px);"></div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW: MY WORKSPACE (/my-circuits /workspace)
          ==================================================================== -->
     <div class="view-page" id="view-my-circuits">
       <div class="my-circuits-container">
         <div class="my-circuits-header">
           <div>
-            <h1 class="section-title">📁 My Circuits</h1>
-            <p class="section-subtitle">Your personal circuit library saved automatically to your device and synced when online.</p>
+            <h1 class="section-title">📁 My Studio Workspace</h1>
+            <p class="section-subtitle">Offline-first local storage for your electronic circuits, dynamical block models, and scientific scripts.</p>
           </div>
           <div class="my-circuits-actions">
             <button class="btn btn-primary btn-large" id="btnNewMyCircuit">➕ New Circuit</button>
-            <button class="btn btn-outline" id="btnImportMyCircuit">📂 Import JSON</button>
+            <button class="btn btn-outline" id="btnImportMyCircuit">📂 Import File</button>
           </div>
+        </div>
+
+        <!-- Workspace Tabs (Circuits / Models / Scripts) -->
+        <div class="filter-tabs" style="margin-bottom: 16px;">
+          <button class="filter-tab active" id="tabWorkspaceCircuits" data-workspace-tab="circuits">🔌 Circuits (.swcirc)</button>
+          <button class="filter-tab" id="tabWorkspaceModels" data-workspace-tab="models">🧩 Models (.swblock)</button>
+          <button class="filter-tab" id="tabWorkspaceScripts" data-workspace-tab="scripts">💻 Scripts (.swcode)</button>
         </div>
 
         <div class="my-circuits-toolbar">
           <div class="search-box">
             <span class="search-icon">🔍</span>
-            <input type="text" class="search-input" id="myCircuitsSearchInput" placeholder="Search your saved circuits..."/>
+            <input type="text" class="search-input" id="myCircuitsSearchInput" placeholder="Search your saved projects..."/>
           </div>
           <div class="my-circuits-stats" id="myCircuitsCount">
-            0 Circuits Saved
+            0 Projects Saved
           </div>
         </div>
 
@@ -927,10 +1064,28 @@
     </div>
   </div>
 
+  <!-- Digital Multimeter (DMM) Modal -->
+  <div class="modal-overlay" id="dmmModal">
+    <div class="modal-content" id="dmmModalContent" style="max-width: 480px; width: 90%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 0; border-radius: 12px; overflow: hidden;">
+    </div>
+  </div>
+
+  <!-- Logic Analyzer Modal -->
+  <div class="modal-overlay" id="logicAnalyzerModal">
+    <div class="modal-content" id="logicAnalyzerModalContent" style="max-width: 840px; width: 92%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 0; border-radius: 12px; overflow: hidden;">
+    </div>
+  </div>
+
+  <!-- Spectrum Analyzer Modal -->
+  <div class="modal-overlay" id="spectrumAnalyzerModal">
+    <div class="modal-content" id="spectrumAnalyzerModalContent" style="max-width: 840px; width: 92%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 0; border-radius: 12px; overflow: hidden;">
+    </div>
+  </div>
+
   <!-- Switcha Toast Notification -->
   <div class="switcha-toast" id="switchaToast"></div>
 
-  <!-- Main JavaScript App Loader -->
+  <!-- Main JavaScript App Loader (ES Module) -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

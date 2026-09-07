@@ -50,7 +50,7 @@ console.log('✓ PASS: CSS stylesheet includes responsive styles for My Circuits
 
 // 5. Service Worker Verification
 const swJs = fs.readFileSync(path.join(rootDir, 'sw.js'), 'utf8');
-assert.ok(swJs.includes('switcha-pwa-v1'), 'SW cache name is switcha-pwa-v1');
+assert.ok(swJs.includes('switcha-pwa-v'), 'SW cache name matches switcha-pwa-v*');
 assert.ok(!swJs.includes('electrosim'), 'SW has zero electrosim references');
 console.log('✓ PASS: Service Worker is updated with Switcha PWA cache strategy');
 

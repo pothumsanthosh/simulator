@@ -47,6 +47,7 @@ export const ComponentTypes = {
   CCCS: 'CCCS',
   BATTERY_CELL: 'BATTERY_CELL',
   SOLAR_CELL: 'SOLAR_CELL',
+  FUNCTION_GENERATOR: 'FUNCTION_GENERATOR',
 
   // Passives
   RESISTOR: 'RESISTOR',
@@ -369,7 +370,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'GND',
     width: 30, height: 30,
-    pins: [{ id: 'p1', name: 'GND', x: 0, y: -15, dir: 'top' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "GND (1)",
+            "num": 1,
+            "x": 0,
+            "y": -15,
+            "dir": "top",
+            "desc": "Ground Reference (0V)"
+      }
+    ],
     params: {}, paramSchema: []
   },
   [ComponentTypes.DC_VOLTAGE]: {
@@ -378,7 +389,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_DC',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Positive Terminal (+)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Negative Terminal (-)"
+      }
+    ],
     params: { voltage: 5 },
     paramSchema: [{ key: 'voltage', label: 'Voltage', type: 'number', unit: 'V', default: 5, step: 0.1 }]
   },
@@ -388,7 +418,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_AC',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "AC Live Terminal (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "AC Neutral Terminal (Pin 2)"
+      }
+    ],
     params: { amplitude: 5, frequency: 1000, offset: 0, phase: 0 },
     paramSchema: [
       { key: 'amplitude', label: 'Peak Amplitude', type: 'number', unit: 'V', default: 5, step: 0.1 },
@@ -403,7 +452,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_CLK',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Clock Pulse Output (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Clock Return (Pin 2)"
+      }
+    ],
     params: { vHigh: 5, vLow: 0, frequency: 1000, dutyCycle: 50 },
     paramSchema: [
       { key: 'vHigh', label: 'High Voltage', type: 'number', unit: 'V', default: 5 },
@@ -418,7 +486,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_TRI',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Triangle Wave Out (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Signal Return (Pin 2)"
+      }
+    ],
     params: { amplitude: 5, frequency: 1000, offset: 0 },
     paramSchema: [
       { key: 'amplitude', label: 'Peak Amplitude', type: 'number', unit: 'V', default: 5 },
@@ -432,7 +519,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_SAW',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Sawtooth Wave Out (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Signal Return (Pin 2)"
+      }
+    ],
     params: { amplitude: 5, frequency: 1000, offset: 0 },
     paramSchema: [
       { key: 'amplitude', label: 'Peak Amplitude', type: 'number', unit: 'V', default: 5 },
@@ -445,7 +551,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_PULSE',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Pulse Output (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Pulse Return (Pin 2)"
+      }
+    ],
     params: { v1: 0, v2: 5, tDelay: 0, tRise: 1e-6, tFall: 1e-6, tWidth: 1e-3, period: 2e-3 },
     paramSchema: [
       { key: 'v1', label: 'Initial Voltage', type: 'number', unit: 'V', default: 0 },
@@ -464,8 +589,24 @@ export const ComponentDefinitions = {
     prefix: 'V_TRIG',
     width: 50, height: 60,
     pins: [
-      { id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' },
-      { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Trigger Pulse Out (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Trigger Return (Pin 2)"
+      }
     ],
     params: { vHigh: 5, vLow: 0, pulseWidth: 1e-3, tRise: 1e-6, tFall: 1e-6 },
     paramSchema: [
@@ -480,7 +621,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_AM',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "AM Modulated Out (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "RF Return (Pin 2)"
+      }
+    ],
     params: { carrierAmp: 5, carrierFreq: 50000, modFreq: 1000, modIndex: 0.8 },
     paramSchema: [
       { key: 'carrierAmp', label: 'Carrier Amp', type: 'number', unit: 'V', default: 5 },
@@ -495,7 +655,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_FM',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "FM Modulated Out (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "RF Return (Pin 2)"
+      }
+    ],
     params: { carrierAmp: 5, carrierFreq: 20000, modFreq: 1000, freqDev: 5000 },
     paramSchema: [
       { key: 'carrierAmp', label: 'Carrier Amp', type: 'number', unit: 'V', default: 5 },
@@ -509,7 +688,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'V_NOISE',
     width: 40, height: 60,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -30, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Noise Source Out (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Noise Return (Pin 2)"
+      }
+    ],
     params: { rmsVoltage: 0.5 },
     paramSchema: [{ key: 'rmsVoltage', label: 'RMS Noise', type: 'number', unit: 'V', default: 0.5 }]
   },
@@ -519,7 +717,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'I_DC',
     width: 40, height: 60,
-    pins: [{ id: 'p_in', name: 'In', x: 0, y: -30, dir: 'top' }, { id: 'p_out', name: 'Out', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_in",
+            "name": "IN (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "Current Inflow (Pin 1)"
+      },
+      {
+            "id": "p_out",
+            "name": "OUT (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Current Outflow (Pin 2)"
+      }
+    ],
     params: { current: 0.001 },
     paramSchema: [{ key: 'current', label: 'DC Current', type: 'number', unit: 'A', default: 0.001, step: 0.0001 }]
   },
@@ -529,7 +746,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'I_AC',
     width: 40, height: 60,
-    pins: [{ id: 'p_in', name: 'In', x: 0, y: -30, dir: 'top' }, { id: 'p_out', name: 'Out', x: 0, y: 30, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_in",
+            "name": "IN (1)",
+            "num": 1,
+            "x": 0,
+            "y": -30,
+            "dir": "top",
+            "desc": "AC Inflow (Pin 1)"
+      },
+      {
+            "id": "p_out",
+            "name": "OUT (2)",
+            "num": 2,
+            "x": 0,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "AC Outflow (Pin 2)"
+      }
+    ],
     params: { amplitude: 0.005, frequency: 1000 },
     paramSchema: [
       { key: 'amplitude', label: 'Peak Current', type: 'number', unit: 'A', default: 0.005 },
@@ -543,10 +779,42 @@ export const ComponentDefinitions = {
     prefix: 'E_VCVS',
     width: 50, height: 60,
     pins: [
-      { id: 'in_pos', name: 'IN+', x: -25, y: -15, dir: 'left' },
-      { id: 'in_neg', name: 'IN-', x: -25, y: 15, dir: 'left' },
-      { id: 'out_pos', name: 'OUT+', x: 25, y: -15, dir: 'right' },
-      { id: 'out_neg', name: 'OUT-', x: 25, y: 15, dir: 'right' }
+      {
+            "id": "in_pos",
+            "name": "IN+ (1)",
+            "num": 1,
+            "x": -30,
+            "y": -15,
+            "dir": "left",
+            "desc": "Control Input (+) (Pin 1)"
+      },
+      {
+            "id": "in_neg",
+            "name": "IN- (2)",
+            "num": 2,
+            "x": -30,
+            "y": 15,
+            "dir": "left",
+            "desc": "Control Input (-) (Pin 2)"
+      },
+      {
+            "id": "out_pos",
+            "name": "OUT+ (3)",
+            "num": 3,
+            "x": 30,
+            "y": -15,
+            "dir": "right",
+            "desc": "Controlled Output (+) (Pin 3)"
+      },
+      {
+            "id": "out_neg",
+            "name": "OUT- (4)",
+            "num": 4,
+            "x": 30,
+            "y": 15,
+            "dir": "right",
+            "desc": "Controlled Output (-) (Pin 4)"
+      }
     ],
     params: { gain: 2.0 },
     paramSchema: [{ key: 'gain', label: 'Voltage Gain (V/V)', type: 'number', unit: '', default: 2.0 }]
@@ -558,10 +826,42 @@ export const ComponentDefinitions = {
     prefix: 'G_VCCS',
     width: 50, height: 60,
     pins: [
-      { id: 'in_pos', name: 'IN+', x: -25, y: -15, dir: 'left' },
-      { id: 'in_neg', name: 'IN-', x: -25, y: 15, dir: 'left' },
-      { id: 'out_pos', name: 'OUT+', x: 25, y: -15, dir: 'right' },
-      { id: 'out_neg', name: 'OUT-', x: 25, y: 15, dir: 'right' }
+      {
+            "id": "in_pos",
+            "name": "IN+ (1)",
+            "num": 1,
+            "x": -30,
+            "y": -15,
+            "dir": "left",
+            "desc": "Control Input (+) (Pin 1)"
+      },
+      {
+            "id": "in_neg",
+            "name": "IN- (2)",
+            "num": 2,
+            "x": -30,
+            "y": 15,
+            "dir": "left",
+            "desc": "Control Input (-) (Pin 2)"
+      },
+      {
+            "id": "out_pos",
+            "name": "OUT+ (3)",
+            "num": 3,
+            "x": 30,
+            "y": -15,
+            "dir": "right",
+            "desc": "Controlled Current (+) (Pin 3)"
+      },
+      {
+            "id": "out_neg",
+            "name": "OUT- (4)",
+            "num": 4,
+            "x": 30,
+            "y": 15,
+            "dir": "right",
+            "desc": "Controlled Current (-) (Pin 4)"
+      }
     ],
     params: { transconductance: 0.01 },
     paramSchema: [{ key: 'transconductance', label: 'Transconductance (A/V)', type: 'number', unit: 'S', default: 0.01 }]
@@ -572,11 +872,77 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SOURCES,
     prefix: 'BAT',
     width: 40, height: 50,
-    pins: [{ id: 'p_pos', name: '+', x: 0, y: -25, dir: 'top' }, { id: 'p_neg', name: '-', x: 0, y: 25, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": 0,
+            "y": -25,
+            "dir": "top",
+            "desc": "Positive Electrode (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 0,
+            "y": 25,
+            "dir": "bottom",
+            "desc": "Negative Electrode (Pin 2)"
+      }
+    ],
     params: { voltage: 3.7, internalR: 0.05 },
     paramSchema: [
       { key: 'voltage', label: 'Cell Voltage', type: 'number', unit: 'V', default: 3.7 },
       { key: 'internalR', label: 'Internal Resistance', type: 'number', unit: 'Ω', default: 0.05 }
+    ]
+  },
+  [ComponentTypes.FUNCTION_GENERATOR]: {
+    name: 'Function Generator (XFG1)',
+    type: ComponentTypes.FUNCTION_GENERATOR,
+    category: ComponentCategory.SOURCES,
+    prefix: 'XFG',
+    package: 'Virtual Instrument',
+    description: 'Multi-waveform laboratory signal generator producing Sine, Triangle, Square, and Sawtooth waveforms with variable frequency, amplitude, offset, duty cycle, and phase.',
+    width: 70, height: 60,
+    pins: [
+      {
+        id: 'p_pos',
+        name: '+ (1)',
+        num: 1,
+        x: 35,
+        y: -15,
+        dir: 'right',
+        desc: 'Positive Signal Output (+)'
+      },
+      {
+        id: 'com',
+        name: 'COM (2)',
+        num: 2,
+        x: 35,
+        y: 0,
+        dir: 'right',
+        desc: 'Common Ground Reference (COM)'
+      },
+      {
+        id: 'p_neg',
+        name: '- (3)',
+        num: 3,
+        x: 35,
+        y: 15,
+        dir: 'right',
+        desc: 'Inverted Signal Output (-)'
+      }
+    ],
+    params: { waveform: 'sine', frequency: 1000, amplitude: 5, offset: 0, dutyCycle: 50, phase: 0 },
+    paramSchema: [
+      { key: 'waveform', label: 'Waveform Function', type: 'select', options: ['sine', 'triangle', 'square', 'sawtooth'], default: 'sine' },
+      { key: 'frequency', label: 'Frequency', type: 'number', unit: 'Hz', default: 1000, step: 10 },
+      { key: 'amplitude', label: 'Peak Amplitude (Vp)', type: 'number', unit: 'V', default: 5, step: 0.1 },
+      { key: 'offset', label: 'DC Offset Voltage', type: 'number', unit: 'V', default: 0, step: 0.1 },
+      { key: 'dutyCycle', label: 'Duty Cycle', type: 'range', min: 1, max: 99, default: 50 },
+      { key: 'phase', label: 'Phase Angle', type: 'number', unit: '°', default: 0, step: 5 }
     ]
   },
 
@@ -587,7 +953,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'R',
     width: 60, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -30, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 30, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Terminal 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "Terminal 2"
+      }
+    ],
     params: { resistance: 1000 },
     paramSchema: [{ key: 'resistance', label: 'Resistance', type: 'number', unit: 'Ω', default: 1000, step: 10 }]
   },
@@ -598,9 +983,33 @@ export const ComponentDefinitions = {
     prefix: 'POT',
     width: 60, height: 40,
     pins: [
-      { id: 'p1', name: '1', x: -30, y: 0, dir: 'left' },
-      { id: 'p2', name: 'Wiper', x: 0, y: -20, dir: 'top' },
-      { id: 'p3', name: '2', x: 30, y: 0, dir: 'right' }
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "End Terminal 1"
+      },
+      {
+            "id": "p2",
+            "name": "W (2)",
+            "num": 2,
+            "x": 0,
+            "y": -20,
+            "dir": "top",
+            "desc": "Wiper Contact (Pin 2)"
+      },
+      {
+            "id": "p3",
+            "name": "3",
+            "num": 3,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "End Terminal 2"
+      }
     ],
     params: { resistance: 10000, position: 50 },
     paramSchema: [
@@ -614,7 +1023,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'C',
     width: 40, height: 40,
-    pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -20,
+            "y": 0,
+            "dir": "left",
+            "desc": "Plate 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Plate 2"
+      }
+    ],
     params: { capacitance: 1e-7 },
     paramSchema: [{ key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 1e-7, step: 1e-9 }]
   },
@@ -624,7 +1052,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'C_POL',
     width: 40, height: 40,
-    pins: [{ id: 'p_pos', name: '+', x: -20, y: 0, dir: 'left' }, { id: 'p_neg', name: '-', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": -20,
+            "y": 0,
+            "dir": "left",
+            "desc": "Anode Lead (+) (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Cathode Lead (-) (Pin 2)"
+      }
+    ],
     params: { capacitance: 1e-4 },
     paramSchema: [{ key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 1e-4, step: 1e-6 }]
   },
@@ -634,7 +1081,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'C_TAN',
     width: 40, height: 40,
-    pins: [{ id: 'p_pos', name: '+', x: -20, y: 0, dir: 'left' }, { id: 'p_neg', name: '-', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": -20,
+            "y": 0,
+            "dir": "left",
+            "desc": "Tantalum Anode (+) (Pin 1)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Tantalum Cathode (-) (Pin 2)"
+      }
+    ],
     params: { capacitance: 2.2e-5, esr: 0.1 },
     paramSchema: [{ key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 2.2e-5 }]
   },
@@ -644,7 +1110,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'L',
     width: 60, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -30, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 30, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Coil Terminal 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "Coil Terminal 2"
+      }
+    ],
     params: { inductance: 1e-3 },
     paramSchema: [{ key: 'inductance', label: 'Inductance', type: 'number', unit: 'H', default: 1e-3, step: 1e-4 }]
   },
@@ -655,10 +1140,42 @@ export const ComponentDefinitions = {
     prefix: 'L_CUP',
     width: 60, height: 50,
     pins: [
-      { id: 'l1_p1', name: 'L1+', x: -30, y: -15, dir: 'left' },
-      { id: 'l1_p2', name: 'L1-', x: 30, y: -15, dir: 'right' },
-      { id: 'l2_p1', name: 'L2+', x: -30, y: 15, dir: 'left' },
-      { id: 'l2_p2', name: 'L2-', x: 30, y: 15, dir: 'right' }
+      {
+            "id": "l1_p1",
+            "name": "L1+ (1)",
+            "num": 1,
+            "x": -30,
+            "y": -15,
+            "dir": "left",
+            "desc": "Primary Inductor Dot (Pin 1)"
+      },
+      {
+            "id": "l1_p2",
+            "name": "L1- (2)",
+            "num": 2,
+            "x": -30,
+            "y": 15,
+            "dir": "left",
+            "desc": "Primary Inductor Return (Pin 2)"
+      },
+      {
+            "id": "l2_p1",
+            "name": "L2+ (3)",
+            "num": 3,
+            "x": 30,
+            "y": -15,
+            "dir": "right",
+            "desc": "Secondary Inductor Dot (Pin 3)"
+      },
+      {
+            "id": "l2_p2",
+            "name": "L2- (4)",
+            "num": 4,
+            "x": 30,
+            "y": 15,
+            "dir": "right",
+            "desc": "Secondary Inductor Return (Pin 4)"
+      }
     ],
     params: { l1: 1e-3, l2: 1e-3, k: 0.98 },
     paramSchema: [
@@ -674,10 +1191,42 @@ export const ComponentDefinitions = {
     prefix: 'XFMR',
     width: 60, height: 60,
     pins: [
-      { id: 'pri_1', name: 'Pri 1', x: -30, y: -20, dir: 'left' },
-      { id: 'pri_2', name: 'Pri 2', x: -30, y: 20, dir: 'left' },
-      { id: 'sec_1', name: 'Sec 1', x: 30, y: -20, dir: 'right' },
-      { id: 'sec_2', name: 'Sec 2', x: 30, y: 20, dir: 'right' }
+      {
+            "id": "pri_1",
+            "name": "P1 (1)",
+            "num": 1,
+            "x": -30,
+            "y": -20,
+            "dir": "left",
+            "desc": "Primary Winding (+) (Pin 1)"
+      },
+      {
+            "id": "pri_2",
+            "name": "P2 (2)",
+            "num": 2,
+            "x": -30,
+            "y": 20,
+            "dir": "left",
+            "desc": "Primary Winding (-) (Pin 2)"
+      },
+      {
+            "id": "sec_1",
+            "name": "S1 (3)",
+            "num": 3,
+            "x": 30,
+            "y": -20,
+            "dir": "right",
+            "desc": "Secondary Winding (+) (Pin 3)"
+      },
+      {
+            "id": "sec_2",
+            "name": "S2 (4)",
+            "num": 4,
+            "x": 30,
+            "y": 20,
+            "dir": "right",
+            "desc": "Secondary Winding (-) (Pin 4)"
+      }
     ],
     params: { ratio: 0.1, primaryL: 0.01 },
     paramSchema: [
@@ -692,11 +1241,51 @@ export const ComponentDefinitions = {
     prefix: 'XFMR_CT',
     width: 60, height: 70,
     pins: [
-      { id: 'pri_1', name: 'Pri 1', x: -30, y: -20, dir: 'left' },
-      { id: 'pri_2', name: 'Pri 2', x: -30, y: 20, dir: 'left' },
-      { id: 'sec_1', name: 'Sec 1', x: 30, y: -25, dir: 'right' },
-      { id: 'sec_ct', name: 'Center Tap', x: 30, y: 0, dir: 'right' },
-      { id: 'sec_2', name: 'Sec 2', x: 30, y: 25, dir: 'right' }
+      {
+            "id": "pri_1",
+            "name": "P1 (1)",
+            "num": 1,
+            "x": -30,
+            "y": -20,
+            "dir": "left",
+            "desc": "Primary Winding (+) (Pin 1)"
+      },
+      {
+            "id": "pri_2",
+            "name": "P2 (2)",
+            "num": 2,
+            "x": -30,
+            "y": 20,
+            "dir": "left",
+            "desc": "Primary Winding (-) (Pin 2)"
+      },
+      {
+            "id": "sec_1",
+            "name": "S1 (3)",
+            "num": 3,
+            "x": 30,
+            "y": -20,
+            "dir": "right",
+            "desc": "Secondary Upper (+) (Pin 3)"
+      },
+      {
+            "id": "sec_ct",
+            "name": "CT (4)",
+            "num": 4,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "Center Tap Neutral (Pin 4)"
+      },
+      {
+            "id": "sec_2",
+            "name": "S2 (5)",
+            "num": 5,
+            "x": 30,
+            "y": 20,
+            "dir": "right",
+            "desc": "Secondary Lower (-) (Pin 5)"
+      }
     ],
     params: { ratio: 0.2, primaryL: 0.01 },
     paramSchema: [{ key: 'ratio', label: 'Turns Ratio', type: 'number', default: 0.2 }]
@@ -707,7 +1296,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'XTAL',
     width: 50, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -25, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 25, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -20,
+            "y": 0,
+            "dir": "left",
+            "desc": "Crystal Electrode 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Crystal Electrode 2"
+      }
+    ],
     params: { frequency: 4e6 },
     paramSchema: [{ key: 'frequency', label: 'Resonant Frequency', type: 'number', unit: 'Hz', default: 4e6 }]
   },
@@ -717,7 +1325,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'FUSE',
     width: 50, height: 20,
-    pins: [{ id: 'p1', name: '1', x: -25, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 25, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Fuse Lead 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Fuse Lead 2"
+      }
+    ],
     params: { currentRating: 1.0, blown: false },
     paramSchema: [
       { key: 'currentRating', label: 'Current Rating', type: 'number', unit: 'A', default: 1.0 },
@@ -730,7 +1357,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'TH_NTC',
     width: 50, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -25, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 25, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Thermistor Lead 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "Thermistor Lead 2"
+      }
+    ],
     params: { r25: 10000, beta: 3950, temperature: 25 },
     paramSchema: [
       { key: 'r25', label: 'R at 25°C', type: 'number', unit: 'Ω', default: 10000 },
@@ -743,7 +1389,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PASSIVES,
     prefix: 'LDR',
     width: 50, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -25, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 25, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "LDR Cell Terminal 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "LDR Cell Terminal 2"
+      }
+    ],
     params: { lightLevel: 50, rDark: 1e6, rLight: 500 },
     paramSchema: [
       { key: 'lightLevel', label: 'Illumination', type: 'range', min: 0, max: 100, default: 50 }
@@ -757,7 +1422,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.DIODES,
     prefix: 'D',
     width: 40, height: 30,
-    pins: [{ id: 'anode', name: 'A', x: -20, y: 0, dir: 'left' }, { id: 'cathode', name: 'K', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "anode",
+            "name": "A (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Diode Anode (Pin 1)"
+      },
+      {
+            "id": "cathode",
+            "name": "K (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Diode Cathode (Pin 2)"
+      }
+    ],
     params: { model: '1N4007', forwardDrop: 0.7, satCurrent: 1e-12 },
     paramSchema: [
       { key: 'model', label: 'Part Model', type: 'select', options: ['1N4007', '1N4148', '1N4001', '1N4004', '1N914'], default: '1N4007' },
@@ -770,7 +1454,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.DIODES,
     prefix: 'D_SCH',
     width: 40, height: 30,
-    pins: [{ id: 'anode', name: 'A', x: -20, y: 0, dir: 'left' }, { id: 'cathode', name: 'K', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "anode",
+            "name": "A (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Schottky Anode (Pin 1)"
+      },
+      {
+            "id": "cathode",
+            "name": "K (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Schottky Cathode (Pin 2)"
+      }
+    ],
     params: { model: 'BAT54', forwardDrop: 0.32 },
     paramSchema: [{ key: 'forwardDrop', label: 'Forward Drop', type: 'number', unit: 'V', default: 0.32 }]
   },
@@ -780,7 +1483,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.DIODES,
     prefix: 'D_ZEN',
     width: 40, height: 30,
-    pins: [{ id: 'anode', name: 'A', x: -20, y: 0, dir: 'left' }, { id: 'cathode', name: 'K', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "anode",
+            "name": "A (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Zener Anode (Pin 1)"
+      },
+      {
+            "id": "cathode",
+            "name": "K (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Zener Cathode (Pin 2)"
+      }
+    ],
     params: { zenerVoltage: 5.1, forwardDrop: 0.7 },
     paramSchema: [
       { key: 'zenerVoltage', label: 'Zener Breakdown Voltage (Vz)', type: 'number', unit: 'V', default: 5.1, step: 0.1 }
@@ -792,7 +1514,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.DIODES,
     prefix: 'LED',
     width: 40, height: 30,
-    pins: [{ id: 'anode', name: 'A', x: -20, y: 0, dir: 'left' }, { id: 'cathode', name: 'K', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "anode",
+            "name": "A (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "LED Anode (+) (Pin 1)"
+      },
+      {
+            "id": "cathode",
+            "name": "K (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "LED Cathode (-) (Pin 2)"
+      }
+    ],
     params: { color: '#ff3b30', forwardDrop: 2.0 },
     paramSchema: [
       { key: 'color', label: 'Emission Color', type: 'select', options: ['#ff3b30', '#03b585', '#007aff', '#ff9500', '#ffffff'], default: '#ff3b30' },
@@ -806,10 +1547,42 @@ export const ComponentDefinitions = {
     prefix: 'BR',
     width: 50, height: 50,
     pins: [
-      { id: 'ac1', name: 'AC 1', x: -25, y: -15, dir: 'left' },
-      { id: 'ac2', name: 'AC 2', x: -25, y: 15, dir: 'left' },
-      { id: 'pos', name: '+ (DC)', x: 25, y: -15, dir: 'right' },
-      { id: 'neg', name: '- (DC)', x: 25, y: 15, dir: 'right' }
+      {
+            "id": "ac1",
+            "name": "AC1 (1)",
+            "num": 1,
+            "x": -30,
+            "y": -15,
+            "dir": "left",
+            "desc": "AC Input Phase 1 (Pin 1)"
+      },
+      {
+            "id": "ac2",
+            "name": "AC2 (2)",
+            "num": 2,
+            "x": -30,
+            "y": 15,
+            "dir": "left",
+            "desc": "AC Input Phase 2 (Pin 2)"
+      },
+      {
+            "id": "pos",
+            "name": "+ (3)",
+            "num": 3,
+            "x": 30,
+            "y": -15,
+            "dir": "right",
+            "desc": "Rectified DC Positive (Pin 3)"
+      },
+      {
+            "id": "neg",
+            "name": "- (4)",
+            "num": 4,
+            "x": 30,
+            "y": 15,
+            "dir": "right",
+            "desc": "Rectified DC Negative (Pin 4)"
+      }
     ],
     params: { forwardDrop: 0.7 },
     paramSchema: [{ key: 'forwardDrop', label: 'Diode Vf', type: 'number', unit: 'V', default: 0.7 }]
@@ -823,9 +1596,33 @@ export const ComponentDefinitions = {
     prefix: 'Q_NPN',
     width: 40, height: 50,
     pins: [
-      { id: 'base', name: 'B', x: -20, y: 0, dir: 'left' },
-      { id: 'collector', name: 'C', x: 15, y: -25, dir: 'top' },
-      { id: 'emitter', name: 'E', x: 15, y: 25, dir: 'bottom' }
+      {
+            "id": "base",
+            "name": "B (1)",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Base (Pin 1)"
+      },
+      {
+            "id": "collector",
+            "name": "C (2)",
+            "num": 2,
+            "x": 10,
+            "y": -30,
+            "dir": "top",
+            "desc": "Collector (Pin 2)"
+      },
+      {
+            "id": "emitter",
+            "name": "E (3)",
+            "num": 3,
+            "x": 10,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Emitter (Pin 3)"
+      }
     ],
     params: { model: '2N3904', beta: 200, vbe: 0.65 },
     paramSchema: [
@@ -840,9 +1637,33 @@ export const ComponentDefinitions = {
     prefix: 'Q_PNP',
     width: 40, height: 50,
     pins: [
-      { id: 'base', name: 'B', x: -20, y: 0, dir: 'left' },
-      { id: 'collector', name: 'C', x: 15, y: 25, dir: 'bottom' },
-      { id: 'emitter', name: 'E', x: 15, y: -25, dir: 'top' }
+      {
+            "id": "base",
+            "name": "B (1)",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Base (Pin 1)"
+      },
+      {
+            "id": "collector",
+            "name": "C (2)",
+            "num": 2,
+            "x": 10,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Collector (Pin 2)"
+      },
+      {
+            "id": "emitter",
+            "name": "E (3)",
+            "num": 3,
+            "x": 10,
+            "y": -30,
+            "dir": "top",
+            "desc": "Emitter (Pin 3)"
+      }
     ],
     params: { model: '2N3906', beta: 200, vbe: 0.65 },
     paramSchema: [
@@ -857,9 +1678,33 @@ export const ComponentDefinitions = {
     prefix: 'Q_DARL',
     width: 40, height: 50,
     pins: [
-      { id: 'base', name: 'B', x: -20, y: 0, dir: 'left' },
-      { id: 'collector', name: 'C', x: 15, y: -25, dir: 'top' },
-      { id: 'emitter', name: 'E', x: 15, y: 25, dir: 'bottom' }
+      {
+            "id": "base",
+            "name": "B (1)",
+            "num": 1,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Darlington Base (Pin 1)"
+      },
+      {
+            "id": "collector",
+            "name": "C (2)",
+            "num": 2,
+            "x": 10,
+            "y": -30,
+            "dir": "top",
+            "desc": "Darlington Collector (Pin 2)"
+      },
+      {
+            "id": "emitter",
+            "name": "E (3)",
+            "num": 3,
+            "x": 10,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Darlington Emitter (Pin 3)"
+      }
     ],
     params: { beta: 1000, vbe: 1.3 },
     paramSchema: [{ key: 'beta', label: 'Darlington Beta', type: 'number', unit: '', default: 1000 }]
@@ -871,9 +1716,33 @@ export const ComponentDefinitions = {
     prefix: 'M_NMOS',
     width: 40, height: 50,
     pins: [
-      { id: 'gate', name: 'G', x: -20, y: 10, dir: 'left' },
-      { id: 'drain', name: 'D', x: 15, y: -25, dir: 'top' },
-      { id: 'source', name: 'S', x: 15, y: 25, dir: 'bottom' }
+      {
+            "id": "gate",
+            "name": "G (1)",
+            "num": 1,
+            "x": -30,
+            "y": 10,
+            "dir": "left",
+            "desc": "Gate (Pin 1)"
+      },
+      {
+            "id": "drain",
+            "name": "D (2)",
+            "num": 2,
+            "x": 10,
+            "y": -30,
+            "dir": "top",
+            "desc": "Drain (Pin 2)"
+      },
+      {
+            "id": "source",
+            "name": "S (3)",
+            "num": 3,
+            "x": 10,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Source (Pin 3)"
+      }
     ],
     params: { model: 'IRF540N', vth: 3.5, kp: 0.8, rdsOn: 0.044 },
     paramSchema: [
@@ -889,9 +1758,33 @@ export const ComponentDefinitions = {
     prefix: 'M_PMOS',
     width: 40, height: 50,
     pins: [
-      { id: 'gate', name: 'G', x: -20, y: -10, dir: 'left' },
-      { id: 'drain', name: 'D', x: 15, y: 25, dir: 'bottom' },
-      { id: 'source', name: 'S', x: 15, y: -25, dir: 'top' }
+      {
+            "id": "gate",
+            "name": "G (1)",
+            "num": 1,
+            "x": -30,
+            "y": -10,
+            "dir": "left",
+            "desc": "Gate (Pin 1)"
+      },
+      {
+            "id": "drain",
+            "name": "D (2)",
+            "num": 2,
+            "x": 10,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "Drain (Pin 2)"
+      },
+      {
+            "id": "source",
+            "name": "S (3)",
+            "num": 3,
+            "x": 10,
+            "y": -30,
+            "dir": "top",
+            "desc": "Source (Pin 3)"
+      }
     ],
     params: { model: 'IRF9540', vth: -3.5, kp: 0.6, rdsOn: 0.117 },
     paramSchema: [
@@ -906,9 +1799,33 @@ export const ComponentDefinitions = {
     prefix: 'J_NJFET',
     width: 40, height: 50,
     pins: [
-      { id: 'gate', name: 'G', x: -20, y: 10, dir: 'left' },
-      { id: 'drain', name: 'D', x: 15, y: -25, dir: 'top' },
-      { id: 'source', name: 'S', x: 15, y: 25, dir: 'bottom' }
+      {
+            "id": "gate",
+            "name": "G (1)",
+            "num": 1,
+            "x": -30,
+            "y": 10,
+            "dir": "left",
+            "desc": "JFET Gate (Pin 1)"
+      },
+      {
+            "id": "drain",
+            "name": "D (2)",
+            "num": 2,
+            "x": 10,
+            "y": -30,
+            "dir": "top",
+            "desc": "JFET Drain (Pin 2)"
+      },
+      {
+            "id": "source",
+            "name": "S (3)",
+            "num": 3,
+            "x": 10,
+            "y": 30,
+            "dir": "bottom",
+            "desc": "JFET Source (Pin 3)"
+      }
     ],
     params: { vPinchOff: -2.5, idss: 0.003 },
     paramSchema: [
@@ -925,9 +1842,33 @@ export const ComponentDefinitions = {
     prefix: 'SCR',
     width: 40, height: 50,
     pins: [
-      { id: 'anode', name: 'A', x: -20, y: -15, dir: 'left' },
-      { id: 'cathode', name: 'K', x: 20, y: -15, dir: 'right' },
-      { id: 'gate', name: 'G', x: -10, y: 25, dir: 'bottom' }
+      {
+            "id": "anode",
+            "name": "A (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "SCR Anode (Pin 1)"
+      },
+      {
+            "id": "cathode",
+            "name": "K (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "SCR Cathode (Pin 2)"
+      },
+      {
+            "id": "gate",
+            "name": "G (3)",
+            "num": 3,
+            "x": 0,
+            "y": 25,
+            "dir": "bottom",
+            "desc": "SCR Gate Trigger (Pin 3)"
+      }
     ],
     params: { vGateTrig: 0.8, iHold: 0.01 },
     paramSchema: [{ key: 'vGateTrig', label: 'Gate Trigger Voltage', type: 'number', unit: 'V', default: 0.8 }]
@@ -939,9 +1880,33 @@ export const ComponentDefinitions = {
     prefix: 'TRIAC',
     width: 40, height: 50,
     pins: [
-      { id: 'mt1', name: 'MT1', x: 0, y: -25, dir: 'top' },
-      { id: 'mt2', name: 'MT2', x: 0, y: 25, dir: 'bottom' },
-      { id: 'gate', name: 'G', x: 20, y: 10, dir: 'right' }
+      {
+            "id": "mt1",
+            "name": "MT1 (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Main Terminal 1 (Pin 1)"
+      },
+      {
+            "id": "mt2",
+            "name": "MT2 (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Main Terminal 2 (Pin 2)"
+      },
+      {
+            "id": "gate",
+            "name": "G (3)",
+            "num": 3,
+            "x": 0,
+            "y": 25,
+            "dir": "bottom",
+            "desc": "TRIAC Gate Trigger (Pin 3)"
+      }
     ],
     params: { vGateTrig: 1.0 },
     paramSchema: [{ key: 'vGateTrig', label: 'Gate Trigger Voltage', type: 'number', unit: 'V', default: 1.0 }]
@@ -953,12 +1918,48 @@ export const ComponentDefinitions = {
     prefix: 'DIAC',
     width: 40, height: 40,
     pins: [
-      { id: 'p1', name: '1', x: -20, y: 0, dir: 'left' },
-      { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "DIAC Terminal 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "DIAC Terminal 2"
+      }
     ],
     params: { vBreakover: 32, rOn: 5, rOff: 1e7 },
     paramSchema: [
       { key: 'vBreakover', label: 'Breakover Voltage (Vbo)', type: 'number', unit: 'V', default: 32 }
+    ]
+  },
+  [ComponentTypes.VOLTAGE_CONTROLLED_SWITCH]: {
+    name: 'Voltage Controlled Switch (VCSW)',
+    type: ComponentTypes.VOLTAGE_CONTROLLED_SWITCH,
+    category: ComponentCategory.POWER,
+    prefix: 'S_VC',
+    description: 'Analog voltage-controlled switch that transitions from open to closed state when control voltage exceeds threshold.',
+    width: 60, height: 50,
+    pins: [
+      { id: 'ctrl_pos', name: 'CTRL+ (1)', num: 1, x: -30, y: -15, dir: 'left', desc: 'Positive Control Terminal' },
+      { id: 'ctrl_neg', name: 'CTRL- (2)', num: 2, x: -30, y: 15, dir: 'left', desc: 'Negative Control Terminal' },
+      { id: 'p1', name: 'SW1 (3)', num: 3, x: 30, y: -15, dir: 'right', desc: 'Switch Terminal 1' },
+      { id: 'p2', name: 'SW2 (4)', num: 4, x: 30, y: 15, dir: 'right', desc: 'Switch Terminal 2' }
+    ],
+    params: { vThresh: 2.5, rOn: 0.1, rOff: 1e8 },
+    paramSchema: [
+      { key: 'vThresh', label: 'Threshold Voltage', type: 'number', unit: 'V', default: 2.5 },
+      { key: 'rOn', label: 'On Resistance (Ron)', type: 'number', unit: 'Ω', default: 0.1 },
+      { key: 'rOff', label: 'Off Resistance (Roff)', type: 'number', unit: 'Ω', default: 1e8 }
     ]
   },
 
@@ -968,13 +1969,16 @@ export const ComponentDefinitions = {
     type: ComponentTypes.OPAMP,
     category: ComponentCategory.ANALOG,
     prefix: 'U_OP',
+    package: 'DIP-8',
+    pinCount: 8,
+    description: 'High-gain differential voltage amplifier with inverting/non-inverting inputs, bipolar power rails, and rail-to-rail saturation clamping.',
     width: 60, height: 60,
     pins: [
-      { id: 'in_inv', name: 'IN-', x: -30, y: -15, dir: 'left' },
-      { id: 'in_noninv', name: 'IN+', x: -30, y: 15, dir: 'left' },
-      { id: 'v_pos', name: 'V+', x: 0, y: -25, dir: 'top' },
-      { id: 'v_neg', name: 'V-', x: 0, y: 25, dir: 'bottom' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
+      { id: 'in_inv', name: 'IN- (2)', num: 2, x: -30, y: -15, dir: 'left', desc: 'Inverting Input' },
+      { id: 'in_noninv', name: 'IN+ (3)', num: 3, x: -30, y: 15, dir: 'left', desc: 'Non-Inverting Input' },
+      { id: 'v_pos', name: 'V+ (7)', num: 7, x: 0, y: -25, dir: 'top', desc: 'Positive DC Power Supply (+Vcc)' },
+      { id: 'v_neg', name: 'V- (4)', num: 4, x: 0, y: 25, dir: 'bottom', desc: 'Negative DC Power Supply (-Vee / GND)' },
+      { id: 'out', name: 'OUT (6)', num: 6, x: 30, y: 0, dir: 'right', desc: 'Amplified Analog Output' }
     ],
     params: { model: 'TL082', openLoopGain: 200000, vSatPos: 14, vSatNeg: -14 },
     paramSchema: [
@@ -989,11 +1993,14 @@ export const ComponentDefinitions = {
     type: ComponentTypes.COMPARATOR,
     category: ComponentCategory.ANALOG,
     prefix: 'U_COMP',
+    package: 'DIP-8',
+    pinCount: 8,
+    description: 'High-speed analog voltage comparator with open-collector digital output and hysteresis switching.',
     width: 60, height: 60,
     pins: [
-      { id: 'in_inv', name: 'IN-', x: -30, y: -15, dir: 'left' },
-      { id: 'in_noninv', name: 'IN+', x: -30, y: 15, dir: 'left' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
+      { id: 'in_inv', name: 'IN- (2)', num: 2, x: -30, y: -15, dir: 'left', desc: 'Inverting Input' },
+      { id: 'in_noninv', name: 'IN+ (3)', num: 3, x: -30, y: 15, dir: 'left', desc: 'Non-Inverting Input' },
+      { id: 'out', name: 'OUT (1)', num: 1, x: 30, y: 0, dir: 'right', desc: 'Digital Comparator Output' }
     ],
     params: { vHigh: 5, vLow: 0, hysteresis: 0.01 },
     paramSchema: [
@@ -1006,16 +2013,19 @@ export const ComponentDefinitions = {
     type: ComponentTypes.TIMER555,
     category: ComponentCategory.ANALOG,
     prefix: 'U_555',
+    package: 'DIP-8',
+    pinCount: 8,
+    description: 'Precision timing circuit generating accurate time delays or oscillations (astable / monostable multivibrator).',
     width: 70, height: 80,
     pins: [
-      { id: 'gnd', name: 'GND (1)', x: -35, y: -30, dir: 'left' },
-      { id: 'trig', name: 'TRIG (2)', x: -35, y: -10, dir: 'left' },
-      { id: 'out', name: 'OUT (3)', x: 35, y: -30, dir: 'right' },
-      { id: 'reset', name: 'RESET (4)', x: 35, y: -10, dir: 'right' },
-      { id: 'ctrl', name: 'CTRL (5)', x: 35, y: 10, dir: 'right' },
-      { id: 'thresh', name: 'THRESH (6)', x: -35, y: 10, dir: 'left' },
-      { id: 'disch', name: 'DISCH (7)', x: -35, y: 30, dir: 'left' },
-      { id: 'vcc', name: 'VCC (8)', x: 35, y: 30, dir: 'right' }
+      { id: 'gnd', name: 'GND (1)', num: 1, x: -35, y: -30, dir: 'left', desc: 'Ground Reference (0V)' },
+      { id: 'trig', name: 'TRIG (2)', num: 2, x: -35, y: -10, dir: 'left', desc: 'Trigger Input (< 1/3 Vcc starts output)' },
+      { id: 'out', name: 'OUT (3)', num: 3, x: 35, y: -30, dir: 'right', desc: 'High-Current Pulse Output (up to 200mA)' },
+      { id: 'reset', name: 'RESET (4)', num: 4, x: 35, y: -10, dir: 'right', desc: 'Active-Low Reset Override' },
+      { id: 'ctrl', name: 'CTRL (5)', num: 5, x: 35, y: 10, dir: 'right', desc: 'Control Voltage (2/3 Vcc internal tap)' },
+      { id: 'thresh', name: 'THRESH (6)', num: 6, x: -35, y: 10, dir: 'left', desc: 'Threshold Input (> 2/3 Vcc resets flip-flop)' },
+      { id: 'disch', name: 'DISCH (7)', num: 7, x: -35, y: 30, dir: 'left', desc: 'Discharge Transistor Collector' },
+      { id: 'vcc', name: 'VCC (8)', num: 8, x: 35, y: 30, dir: 'right', desc: 'Positive Supply (+4.5V to +15V)' }
     ],
     params: { vcc: 9 },
     paramSchema: [{ key: 'vcc', label: 'Supply Voltage (Vcc)', type: 'number', unit: 'V', default: 9 }]
@@ -1025,22 +2035,25 @@ export const ComponentDefinitions = {
     type: ComponentTypes.TIMER556,
     category: ComponentCategory.ANALOG,
     prefix: 'U_556',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Dual monolithic precision timing circuit containing two independent 555 timers in a single 14-pin DIP package.',
     width: 80, height: 100,
     pins: [
-      { id: 'disch1', name: 'DIS1 (1)', x: -40, y: -35, dir: 'left' },
-      { id: 'thresh1', name: 'TH1 (2)', x: -40, y: -20, dir: 'left' },
-      { id: 'ctrl1', name: 'CV1 (3)', x: -40, y: -5, dir: 'left' },
-      { id: 'reset1', name: 'RST1 (4)', x: -40, y: 10, dir: 'left' },
-      { id: 'out1', name: 'OUT1 (5)', x: -40, y: 25, dir: 'left' },
-      { id: 'trig1', name: 'TR1 (6)', x: -40, y: 40, dir: 'left' },
-      { id: 'gnd', name: 'GND (7)', x: 0, y: 50, dir: 'bottom' },
-      { id: 'vcc', name: 'VCC (14)', x: 0, y: -50, dir: 'top' },
-      { id: 'disch2', name: 'DIS2 (13)', x: 40, y: -35, dir: 'right' },
-      { id: 'thresh2', name: 'TH2 (12)', x: 40, y: -20, dir: 'right' },
-      { id: 'ctrl2', name: 'CV2 (11)', x: 40, y: -5, dir: 'right' },
-      { id: 'reset2', name: 'RST2 (10)', x: 40, y: 10, dir: 'right' },
-      { id: 'out2', name: 'OUT2 (9)', x: 40, y: 25, dir: 'right' },
-      { id: 'trig2', name: 'TR2 (8)', x: 40, y: 40, dir: 'right' }
+      { id: 'disch1', name: 'DIS1 (1)', num: 1, x: -40, y: -35, dir: 'left', desc: 'Timer 1 Discharge' },
+      { id: 'thresh1', name: 'TH1 (2)', num: 2, x: -40, y: -20, dir: 'left', desc: 'Timer 1 Threshold' },
+      { id: 'ctrl1', name: 'CV1 (3)', num: 3, x: -40, y: -5, dir: 'left', desc: 'Timer 1 Control Voltage' },
+      { id: 'reset1', name: 'RST1 (4)', num: 4, x: -40, y: 10, dir: 'left', desc: 'Timer 1 Reset' },
+      { id: 'out1', name: 'OUT1 (5)', num: 5, x: -40, y: 25, dir: 'left', desc: 'Timer 1 Output' },
+      { id: 'trig1', name: 'TR1 (6)', num: 6, x: -40, y: 40, dir: 'left', desc: 'Timer 1 Trigger' },
+      { id: 'gnd', name: 'GND (7)', num: 7, x: 0, y: 50, dir: 'bottom', desc: 'Common Ground Reference' },
+      { id: 'vcc', name: 'VCC (14)', num: 14, x: 0, y: -50, dir: 'top', desc: 'Common Positive Supply (+Vcc)' },
+      { id: 'disch2', name: 'DIS2 (13)', num: 13, x: 40, y: -35, dir: 'right', desc: 'Timer 2 Discharge' },
+      { id: 'thresh2', name: 'TH2 (12)', num: 12, x: 40, y: -20, dir: 'right', desc: 'Timer 2 Threshold' },
+      { id: 'ctrl2', name: 'CV2 (11)', num: 11, x: 40, y: -5, dir: 'right', desc: 'Timer 2 Control Voltage' },
+      { id: 'reset2', name: 'RST2 (10)', num: 10, x: 40, y: 10, dir: 'right', desc: 'Timer 2 Reset' },
+      { id: 'out2', name: 'OUT2 (9)', num: 9, x: 40, y: 25, dir: 'right', desc: 'Timer 2 Output' },
+      { id: 'trig2', name: 'TR2 (8)', num: 8, x: 40, y: 40, dir: 'right', desc: 'Timer 2 Trigger' }
     ],
     params: { vcc: 9 },
     paramSchema: [{ key: 'vcc', label: 'Supply Voltage (Vcc)', type: 'number', unit: 'V', default: 9 }]
@@ -1050,14 +2063,60 @@ export const ComponentDefinitions = {
     type: ComponentTypes.ANALOG_MULTIPLIER,
     category: ComponentCategory.ANALOG,
     prefix: 'U_MULT',
+    package: 'DIP-8',
+    pinCount: 8,
+    description: 'Four-quadrant analog voltage multiplier producing Vout = (X * Y) / 10V.',
     width: 60, height: 60,
     pins: [
-      { id: 'x_in', name: 'X', x: -30, y: -15, dir: 'left' },
-      { id: 'y_in', name: 'Y', x: -30, y: 15, dir: 'left' },
-      { id: 'out', name: 'W', x: 30, y: 0, dir: 'right' }
+      { id: 'x_in', name: 'X (1)', num: 1, x: -30, y: -15, dir: 'left', desc: 'X Input Voltage' },
+      { id: 'y_in', name: 'Y (3)', num: 3, x: -30, y: 15, dir: 'left', desc: 'Y Input Voltage' },
+      { id: 'out', name: 'W (7)', num: 7, x: 30, y: 0, dir: 'right', desc: 'Product Output (X*Y/10)' }
     ],
     params: { scale: 0.1 },
     paramSchema: [{ key: 'scale', label: 'Scale Factor (1/10)', type: 'number', default: 0.1 }]
+  },
+  [ComponentTypes.SAMPLE_AND_HOLD]: {
+    name: 'Sample & Hold Amplifier (LF398 / S&H)',
+    type: ComponentTypes.SAMPLE_AND_HOLD,
+    category: ComponentCategory.ANALOG,
+    prefix: 'U_SH',
+    package: 'DIP-8',
+    pinCount: 8,
+    description: 'Monolithic Sample and Hold amplifier (LF398) with high-speed FET switch, low droop rate hold capacitor pin, and unity-gain output buffer.',
+    width: 70, height: 70,
+    pins: [
+      { id: 'in', name: 'IN (3)', num: 3, x: -35, y: -15, dir: 'left', desc: 'Analog Input Voltage' },
+      { id: 'ctrl', name: 'HOLD/SMP (8)', num: 8, x: -35, y: 15, dir: 'left', desc: 'Logic Control (HIGH = Sample, LOW = Hold)' },
+      { id: 'ch', name: 'CH (6)', num: 6, x: 0, y: 35, dir: 'bottom', desc: 'Hold Capacitor Connection Pin' },
+      { id: 'v_pos', name: 'V+ (1)', num: 1, x: 0, y: -35, dir: 'top', desc: 'Positive Supply (+Vcc)' },
+      { id: 'out', name: 'OUT (5)', num: 5, x: 35, y: 0, dir: 'right', desc: 'Buffered Sampled Output Voltage' }
+    ],
+    params: { vThresh: 2.5, rOn: 5, rOff: 1e9, internalCap: 1e-8, droopRate: 1e-5 },
+    paramSchema: [
+      { key: 'vThresh', label: 'Logic Threshold', type: 'number', unit: 'V', default: 2.5 },
+      { key: 'rOn', label: 'Switch On-Resistance (Ron)', type: 'number', unit: 'Ω', default: 5 },
+      { key: 'internalCap', label: 'Internal Hold Cap', type: 'number', unit: 'F', default: 1e-8 }
+    ]
+  },
+  [ComponentTypes.ANALOG_SWITCH_4066]: {
+    name: 'Quad Bilateral Analog Switch (CD4066)',
+    type: ComponentTypes.ANALOG_SWITCH_4066,
+    category: ComponentCategory.ANALOG,
+    prefix: 'U_4066',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'CMOS Quad Bilateral Analog Switch for transmission and multiplexing of analog or digital signals.',
+    width: 60, height: 60,
+    pins: [
+      { id: 'in', name: 'IN/OUT (1)', num: 1, x: -30, y: -15, dir: 'left', desc: 'Signal Terminal A' },
+      { id: 'ctrl', name: 'CTRL (13)', num: 13, x: -30, y: 15, dir: 'left', desc: 'Active-High Control Input' },
+      { id: 'out', name: 'OUT/IN (2)', num: 2, x: 30, y: 0, dir: 'right', desc: 'Signal Terminal B' }
+    ],
+    params: { rOn: 50, rOff: 1e9, vThresh: 2.5 },
+    paramSchema: [
+      { key: 'rOn', label: 'On Resistance (Ron)', type: 'number', unit: 'Ω', default: 50 },
+      { key: 'vThresh', label: 'Control Threshold', type: 'number', unit: 'V', default: 2.5 }
+    ]
   },
 
   // =================== 7. VOLTAGE REGULATORS ===================
@@ -1066,11 +2125,14 @@ export const ComponentDefinitions = {
     type: ComponentTypes.LM7805,
     category: ComponentCategory.REGULATORS,
     prefix: 'REG_7805',
+    package: 'TO-220',
+    pinCount: 3,
+    description: 'Fixed 3-terminal positive voltage regulator producing steady +5.0V with thermal and short-circuit protection.',
     width: 60, height: 40,
     pins: [
-      { id: 'in', name: 'IN', x: -30, y: 0, dir: 'left' },
-      { id: 'gnd', name: 'GND', x: 0, y: 20, dir: 'bottom' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
+      { id: 'in', name: 'IN (1)', num: 1, x: -30, y: 0, dir: 'left', desc: 'Unregulated Input (7V - 25V)' },
+      { id: 'gnd', name: 'GND (2)', num: 2, x: 0, y: 20, dir: 'bottom', desc: 'Ground Reference' },
+      { id: 'out', name: 'OUT (3)', num: 3, x: 30, y: 0, dir: 'right', desc: 'Regulated +5.0V Output' }
     ],
     params: { vOut: 5.0, vDropMin: 2.0 },
     paramSchema: [{ key: 'vOut', label: 'Regulated Output Voltage', type: 'number', unit: 'V', default: 5.0 }]
@@ -1080,11 +2142,14 @@ export const ComponentDefinitions = {
     type: ComponentTypes.LM7812,
     category: ComponentCategory.REGULATORS,
     prefix: 'REG_7812',
+    package: 'TO-220',
+    pinCount: 3,
+    description: 'Fixed 3-terminal positive voltage regulator delivering +12.0V DC.',
     width: 60, height: 40,
     pins: [
-      { id: 'in', name: 'IN', x: -30, y: 0, dir: 'left' },
-      { id: 'gnd', name: 'GND', x: 0, y: 20, dir: 'bottom' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
+      { id: 'in', name: 'IN (1)', num: 1, x: -30, y: 0, dir: 'left', desc: 'Unregulated Input (14V - 35V)' },
+      { id: 'gnd', name: 'GND (2)', num: 2, x: 0, y: 20, dir: 'bottom', desc: 'Ground Reference' },
+      { id: 'out', name: 'OUT (3)', num: 3, x: 30, y: 0, dir: 'right', desc: 'Regulated +12.0V Output' }
     ],
     params: { vOut: 12.0 },
     paramSchema: [{ key: 'vOut', label: 'Output Voltage', type: 'number', unit: 'V', default: 12.0 }]
@@ -1094,11 +2159,14 @@ export const ComponentDefinitions = {
     type: ComponentTypes.LM7912,
     category: ComponentCategory.REGULATORS,
     prefix: 'REG_7912',
+    package: 'TO-220',
+    pinCount: 3,
+    description: 'Fixed negative 3-terminal voltage regulator delivering -12.0V DC.',
     width: 60, height: 40,
     pins: [
-      { id: 'in', name: 'IN', x: -30, y: 0, dir: 'left' },
-      { id: 'gnd', name: 'GND', x: 0, y: 20, dir: 'bottom' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
+      { id: 'in', name: 'IN (2)', num: 2, x: -30, y: 0, dir: 'left', desc: 'Negative Input Voltage' },
+      { id: 'gnd', name: 'GND (1)', num: 1, x: 0, y: 20, dir: 'bottom', desc: 'Ground Reference' },
+      { id: 'out', name: 'OUT (3)', num: 3, x: 30, y: 0, dir: 'right', desc: 'Regulated -12.0V Output' }
     ],
     params: { vOut: -12.0 },
     paramSchema: [{ key: 'vOut', label: 'Output Voltage', type: 'number', unit: 'V', default: -12.0 }]
@@ -1108,11 +2176,14 @@ export const ComponentDefinitions = {
     type: ComponentTypes.LM317,
     category: ComponentCategory.REGULATORS,
     prefix: 'REG_317',
+    package: 'TO-220',
+    pinCount: 3,
+    description: 'Adjustable 3-terminal positive voltage regulator with 1.25V internal reference, capable of 1.25V to 37V output.',
     width: 60, height: 40,
     pins: [
-      { id: 'in', name: 'IN', x: -30, y: 0, dir: 'left' },
-      { id: 'adj', name: 'ADJ', x: 0, y: 20, dir: 'bottom' },
-      { id: 'out', name: 'OUT', x: 30, y: 0, dir: 'right' }
+      { id: 'in', name: 'IN (3)', num: 3, x: -30, y: 0, dir: 'left', desc: 'Unregulated Input (Vin)' },
+      { id: 'adj', name: 'ADJ (1)', num: 1, x: 0, y: 20, dir: 'bottom', desc: 'Adjustment Voltage Reference (1.25V)' },
+      { id: 'out', name: 'OUT (2)', num: 2, x: 30, y: 0, dir: 'right', desc: 'Regulated Output (Vout)' }
     ],
     params: { vRef: 1.25 },
     paramSchema: [{ key: 'vRef', label: 'Reference Voltage (Vref)', type: 'number', unit: 'V', default: 1.25 }]
@@ -1120,98 +2191,119 @@ export const ComponentDefinitions = {
 
   // =================== 8. DIGITAL LOGIC GATES ===================
   [ComponentTypes.AND_GATE]: {
-    name: '2-Input AND Gate',
+    name: '2-Input AND Gate (74HC08)',
     type: ComponentTypes.AND_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Dual-input positive logic AND gate: Y = A AND B.',
     width: 50, height: 40,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 10, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -10, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 10, dir: 'left', desc: 'Input B' },
+      { id: 'out', name: 'Y (3)', num: 3, x: 25, y: 0, dir: 'right', desc: 'Output Y = A·B' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
   [ComponentTypes.OR_GATE]: {
-    name: '2-Input OR Gate',
+    name: '2-Input OR Gate (74HC32)',
     type: ComponentTypes.OR_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Dual-input positive logic OR gate: Y = A OR B.',
     width: 50, height: 40,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 10, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -10, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 10, dir: 'left', desc: 'Input B' },
+      { id: 'out', name: 'Y (3)', num: 3, x: 25, y: 0, dir: 'right', desc: 'Output Y = A+B' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
   [ComponentTypes.NOT_GATE]: {
-    name: 'NOT Inverter Gate',
+    name: 'NOT Inverter Gate (74HC04)',
     type: ComponentTypes.NOT_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Single-input Hex Inverter logic gate: Y = NOT A.',
     width: 40, height: 30,
     pins: [
-      { id: 'in', name: 'A', x: -20, y: 0, dir: 'left' },
-      { id: 'out', name: 'Y', x: 20, y: 0, dir: 'right' }
+      { id: 'in', name: 'A (1)', num: 1, x: -20, y: 0, dir: 'left', desc: 'Input A' },
+      { id: 'out', name: 'Y (2)', num: 2, x: 20, y: 0, dir: 'right', desc: 'Inverted Output Y = ~A' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
   [ComponentTypes.NAND_GATE]: {
-    name: '2-Input NAND Gate',
+    name: '2-Input NAND Gate (74HC00)',
     type: ComponentTypes.NAND_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Dual-input Universal NAND logic gate: Y = NOT (A AND B).',
     width: 50, height: 40,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 10, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -10, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 10, dir: 'left', desc: 'Input B' },
+      { id: 'out', name: 'Y (3)', num: 3, x: 25, y: 0, dir: 'right', desc: 'Output Y = ~(A·B)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
   [ComponentTypes.NOR_GATE]: {
-    name: '2-Input NOR Gate',
+    name: '2-Input NOR Gate (74HC02)',
     type: ComponentTypes.NOR_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Dual-input Universal NOR logic gate: Y = NOT (A OR B).',
     width: 50, height: 40,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 10, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (2)', num: 2, x: -25, y: -10, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (3)', num: 3, x: -25, y: 10, dir: 'left', desc: 'Input B' },
+      { id: 'out', name: 'Y (1)', num: 1, x: 25, y: 0, dir: 'right', desc: 'Output Y = ~(A+B)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
   [ComponentTypes.XOR_GATE]: {
-    name: '2-Input XOR Gate',
+    name: '2-Input XOR Gate (74HC86)',
     type: ComponentTypes.XOR_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Exclusive-OR logic gate: Y = A XOR B.',
     width: 50, height: 40,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 10, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -10, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 10, dir: 'left', desc: 'Input B' },
+      { id: 'out', name: 'Y (3)', num: 3, x: 25, y: 0, dir: 'right', desc: 'Output Y = A⊕B' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
   },
   [ComponentTypes.XNOR_GATE]: {
-    name: '2-Input XNOR Gate',
+    name: '2-Input XNOR Gate (74HC7266)',
     type: ComponentTypes.XNOR_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Exclusive-NOR logic gate: Y = NOT (A XOR B).',
     width: 50, height: 40,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -10, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 10, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -10, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 10, dir: 'left', desc: 'Input B' },
+      { id: 'out', name: 'Y (3)', num: 3, x: 25, y: 0, dir: 'right', desc: 'Output Y = ~(A⊕B)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
@@ -1221,10 +2313,13 @@ export const ComponentDefinitions = {
     type: ComponentTypes.SCHMITT_TRIGGER,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U_ST',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Hex Inverting Schmitt Trigger with built-in input hysteresis to clean noisy or slow-rising digital waveforms.',
     width: 50, height: 40,
     pins: [
-      { id: 'in', name: 'A', x: -25, y: 0, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in', name: 'A (1)', num: 1, x: -25, y: 0, dir: 'left', desc: 'Analog / Digital Input with Hysteresis' },
+      { id: 'out', name: 'Y (2)', num: 2, x: 25, y: 0, dir: 'right', desc: 'Sharp Inverted Logic Output' }
     ],
     params: { vHigh: 5, vLow: 0, vThreshPos: 3.0, vThreshNeg: 1.8, isInverting: true },
     paramSchema: [
@@ -1240,10 +2335,13 @@ export const ComponentDefinitions = {
     type: ComponentTypes.BUFFER_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U_BUF',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Non-inverting digital driver buffer for signal amplification and isolation.',
     width: 40, height: 30,
     pins: [
-      { id: 'in', name: 'A', x: -20, y: 0, dir: 'left' },
-      { id: 'out', name: 'Y', x: 20, y: 0, dir: 'right' }
+      { id: 'in', name: 'A (1)', num: 1, x: -20, y: 0, dir: 'left', desc: 'Input A' },
+      { id: 'out', name: 'Y (2)', num: 2, x: 20, y: 0, dir: 'right', desc: 'Buffered Output Y = A' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
@@ -1253,12 +2351,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.AND3_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U_AND3',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Triple 3-input positive AND gate: Y = A·B·C.',
     width: 50, height: 50,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
-      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -15, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 0, dir: 'left', desc: 'Input B' },
+      { id: 'in3', name: 'C (13)', num: 13, x: -25, y: 15, dir: 'left', desc: 'Input C' },
+      { id: 'out', name: 'Y (12)', num: 12, x: 25, y: 0, dir: 'right', desc: 'Output Y = A·B·C' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
@@ -1268,12 +2369,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.NAND3_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U_NAND3',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Triple 3-input NAND gate: Y = ~(A·B·C).',
     width: 50, height: 50,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
-      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -15, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 0, dir: 'left', desc: 'Input B' },
+      { id: 'in3', name: 'C (13)', num: 13, x: -25, y: 15, dir: 'left', desc: 'Input C' },
+      { id: 'out', name: 'Y (12)', num: 12, x: 25, y: 0, dir: 'right', desc: 'Output Y = ~(A·B·C)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
@@ -1283,12 +2387,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.OR3_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U_OR3',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Triple 3-input positive OR gate: Y = A+B+C.',
     width: 50, height: 50,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
-      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -15, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 0, dir: 'left', desc: 'Input B' },
+      { id: 'in3', name: 'C (13)', num: 13, x: -25, y: 15, dir: 'left', desc: 'Input C' },
+      { id: 'out', name: 'Y (12)', num: 12, x: 25, y: 0, dir: 'right', desc: 'Output Y = A+B+C' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
@@ -1298,12 +2405,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.NOR3_GATE,
     category: ComponentCategory.LOGIC_GATES,
     prefix: 'U_NOR3',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Triple 3-input NOR gate: Y = ~(A+B+C).',
     width: 50, height: 50,
     pins: [
-      { id: 'in1', name: 'A', x: -25, y: -15, dir: 'left' },
-      { id: 'in2', name: 'B', x: -25, y: 0, dir: 'left' },
-      { id: 'in3', name: 'C', x: -25, y: 15, dir: 'left' },
-      { id: 'out', name: 'Y', x: 25, y: 0, dir: 'right' }
+      { id: 'in1', name: 'A (1)', num: 1, x: -25, y: -15, dir: 'left', desc: 'Input A' },
+      { id: 'in2', name: 'B (2)', num: 2, x: -25, y: 0, dir: 'left', desc: 'Input B' },
+      { id: 'in3', name: 'C (13)', num: 13, x: -25, y: 15, dir: 'left', desc: 'Input C' },
+      { id: 'out', name: 'Y (12)', num: 12, x: 25, y: 0, dir: 'right', desc: 'Output Y = ~(A+B+C)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (Vcc)', type: 'number', unit: 'V', default: 5 }]
@@ -1315,12 +2425,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.SR_LATCH,
     category: ComponentCategory.FLIP_FLOPS,
     prefix: 'U_SR',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Bistable multivibrator latch with Set and Reset control lines.',
     width: 50, height: 60,
     pins: [
-      { id: 's', name: 'S', x: -25, y: -15, dir: 'left' },
-      { id: 'r', name: 'R', x: -25, y: 15, dir: 'left' },
-      { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
-      { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
+      { id: 's', name: 'S (1)', num: 1, x: -25, y: -15, dir: 'left', desc: 'Set Input (Active High)' },
+      { id: 'r', name: 'R (2)', num: 2, x: -25, y: 15, dir: 'left', desc: 'Reset Input (Active High)' },
+      { id: 'q', name: 'Q (3)', num: 3, x: 25, y: -15, dir: 'right', desc: 'Normal Q Output' },
+      { id: 'q_not', name: '~Q (4)', num: 4, x: 25, y: 15, dir: 'right', desc: 'Inverted ~Q Output' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
@@ -1330,12 +2443,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.D_FLIPFLOP,
     category: ComponentCategory.FLIP_FLOPS,
     prefix: 'U_DFF',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Dual positive-edge-triggered D-type flip-flop with clear and preset.',
     width: 50, height: 60,
     pins: [
-      { id: 'd', name: 'D', x: -25, y: -15, dir: 'left' },
-      { id: 'clk', name: 'CLK', x: -25, y: 15, dir: 'left' },
-      { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
-      { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
+      { id: 'd', name: 'D (2)', num: 2, x: -25, y: -15, dir: 'left', desc: 'Data Input (sampled on rising clock edge)' },
+      { id: 'clk', name: 'CLK (3)', num: 3, x: -25, y: 15, dir: 'left', desc: 'Clock Input (Rising Edge Triggered)' },
+      { id: 'q', name: 'Q (5)', num: 5, x: 25, y: -15, dir: 'right', desc: 'Stored Q Output' },
+      { id: 'q_not', name: '~Q (6)', num: 6, x: 25, y: 15, dir: 'right', desc: 'Complementary Inverted ~Q Output' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
@@ -1345,13 +2461,16 @@ export const ComponentDefinitions = {
     type: ComponentTypes.JK_FLIPFLOP,
     category: ComponentCategory.FLIP_FLOPS,
     prefix: 'U_JKFF',
+    package: 'DIP-16',
+    pinCount: 16,
+    description: 'Dual JK flip-flop with Set, Reset, and Toggle states (J=1, K=1 toggles output).',
     width: 50, height: 60,
     pins: [
-      { id: 'j', name: 'J', x: -25, y: -20, dir: 'left' },
-      { id: 'clk', name: 'CLK', x: -25, y: 0, dir: 'left' },
-      { id: 'k', name: 'K', x: -25, y: 20, dir: 'left' },
-      { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
-      { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
+      { id: 'j', name: 'J (1)', num: 1, x: -25, y: -20, dir: 'left', desc: 'J Input' },
+      { id: 'clk', name: 'CLK (2)', num: 2, x: -25, y: 0, dir: 'left', desc: 'Clock Pulse Trigger' },
+      { id: 'k', name: 'K (4)', num: 4, x: -25, y: 20, dir: 'left', desc: 'K Input' },
+      { id: 'q', name: 'Q (15)', num: 15, x: 25, y: -15, dir: 'right', desc: 'Q Output' },
+      { id: 'q_not', name: '~Q (14)', num: 14, x: 25, y: 15, dir: 'right', desc: 'Inverted ~Q Output' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
@@ -1361,12 +2480,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.T_FLIPFLOP,
     category: ComponentCategory.FLIP_FLOPS,
     prefix: 'U_TFF',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Toggle flip-flop that inverts its state on each clock edge when T=1.',
     width: 50, height: 60,
     pins: [
-      { id: 't', name: 'T', x: -25, y: -15, dir: 'left' },
-      { id: 'clk', name: 'CLK', x: -25, y: 15, dir: 'left' },
-      { id: 'q', name: 'Q', x: 25, y: -15, dir: 'right' },
-      { id: 'q_not', name: '~Q', x: 25, y: 15, dir: 'right' }
+      { id: 't', name: 'T (2)', num: 2, x: -25, y: -15, dir: 'left', desc: 'Toggle Enable Input' },
+      { id: 'clk', name: 'CLK (3)', num: 3, x: -25, y: 15, dir: 'left', desc: 'Clock Pulse Trigger' },
+      { id: 'q', name: 'Q (5)', num: 5, x: 25, y: -15, dir: 'right', desc: 'Q Output' },
+      { id: 'q_not', name: '~Q (6)', num: 6, x: 25, y: 15, dir: 'right', desc: 'Inverted ~Q Output' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
@@ -1376,14 +2498,17 @@ export const ComponentDefinitions = {
     type: ComponentTypes.BINARY_COUNTER_4BIT,
     category: ComponentCategory.DIGITAL_ICS,
     prefix: 'U_CNT',
+    package: 'DIP-16',
+    pinCount: 16,
+    description: 'Synchronous 4-bit binary counter with asynchronous clear and ripple carry output.',
     width: 60, height: 80,
     pins: [
-      { id: 'clk', name: 'CLK', x: -30, y: -20, dir: 'left' },
-      { id: 'clr', name: 'CLR', x: -30, y: 20, dir: 'left' },
-      { id: 'q0', name: 'Q0', x: 30, y: -30, dir: 'right' },
-      { id: 'q1', name: 'Q1', x: 30, y: -10, dir: 'right' },
-      { id: 'q2', name: 'Q2', x: 30, y: 10, dir: 'right' },
-      { id: 'q3', name: 'Q3', x: 30, y: 30, dir: 'right' }
+      { id: 'clk', name: 'CLK (2)', num: 2, x: -30, y: -20, dir: 'left', desc: 'Clock Input' },
+      { id: 'clr', name: 'CLR (1)', num: 1, x: -30, y: 20, dir: 'left', desc: 'Asynchronous Master Reset / Clear' },
+      { id: 'q0', name: 'Q0 (14)', num: 14, x: 30, y: -30, dir: 'right', desc: 'Bit 0 Output (LSB, 2^0)' },
+      { id: 'q1', name: 'Q1 (13)', num: 13, x: 30, y: -10, dir: 'right', desc: 'Bit 1 Output (2^1)' },
+      { id: 'q2', name: 'Q2 (12)', num: 12, x: 30, y: 10, dir: 'right', desc: 'Bit 2 Output (2^2)' },
+      { id: 'q3', name: 'Q3 (11)', num: 11, x: 30, y: 30, dir: 'right', desc: 'Bit 3 Output (MSB, 2^3)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
@@ -1393,15 +2518,18 @@ export const ComponentDefinitions = {
     type: ComponentTypes.MUX_4TO1,
     category: ComponentCategory.DIGITAL_ICS,
     prefix: 'U_MUX',
+    package: 'DIP-16',
+    pinCount: 16,
+    description: '4-to-1 data selector / multiplexer with binary select lines S0, S1.',
     width: 60, height: 80,
     pins: [
-      { id: 'i0', name: 'I0', x: -30, y: -30, dir: 'left' },
-      { id: 'i1', name: 'I1', x: -30, y: -10, dir: 'left' },
-      { id: 'i2', name: 'I2', x: -30, y: 10, dir: 'left' },
-      { id: 'i3', name: 'I3', x: -30, y: 30, dir: 'left' },
-      { id: 's0', name: 'S0', x: 0, y: 40, dir: 'bottom' },
-      { id: 's1', name: 'S1', x: 15, y: 40, dir: 'bottom' },
-      { id: 'out', name: 'Y', x: 30, y: 0, dir: 'right' }
+      { id: 'i0', name: 'I0 (6)', num: 6, x: -30, y: -30, dir: 'left', desc: 'Data Input 0' },
+      { id: 'i1', name: 'I1 (5)', num: 5, x: -30, y: -10, dir: 'left', desc: 'Data Input 1' },
+      { id: 'i2', name: 'I2 (4)', num: 4, x: -30, y: 10, dir: 'left', desc: 'Data Input 2' },
+      { id: 'i3', name: 'I3 (3)', num: 3, x: -30, y: 30, dir: 'left', desc: 'Data Input 3' },
+      { id: 's0', name: 'S0 (14)', num: 14, x: 0, y: 40, dir: 'bottom', desc: 'Select Line 0 (LSB)' },
+      { id: 's1', name: 'S1 (2)', num: 2, x: 15, y: 40, dir: 'bottom', desc: 'Select Line 1 (MSB)' },
+      { id: 'out', name: 'Y (7)', num: 7, x: 30, y: 0, dir: 'right', desc: 'Selected Output Y' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Output High Voltage', type: 'number', unit: 'V', default: 5 }]
@@ -1413,12 +2541,15 @@ export const ComponentDefinitions = {
     type: ComponentTypes.HALF_ADDER,
     category: ComponentCategory.ARITHMETIC,
     prefix: 'U_HA',
+    package: 'DIP-14',
+    pinCount: 14,
+    description: 'Combinational digital adder calculating Sum = A⊕B and Carry = A·B.',
     width: 50, height: 50,
     pins: [
-      { id: 'a', name: 'A', x: -25, y: -12, dir: 'left' },
-      { id: 'b', name: 'B', x: -25, y: 12, dir: 'left' },
-      { id: 'sum', name: 'SUM', x: 25, y: -12, dir: 'right' },
-      { id: 'carry', name: 'COUT', x: 25, y: 12, dir: 'right' }
+      { id: 'a', name: 'A (1)', num: 1, x: -25, y: -12, dir: 'left', desc: 'Binary Input A' },
+      { id: 'b', name: 'B (2)', num: 2, x: -25, y: 12, dir: 'left', desc: 'Binary Input B' },
+      { id: 'sum', name: 'SUM (3)', num: 3, x: 25, y: -12, dir: 'right', desc: 'Sum Bit Output (A⊕B)' },
+      { id: 'carry', name: 'COUT (4)', num: 4, x: 25, y: 12, dir: 'right', desc: 'Carry Output (A·B)' }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (V)', type: 'number', default: 5 }]
@@ -1430,11 +2561,51 @@ export const ComponentDefinitions = {
     prefix: 'U_FA',
     width: 60, height: 60,
     pins: [
-      { id: 'a', name: 'A', x: -30, y: -20, dir: 'left' },
-      { id: 'b', name: 'B', x: -30, y: 0, dir: 'left' },
-      { id: 'cin', name: 'CIN', x: -30, y: 20, dir: 'left' },
-      { id: 'sum', name: 'SUM', x: 30, y: -15, dir: 'right' },
-      { id: 'cout', name: 'COUT', x: 30, y: 15, dir: 'right' }
+      {
+            "id": "a",
+            "name": "A (1)",
+            "num": 1,
+            "x": -35,
+            "y": -20,
+            "dir": "left",
+            "desc": "Data Input A"
+      },
+      {
+            "id": "b",
+            "name": "B (2)",
+            "num": 2,
+            "x": -35,
+            "y": 0,
+            "dir": "left",
+            "desc": "Data Input B"
+      },
+      {
+            "id": "cin",
+            "name": "CIN (3)",
+            "num": 3,
+            "x": -35,
+            "y": 20,
+            "dir": "left",
+            "desc": "Carry In"
+      },
+      {
+            "id": "sum",
+            "name": "SUM (4)",
+            "num": 4,
+            "x": 35,
+            "y": -10,
+            "dir": "right",
+            "desc": "Arithmetic Sum"
+      },
+      {
+            "id": "cout",
+            "name": "COUT (5)",
+            "num": 5,
+            "x": 35,
+            "y": 10,
+            "dir": "right",
+            "desc": "Carry Out"
+      }
     ],
     params: { vHigh: 5 },
     paramSchema: [{ key: 'vHigh', label: 'Logic High (V)', type: 'number', default: 5 }]
@@ -1447,7 +2618,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SWITCHES,
     prefix: 'SW',
     width: 40, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Switch Terminal 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Switch Terminal 2"
+      }
+    ],
     params: { closed: false },
     paramSchema: [{ key: 'closed', label: 'Switch Closed', type: 'boolean', default: false }]
   },
@@ -1458,9 +2648,33 @@ export const ComponentDefinitions = {
     prefix: 'SW_SPDT',
     width: 50, height: 40,
     pins: [
-      { id: 'com', name: 'COM', x: -25, y: 0, dir: 'left' },
-      { id: 'p1', name: 'NO', x: 25, y: -15, dir: 'right' },
-      { id: 'p2', name: 'NC', x: 25, y: 15, dir: 'right' }
+      {
+            "id": "com",
+            "name": "COM (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Common Pole (Pin 1)"
+      },
+      {
+            "id": "p1",
+            "name": "NO (2)",
+            "num": 2,
+            "x": 25,
+            "y": -15,
+            "dir": "right",
+            "desc": "Throw 1 (Pin 2)"
+      },
+      {
+            "id": "p2",
+            "name": "NC (3)",
+            "num": 3,
+            "x": 25,
+            "y": 15,
+            "dir": "right",
+            "desc": "Throw 2 (Pin 3)"
+      }
     ],
     params: { position: 1 },
     paramSchema: [{ key: 'position', label: 'Switch Position (1 or 2)', type: 'number', default: 1 }]
@@ -1471,7 +2685,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SWITCHES,
     prefix: 'PB',
     width: 40, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Pushbutton Lead 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Pushbutton Lead 2"
+      }
+    ],
     params: { closed: false },
     paramSchema: [{ key: 'closed', label: 'Pressed', type: 'boolean', default: false }]
   },
@@ -1481,7 +2714,26 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SWITCHES,
     prefix: 'PB_NC',
     width: 40, height: 30,
-    pins: [{ id: 'p1', name: '1', x: -20, y: 0, dir: 'left' }, { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Pushbutton NC Lead 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Pushbutton NC Lead 2"
+      }
+    ],
     params: { closed: true },
     paramSchema: [{ key: 'closed', label: 'Closed State', type: 'boolean', default: true }]
   },
@@ -1491,7 +2743,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SWITCHES,
     prefix: 'DG',
     width: 36, height: 24,
-    pins: [{ id: 'out', name: 'OUT', x: 18, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "out",
+            "name": "OUT (1)",
+            "num": 1,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Logic State Output (Pin 1)"
+      }
+    ],
     params: { state: 0, vHigh: 5.0, vLow: 0.0 },
     paramSchema: [
       { key: 'state', label: 'Logic State (0 or 1)', type: 'select', options: [0, 1], default: 0 },
@@ -1504,7 +2766,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.SWITCHES,
     prefix: 'DG',
     width: 36, height: 24,
-    pins: [{ id: 'out', name: 'OUT', x: 18, y: 0, dir: 'right' }],
+    pins: [
+      {
+            "id": "out",
+            "name": "OUT (1)",
+            "num": 1,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Switched Logic Output (Pin 1)"
+      }
+    ],
     params: { state: 0, vHigh: 5.0, vLow: 0.0 },
     paramSchema: [
       { key: 'state', label: 'Logic State (0 or 1)', type: 'select', options: [0, 1], default: 0 },
@@ -1533,11 +2805,51 @@ export const ComponentDefinitions = {
     prefix: 'RLY',
     width: 60, height: 60,
     pins: [
-      { id: 'coil_p1', name: 'Coil +', x: -30, y: -15, dir: 'left' },
-      { id: 'coil_p2', name: 'Coil -', x: -30, y: 15, dir: 'left' },
-      { id: 'com', name: 'COM', x: 30, y: 0, dir: 'right' },
-      { id: 'no', name: 'NO', x: 30, y: -20, dir: 'right' },
-      { id: 'nc', name: 'NC', x: 30, y: 20, dir: 'right' }
+      {
+            "id": "coil_p1",
+            "name": "COIL+ (1)",
+            "num": 1,
+            "x": -30,
+            "y": -20,
+            "dir": "left",
+            "desc": "Coil Input (+) (Pin 1)"
+      },
+      {
+            "id": "coil_p2",
+            "name": "COIL- (2)",
+            "num": 2,
+            "x": -30,
+            "y": 20,
+            "dir": "left",
+            "desc": "Coil Return (-) (Pin 2)"
+      },
+      {
+            "id": "com",
+            "name": "COM (3)",
+            "num": 3,
+            "x": 30,
+            "y": 0,
+            "dir": "right",
+            "desc": "Switch Common Pole (Pin 3)"
+      },
+      {
+            "id": "no",
+            "name": "NO (4)",
+            "num": 4,
+            "x": 30,
+            "y": -20,
+            "dir": "right",
+            "desc": "Normally Open Contact (Pin 4)"
+      },
+      {
+            "id": "nc",
+            "name": "NC (5)",
+            "num": 5,
+            "x": 30,
+            "y": 20,
+            "dir": "right",
+            "desc": "Normally Closed Contact (Pin 5)"
+      }
     ],
     params: { coilR: 100, vPullIn: 3.5 },
     paramSchema: [
@@ -1554,10 +2866,42 @@ export const ComponentDefinitions = {
     prefix: 'OPTO',
     width: 60, height: 50,
     pins: [
-      { id: 'anode', name: 'A', x: -30, y: -15, dir: 'left' },
-      { id: 'cathode', name: 'K', x: -30, y: 15, dir: 'left' },
-      { id: 'coll', name: 'C', x: 30, y: -15, dir: 'right' },
-      { id: 'emit', name: 'E', x: 30, y: 15, dir: 'right' }
+      {
+            "id": "anode",
+            "name": "A (1)",
+            "num": 1,
+            "x": -30,
+            "y": -15,
+            "dir": "left",
+            "desc": "LED Anode (Pin 1)"
+      },
+      {
+            "id": "cathode",
+            "name": "K (2)",
+            "num": 2,
+            "x": -30,
+            "y": 15,
+            "dir": "left",
+            "desc": "LED Cathode (Pin 2)"
+      },
+      {
+            "id": "coll",
+            "name": "C (3)",
+            "num": 3,
+            "x": 30,
+            "y": -15,
+            "dir": "right",
+            "desc": "Phototransistor Collector (Pin 3)"
+      },
+      {
+            "id": "emit",
+            "name": "E (4)",
+            "num": 4,
+            "x": 30,
+            "y": 15,
+            "dir": "right",
+            "desc": "Phototransistor Emitter (Pin 4)"
+      }
     ],
     params: { ctr: 1.0 },
     paramSchema: [{ key: 'ctr', label: 'Current Transfer Ratio (CTR)', type: 'number', default: 1.0 }]
@@ -1569,15 +2913,87 @@ export const ComponentDefinitions = {
     prefix: 'DISP_7SEG',
     width: 60, height: 80,
     pins: [
-      { id: 'a', name: 'A', x: -30, y: -30, dir: 'left' },
-      { id: 'b', name: 'B', x: -30, y: -15, dir: 'left' },
-      { id: 'c', name: 'C', x: -30, y: 0, dir: 'left' },
-      { id: 'd', name: 'D', x: -30, y: 15, dir: 'left' },
-      { id: 'e', name: 'E', x: 30, y: -30, dir: 'right' },
-      { id: 'f', name: 'F', x: 30, y: -15, dir: 'right' },
-      { id: 'g', name: 'G', x: 30, y: 0, dir: 'right' },
-      { id: 'dp', name: 'DP', x: 30, y: 15, dir: 'right' },
-      { id: 'gnd', name: 'GND', x: 0, y: 40, dir: 'bottom' }
+      {
+            "id": "a",
+            "name": "A (1)",
+            "num": 1,
+            "x": -20,
+            "y": -45,
+            "dir": "top",
+            "desc": "Segment A (Pin 1)"
+      },
+      {
+            "id": "b",
+            "name": "B (2)",
+            "num": 2,
+            "x": 20,
+            "y": -45,
+            "dir": "top",
+            "desc": "Segment B (Pin 2)"
+      },
+      {
+            "id": "c",
+            "name": "C (3)",
+            "num": 3,
+            "x": 20,
+            "y": 45,
+            "dir": "bottom",
+            "desc": "Segment C (Pin 3)"
+      },
+      {
+            "id": "d",
+            "name": "D (4)",
+            "num": 4,
+            "x": -20,
+            "y": 45,
+            "dir": "bottom",
+            "desc": "Segment D (Pin 4)"
+      },
+      {
+            "id": "e",
+            "name": "E (5)",
+            "num": 5,
+            "x": -30,
+            "y": 20,
+            "dir": "left",
+            "desc": "Segment E (Pin 5)"
+      },
+      {
+            "id": "f",
+            "name": "F (6)",
+            "num": 6,
+            "x": -30,
+            "y": -20,
+            "dir": "left",
+            "desc": "Segment F (Pin 6)"
+      },
+      {
+            "id": "g",
+            "name": "G (7)",
+            "num": 7,
+            "x": -30,
+            "y": 0,
+            "dir": "left",
+            "desc": "Segment G (Pin 7)"
+      },
+      {
+            "id": "dp",
+            "name": "DP (8)",
+            "num": 8,
+            "x": 30,
+            "y": 25,
+            "dir": "right",
+            "desc": "Decimal Point (Pin 8)"
+      },
+      {
+            "id": "gnd",
+            "name": "COM (9)",
+            "num": 9,
+            "x": 0,
+            "y": 45,
+            "dir": "bottom",
+            "desc": "Common Cathode Ground (Pin 9)"
+      }
     ],
     params: { color: '#ff3b30' },
     paramSchema: [{ key: 'color', label: 'Display Color', type: 'select', options: ['#ff3b30', '#03b585', '#007aff', '#ff9500'], default: '#ff3b30' }]
@@ -1590,8 +3006,24 @@ export const ComponentDefinitions = {
     prefix: 'LAMP',
     width: 40, height: 40,
     pins: [
-      { id: 'p1', name: '1', x: -20, y: 0, dir: 'left' },
-      { id: 'p2', name: '2', x: 20, y: 0, dir: 'right' }
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": -20,
+            "y": 0,
+            "dir": "left",
+            "desc": "Bulb Lead 1"
+      },
+      {
+            "id": "p2",
+            "name": "2",
+            "num": 2,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Bulb Lead 2"
+      }
     ],
     params: { ratedVoltage: 9, ratedPower: 2, nominalR: 40.5 },
     paramSchema: [
@@ -1607,8 +3039,24 @@ export const ComponentDefinitions = {
     prefix: 'BZ',
     width: 40, height: 40,
     pins: [
-      { id: 'p1', name: '+', x: -20, y: 0, dir: 'left' },
-      { id: 'p2', name: '-', x: 20, y: 0, dir: 'right' }
+      {
+            "id": "p1",
+            "name": "+ (1)",
+            "num": 1,
+            "x": -20,
+            "y": 0,
+            "dir": "left",
+            "desc": "Piezo Positive (+) (Pin 1)"
+      },
+      {
+            "id": "p2",
+            "name": "- (2)",
+            "num": 2,
+            "x": 20,
+            "y": 0,
+            "dir": "right",
+            "desc": "Piezo Negative (-) (Pin 2)"
+      }
     ],
     params: { resistance: 50, frequency: 2400 },
     paramSchema: [
@@ -1623,8 +3071,24 @@ export const ComponentDefinitions = {
     prefix: 'M',
     width: 40, height: 40,
     pins: [
-      { id: 'p1', name: '+', x: -20, y: 0, dir: 'left' },
-      { id: 'p2', name: '-', x: 20, y: 0, dir: 'right' }
+      {
+            "id": "p1",
+            "name": "+ (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Motor Terminal (+) (Pin 1)"
+      },
+      {
+            "id": "p2",
+            "name": "- (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Motor Terminal (-) (Pin 2)"
+      }
     ],
     params: { resistance: 12, rpm: 3000 },
     paramSchema: [
@@ -1640,7 +3104,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.POWER_SYMBOLS,
     prefix: 'VCC',
     width: 30, height: 30,
-    pins: [{ id: 'p1', name: 'VCC', x: 0, y: 15, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "VCC (1)",
+            "num": 1,
+            "x": 0,
+            "y": 15,
+            "dir": "bottom",
+            "desc": "Power Supply Rail"
+      }
+    ],
     params: { voltage: 5 },
     paramSchema: [{ key: 'voltage', label: 'Rail Voltage', type: 'number', unit: 'V', default: 5 }]
   },
@@ -1650,7 +3124,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.POWER_SYMBOLS,
     prefix: 'P12V',
     width: 30, height: 30,
-    pins: [{ id: 'p1', name: '+12V', x: 0, y: 15, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "+12V (1)",
+            "num": 1,
+            "x": 0,
+            "y": 15,
+            "dir": "bottom",
+            "desc": "+12V Power Rail"
+      }
+    ],
     params: { voltage: 12 },
     paramSchema: [{ key: 'voltage', label: 'Rail Voltage', type: 'number', unit: 'V', default: 12 }]
   },
@@ -1660,7 +3144,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.POWER_SYMBOLS,
     prefix: 'N12V',
     width: 30, height: 30,
-    pins: [{ id: 'p1', name: '-12V', x: 0, y: -15, dir: 'top' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "-12V (1)",
+            "num": 1,
+            "x": 0,
+            "y": -15,
+            "dir": "top",
+            "desc": "-12V Power Rail"
+      }
+    ],
     params: { voltage: -12 },
     paramSchema: [{ key: 'voltage', label: 'Rail Voltage', type: 'number', unit: 'V', default: -12 }]
   },
@@ -1670,7 +3164,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.POWER_SYMBOLS,
     prefix: 'P15V',
     width: 30, height: 30,
-    pins: [{ id: 'p1', name: '+15V', x: 0, y: 15, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "+15V (1)",
+            "num": 1,
+            "x": 0,
+            "y": 15,
+            "dir": "bottom",
+            "desc": "+15V Power Rail"
+      }
+    ],
     params: { voltage: 15 },
     paramSchema: [{ key: 'voltage', label: 'Rail Voltage', type: 'number', unit: 'V', default: 15 }]
   },
@@ -1680,7 +3184,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.POWER_SYMBOLS,
     prefix: 'N15V',
     width: 30, height: 30,
-    pins: [{ id: 'p1', name: '-15V', x: 0, y: -15, dir: 'top' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "-15V (1)",
+            "num": 1,
+            "x": 0,
+            "y": -15,
+            "dir": "top",
+            "desc": "-15V Power Rail"
+      }
+    ],
     params: { voltage: -15 },
     paramSchema: [{ key: 'voltage', label: 'Rail Voltage', type: 'number', unit: 'V', default: -15 }]
   },
@@ -1690,7 +3204,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.POWER_SYMBOLS,
     prefix: 'NET',
     width: 40, height: 20,
-    pins: [{ id: 'p1', name: 'PIN', x: 0, y: 10, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": 0,
+            "y": 0,
+            "dir": "bottom",
+            "desc": "Net Connection Node"
+      }
+    ],
     params: { label: 'NET1' },
     paramSchema: [{ key: 'label', label: 'Net Name', type: 'string', default: 'NET1' }]
   },
@@ -1701,7 +3225,15 @@ export const ComponentDefinitions = {
     prefix: 'NODE',
     width: 14, height: 14,
     pins: [
-      { id: 'p1', name: 'N', x: 0, y: 0, dir: 'all' }
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": 0,
+            "y": 0,
+            "dir": "top",
+            "desc": "Junction Node"
+      }
     ],
     params: { label: '' },
     paramSchema: [
@@ -1715,7 +3247,15 @@ export const ComponentDefinitions = {
     prefix: 'J',
     width: 14, height: 14,
     pins: [
-      { id: 'p1', name: 'J', x: 0, y: 0, dir: 'all' }
+      {
+            "id": "p1",
+            "name": "1",
+            "num": 1,
+            "x": 0,
+            "y": 0,
+            "dir": "top",
+            "desc": "Junction Node"
+      }
     ],
     params: { label: '' },
     paramSchema: [
@@ -1730,7 +3270,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PROBES,
     prefix: 'PR_V',
     width: 30, height: 40,
-    pins: [{ id: 'tip', name: 'Tip', x: 0, y: 20, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "tip",
+            "name": "TIP (1)",
+            "num": 1,
+            "x": 0,
+            "y": 20,
+            "dir": "bottom",
+            "desc": "Voltage Probe Tip"
+      }
+    ],
     params: { color: '#03b585', label: 'V_out' },
     paramSchema: [
       { key: 'label', label: 'Probe Label', type: 'string', default: 'V_out' },
@@ -1743,7 +3293,17 @@ export const ComponentDefinitions = {
     category: ComponentCategory.PROBES,
     prefix: 'PR_I',
     width: 30, height: 40,
-    pins: [{ id: 'tip', name: 'Tip', x: 0, y: 20, dir: 'bottom' }],
+    pins: [
+      {
+            "id": "tip",
+            "name": "TIP (1)",
+            "num": 1,
+            "x": 0,
+            "y": 20,
+            "dir": "bottom",
+            "desc": "Current Probe Tip"
+      }
+    ],
     params: { color: '#ff9500', label: 'I_branch' },
     paramSchema: [
       { key: 'label', label: 'Probe Label', type: 'string', default: 'I_branch' },
@@ -1757,8 +3317,24 @@ export const ComponentDefinitions = {
     prefix: 'DVM',
     width: 50, height: 40,
     pins: [
-      { id: 'p_pos', name: '+', x: -25, y: 0, dir: 'left' },
-      { id: 'p_neg', name: '-', x: 25, y: 0, dir: 'right' }
+      {
+            "id": "p_pos",
+            "name": "+ (1)",
+            "num": 1,
+            "x": -25,
+            "y": 0,
+            "dir": "left",
+            "desc": "Voltmeter High (+)"
+      },
+      {
+            "id": "p_neg",
+            "name": "- (2)",
+            "num": 2,
+            "x": 25,
+            "y": 0,
+            "dir": "right",
+            "desc": "Voltmeter Low (-)"
+      }
     ],
     params: {}, paramSchema: []
   }

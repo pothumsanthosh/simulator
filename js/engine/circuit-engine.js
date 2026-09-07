@@ -27,7 +27,7 @@ export class CircuitEngine {
     this.prevNodeVoltages = [];
     this.branchCurrents = new Map();
     this.history = [];
-    this.maxHistoryLength = 8000;
+    this.maxHistoryLength = 20000;
 
     this.isRunning = false;
     this.internalStates = new Map(); // Storage for reactive, latch, and sequential states
@@ -145,12 +145,25 @@ export class CircuitEngine {
       }
     }
 
-    // Assign Node 0 to Ground
+    // Assign Node 0 to Ground (BUG-001 Auto-Ground Fallback)
     this.pinToNodeMap.clear();
     this.nodes = [];
 
     if (gndNetIndex !== -1) {
       const gndNet = rawNets.splice(gndNetIndex, 1)[0];
+      rawNets.unshift(gndNet);
+    } else if (rawNets.length > 0) {
+      // Find power source negative terminal or largest connected net
+      let bestNetIdx = 0;
+      for (let i = 0; i < rawNets.length; i++) {
+        const net = rawNets[i];
+        const hasNegPower = net.some(pk => pk.includes(':p_neg') || pk.includes(':gnd') || pk.includes(':p2'));
+        if (hasNegPower) {
+          bestNetIdx = i;
+          break;
+        }
+      }
+      const gndNet = rawNets.splice(bestNetIdx, 1)[0];
       rawNets.unshift(gndNet);
     } else {
       rawNets.unshift([]);
@@ -170,6 +183,14 @@ export class CircuitEngine {
   getNode(comp, pinId) {
     const key = `${comp.id}:${pinId}`;
     return this.pinToNodeMap.get(key) ?? -1;
+  }
+
+  isPinConnected(comp, pinId) {
+    const key = `${comp.id}:${pinId}`;
+    const node = this.pinToNodeMap.get(key);
+    if (node === undefined || node === -1) return false;
+    const net = this.nodes[node];
+    return Array.isArray(net) && net.length > 1;
   }
 
   reset() {
@@ -262,6 +283,7 @@ export class CircuitEngine {
         case ComponentTypes.COMPARATOR:
         case ComponentTypes.SCHMITT_TRIGGER:
         case ComponentTypes.ANALOG_MULTIPLIER:
+        case ComponentTypes.SAMPLE_AND_HOLD:
         case ComponentTypes.LM7805:
         case ComponentTypes.LM7812:
         case ComponentTypes.LM7912:
@@ -285,6 +307,7 @@ export class CircuitEngine {
           vSources.push(comp);
           break;
 
+        case ComponentTypes.FUNCTION_GENERATOR:
         case ComponentTypes.TIMER556:
         case ComponentTypes.SR_LATCH:
         case ComponentTypes.T_FLIPFLOP:
@@ -429,9 +452,9 @@ export class CircuitEngine {
             const n1 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_pos' : 'p1');
             const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
             const c = Math.max(p.capacitance || 1e-6, 1e-15);
-            const gEq = c / dt;
-            const vPrev = (this.prevNodeVoltages[n1] || 0) - (this.prevNodeVoltages[n2] || 0);
-            const iEq = gEq * vPrev;
+            const gEq = (2 * c) / dt;
+            const state = this.internalStates.get(comp.id) || { vPrev: 0, iPrev: 0 };
+            const iEq = gEq * state.vPrev + state.iPrev;
             stampConductance(n1, n2, gEq);
             stampCurrentSource(n2, n1, iEq);
             break;
@@ -582,6 +605,52 @@ export class CircuitEngine {
             const t = (this.time % period) / period;
             const v = (p.offset ?? 0) + amp * (2 * t - 1);
             stampVSourceEquation(vSrcEquationIdx++, nPos, nNeg, v);
+            break;
+          }
+
+          case ComponentTypes.FUNCTION_GENERATOR: {
+            const nPos = this.getNode(comp, 'p_pos');
+            const nCom = this.getNode(comp, 'com');
+            const nNeg = this.getNode(comp, 'p_neg');
+            const freq = Math.max(p.frequency || 1000, 1e-4);
+            const amp = p.amplitude ?? 5;
+            const offset = p.offset ?? 0;
+            const duty = Math.max(0.01, Math.min(0.99, (p.dutyCycle ?? 50) / 100));
+            const phaseRad = ((p.phase ?? 0) * Math.PI) / 180;
+            const tMod = ((this.time * freq + (p.phase ?? 0) / 360) % 1.0 + 1.0) % 1.0;
+
+            let wave = 0;
+            const wf = (p.waveform || 'sine').toLowerCase();
+            if (wf === 'square') {
+              wave = (tMod < duty) ? amp : -amp;
+            } else if (wf === 'triangle') {
+              if (tMod < duty) {
+                wave = -amp + (2 * amp * tMod) / duty;
+              } else {
+                wave = amp - (2 * amp * (tMod - duty)) / (1 - duty);
+              }
+            } else if (wf === 'sawtooth') {
+              wave = -amp + 2 * amp * tMod;
+            } else { // sine
+              wave = amp * Math.sin(2 * Math.PI * freq * this.time + phaseRad);
+            }
+            const vSig = offset + wave;
+            const vInv = offset - wave;
+
+            const isComConn = this.isPinConnected(comp, 'com') && nCom !== -1;
+            const isPosConn = this.isPinConnected(comp, 'p_pos') && nPos !== -1;
+            const isNegConn = this.isPinConnected(comp, 'p_neg') && nNeg !== -1;
+
+            if (isComConn) {
+              stampVSourceEquation(vSrcEquationIdx++, nPos, nCom, isPosConn ? vSig : 0);
+              stampVSourceEquation(vSrcEquationIdx++, nNeg, nCom, isNegConn ? vInv : 0);
+            } else if (isPosConn && isNegConn) {
+              stampVSourceEquation(vSrcEquationIdx++, nPos, nNeg, vSig);
+              stampVSourceEquation(vSrcEquationIdx++, 0, 0, 0);
+            } else {
+              stampVSourceEquation(vSrcEquationIdx++, nPos, 0, isPosConn ? vSig : 0);
+              stampVSourceEquation(vSrcEquationIdx++, nNeg, 0, isNegConn ? vInv : 0);
+            }
             break;
           }
 
@@ -797,11 +866,16 @@ export class CircuitEngine {
             const nB = this.getNode(comp, 'base');
             const nC = this.getNode(comp, 'collector');
             const nE = this.getNode(comp, 'emitter');
-            const vBE = getNodeV(nB) - getNodeV(nE);
-            const vCE = getNodeV(nC) - getNodeV(nE);
             const beta = comp.type === ComponentTypes.DARLINGTON_NPN ? 1000 : (p.beta || 200);
-            const vbeOn = comp.type === ComponentTypes.DARLINGTON_NPN ? 1.3 : 0.65;
-            const rBE = 100;
+            const isDarlington = comp.type === ComponentTypes.DARLINGTON_NPN;
+            const vbeOn = isDarlington ? 1.3 : 0.65;
+            const rBE = p.rBE || (isDarlington ? 1000 : 100);
+
+            const vB = getNodeV(nB);
+            const vC = getNodeV(nC);
+            const vE = getNodeV(nE);
+            const vBE = vB - vE;
+            const vCE = vC - vE;
 
             if (vBE > vbeOn) {
               const gB = 1 / rBE;
@@ -809,8 +883,10 @@ export class CircuitEngine {
               stampConductance(nB, nE, gB);
               stampCurrentSource(nB, nE, -iBeq);
 
-              if (vCE > 0.2) {
-                const gm = beta * gB;
+              const satFactor = Math.max(0, Math.min(1, (vCE - 0.05) / 0.25));
+              const gm = beta * gB * satFactor;
+
+              if (gm > 1e-9) {
                 if (nC > 0 && nC < numNodes) {
                   if (nB > 0 && nB < numNodes) A[nC - 1][nB - 1] += gm;
                   if (nE > 0 && nE < numNodes) A[nC - 1][nE - 1] -= gm;
@@ -821,8 +897,11 @@ export class CircuitEngine {
                   if (nE > 0 && nE < numNodes) A[nE - 1][nE - 1] += gm;
                   Z[nE - 1] -= gm * vbeOn;
                 }
-              } else {
-                stampConductance(nC, nE, 1 / 0.5);
+              }
+
+              const gSat = (1 - satFactor) * (1 / 0.2);
+              if (gSat > 1e-6) {
+                stampConductance(nC, nE, gSat);
               }
             } else {
               stampConductance(nB, nE, 1e-8);
@@ -836,11 +915,16 @@ export class CircuitEngine {
             const nB = this.getNode(comp, 'base');
             const nC = this.getNode(comp, 'collector');
             const nE = this.getNode(comp, 'emitter');
-            const vEB = getNodeV(nE) - getNodeV(nB);
-            const vEC = getNodeV(nE) - getNodeV(nC);
             const beta = comp.type === ComponentTypes.DARLINGTON_PNP ? 1000 : (p.beta || 200);
-            const vbeOn = comp.type === ComponentTypes.DARLINGTON_PNP ? 1.3 : 0.65;
-            const rEB = 100;
+            const isDarlington = comp.type === ComponentTypes.DARLINGTON_PNP;
+            const vbeOn = isDarlington ? 1.3 : 0.65;
+            const rEB = p.rBE || (isDarlington ? 1000 : 100);
+
+            const vB = getNodeV(nB);
+            const vC = getNodeV(nC);
+            const vE = getNodeV(nE);
+            const vEB = vE - vB;
+            const vEC = vE - vC;
 
             if (vEB > vbeOn) {
               const gB = 1 / rEB;
@@ -848,8 +932,10 @@ export class CircuitEngine {
               stampConductance(nE, nB, gB);
               stampCurrentSource(nE, nB, -iBeq);
 
-              if (vEC > 0.2) {
-                const gm = beta * gB;
+              const satFactor = Math.max(0, Math.min(1, (vEC - 0.05) / 0.25));
+              const gm = beta * gB * satFactor;
+
+              if (gm > 1e-9) {
                 if (nC > 0 && nC < numNodes) {
                   if (nE > 0 && nE < numNodes) A[nC - 1][nE - 1] -= gm;
                   if (nB > 0 && nB < numNodes) A[nC - 1][nB - 1] += gm;
@@ -860,8 +946,11 @@ export class CircuitEngine {
                   if (nB > 0 && nB < numNodes) A[nE - 1][nB - 1] -= gm;
                   Z[nE - 1] -= gm * vbeOn;
                 }
-              } else {
-                stampConductance(nE, nC, 1 / 0.5);
+              }
+
+              const gSat = (1 - satFactor) * (1 / 0.2);
+              if (gSat > 1e-6) {
+                stampConductance(nE, nC, gSat);
               }
             } else {
               stampConductance(nE, nB, 1e-8);
@@ -1019,29 +1108,38 @@ export class CircuitEngine {
             const nOut = this.getNode(comp, 'out');
             const nVpos = this.getNode(comp, 'v_pos');
             const nVneg = this.getNode(comp, 'v_neg');
-            const aOl = p.openLoopGain || 200000;
+            const aOl = Math.max(p.openLoopGain || 200000, 10);
+            const vOffset = (p.vOffset !== undefined) ? p.vOffset : 0.00005;
 
             let vSatP = p.vSatPos ?? 14;
             let vSatN = p.vSatNeg ?? -14;
 
-            if (nVpos !== -1) {
+            if (this.isPinConnected(comp, 'v_pos') && nVpos !== -1) {
               const vRailPos = getNodeV(nVpos);
-              if (vRailPos !== 0) vSatP = vRailPos - 1.0;
+              vSatP = vRailPos - 1.2;
             }
-            if (nVneg !== -1) {
+            if (this.isPinConnected(comp, 'v_neg') && nVneg !== -1) {
               const vRailNeg = getNodeV(nVneg);
-              if (vRailNeg !== 0) vSatN = vRailNeg + 1.0;
+              vSatN = vRailNeg + 1.2;
+            }
+            if (vSatP < vSatN) {
+              const tmp = vSatP;
+              vSatP = vSatN;
+              vSatN = tmp;
             }
 
-            const vDiff = getNodeV(nNonInv) - getNodeV(nInv);
+            const effOffset = vOffset;
+
+            const vCurrOut = getNodeV(nOut);
+            const vDiff = (getNodeV(nNonInv) - getNodeV(nInv)) + effOffset;
             const vLinear = aOl * vDiff;
 
-            if (vLinear > vSatP) {
+            if (vCurrOut > vSatP || (vCurrOut >= vSatP - 1e-4 && vLinear >= vSatP)) {
               stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatP);
-            } else if (vLinear < vSatN) {
+            } else if (vCurrOut < vSatN || (vCurrOut <= vSatN + 1e-4 && vLinear <= vSatN)) {
               stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatN);
             } else {
-              stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, 0);
+              stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, aOl * effOffset);
             }
             break;
           }
@@ -1052,7 +1150,9 @@ export class CircuitEngine {
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
             const vL = p.vLow ?? 0;
-            const outV = (getNodeV(nNonInv) > getNodeV(nInv)) ? vH : vL;
+            const vPlus = this.isPinConnected(comp, 'in_noninv') ? getNodeV(nNonInv) : 0;
+            const vMinus = this.isPinConnected(comp, 'in_inv') ? getNodeV(nInv) : 0;
+            const outV = (vPlus > vMinus) ? vH : vL;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, outV);
             break;
           }
@@ -1091,20 +1191,21 @@ export class CircuitEngine {
             const nReset = this.getNode(comp, 'reset');
             const nCtrl = this.getNode(comp, 'ctrl');
 
-            const vccV = nVcc !== -1 ? (getNodeV(nVcc) || this.prevNodeVoltages[nVcc] || (p.vcc ?? 9)) : (p.vcc ?? 9);
-            const gndV = nGnd !== -1 ? (getNodeV(nGnd) || this.prevNodeVoltages[nGnd] || 0) : 0;
+            const hasVcc = this.isPinConnected(comp, 'vcc');
+            const vccV = hasVcc && nVcc !== -1 ? (getNodeV(nVcc) || this.prevNodeVoltages[nVcc] || (p.vcc ?? 9)) : (p.vcc ?? 9);
+            const gndV = this.isPinConnected(comp, 'gnd') && nGnd !== -1 ? (getNodeV(nGnd) || this.prevNodeVoltages[nGnd] || 0) : 0;
             const vSupply = Math.max(vccV - gndV, 1.0);
 
-            const vTrig = getNodeV(nTrig) - gndV;
-            const vThresh = getNodeV(nThresh) - gndV;
-            const vReset = nReset !== -1 ? (getNodeV(nReset) - gndV) : vSupply;
-            const vCtrl = nCtrl !== -1 ? (getNodeV(nCtrl) - gndV) : ((2 / 3) * vSupply);
+            const vTrig = this.isPinConnected(comp, 'trig') && nTrig !== -1 ? (getNodeV(nTrig) - gndV) : (state => (state?.outHigh ? vSupply : 0))(this.internalStates.get(comp.id));
+            const vThresh = this.isPinConnected(comp, 'thresh') && nThresh !== -1 ? (getNodeV(nThresh) - gndV) : 0;
+            const vReset = this.isPinConnected(comp, 'reset') && nReset !== -1 ? (getNodeV(nReset) - gndV) : vSupply;
+            const vCtrl = this.isPinConnected(comp, 'ctrl') && nCtrl !== -1 ? (getNodeV(nCtrl) - gndV) : ((2 / 3) * vSupply);
 
             const vThreshTrip = vCtrl > 0.5 ? vCtrl : ((2 / 3) * vSupply);
             const vTrigTrip = vCtrl > 0.5 ? (vCtrl / 2) : ((1 / 3) * vSupply);
 
             let state = this.internalStates.get(comp.id) || { outHigh: true };
-            const isResetActive = nReset !== -1 && vReset < 0.7 && vSupply >= 1.0;
+            const isResetActive = this.isPinConnected(comp, 'reset') && nReset !== -1 && vReset < 0.7 && vSupply >= 1.0;
             if (isResetActive) {
               state.outHigh = false;
             } else if (vTrig < vTrigTrip) {
@@ -1128,8 +1229,9 @@ export class CircuitEngine {
           case ComponentTypes.TIMER556: {
             const nVcc = this.getNode(comp, 'vcc');
             const nGnd = this.getNode(comp, 'gnd');
-            const vccV = nVcc !== -1 ? (getNodeV(nVcc) || this.prevNodeVoltages[nVcc] || (p.vcc ?? 9)) : (p.vcc ?? 9);
-            const gndV = nGnd !== -1 ? (getNodeV(nGnd) || this.prevNodeVoltages[nGnd] || 0) : 0;
+            const hasVcc = this.isPinConnected(comp, 'vcc');
+            const vccV = hasVcc && nVcc !== -1 ? (getNodeV(nVcc) || this.prevNodeVoltages[nVcc] || (p.vcc ?? 9)) : (p.vcc ?? 9);
+            const gndV = this.isPinConnected(comp, 'gnd') && nGnd !== -1 ? (getNodeV(nGnd) || this.prevNodeVoltages[nGnd] || 0) : 0;
             const vSupply = Math.max(vccV - gndV, 1.0);
 
             ['1', '2'].forEach(idx => {
@@ -1140,16 +1242,16 @@ export class CircuitEngine {
               const nReset = this.getNode(comp, `reset${idx}`);
               const nCtrl = this.getNode(comp, `ctrl${idx}`);
 
-              const vTrig = getNodeV(nTrig) - gndV;
-              const vThresh = getNodeV(nThresh) - gndV;
-              const vReset = nReset !== -1 ? (getNodeV(nReset) - gndV) : vSupply;
-              const vCtrl = nCtrl !== -1 ? (getNodeV(nCtrl) - gndV) : ((2 / 3) * vSupply);
+              const vTrig = this.isPinConnected(comp, `trig${idx}`) && nTrig !== -1 ? (getNodeV(nTrig) - gndV) : 0;
+              const vThresh = this.isPinConnected(comp, `thresh${idx}`) && nThresh !== -1 ? (getNodeV(nThresh) - gndV) : 0;
+              const vReset = this.isPinConnected(comp, `reset${idx}`) && nReset !== -1 ? (getNodeV(nReset) - gndV) : vSupply;
+              const vCtrl = this.isPinConnected(comp, `ctrl${idx}`) && nCtrl !== -1 ? (getNodeV(nCtrl) - gndV) : ((2 / 3) * vSupply);
 
               const vThreshTrip = vCtrl > 0.5 ? vCtrl : ((2 / 3) * vSupply);
               const vTrigTrip = vCtrl > 0.5 ? (vCtrl / 2) : ((1 / 3) * vSupply);
 
               let state = this.internalStates.get(`${comp.id}_${idx}`) || { outHigh: true };
-              const isResetActive = nReset !== -1 && vReset < 0.7 && vSupply >= 1.0;
+              const isResetActive = this.isPinConnected(comp, `reset${idx}`) && nReset !== -1 && vReset < 0.7 && vSupply >= 1.0;
               if (isResetActive) {
                 state.outHigh = false;
               } else if (vTrig < vTrigTrip) {
@@ -1178,6 +1280,70 @@ export class CircuitEngine {
             const scale = p.scale || 0.1;
             const outV = getNodeV(nX) * getNodeV(nY) * scale;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, outV);
+            break;
+          }
+
+          case ComponentTypes.SAMPLE_AND_HOLD: {
+            const nIn = this.getNode(comp, 'in');
+            const nCtrl = this.getNode(comp, 'ctrl');
+            const nOut = this.getNode(comp, 'out');
+            const nCh = this.getNode(comp, 'ch');
+            const vThresh = p.vThresh ?? 2.5;
+            const rOn = p.rOn || 5;
+            const rOff = p.rOff || 1e9;
+            const cInt = p.internalCap || 1e-8;
+
+            const vCtrl = this.isPinConnected(comp, 'ctrl') && nCtrl !== -1 ? getNodeV(nCtrl) : 5.0;
+            const isSampling = vCtrl >= vThresh;
+
+            let state = this.internalStates.get(comp.id);
+            if (!state) {
+              state = { heldVoltage: 0.0, lastT: this.time };
+            }
+
+            if (this.isPinConnected(comp, 'ch') && nCh !== -1) {
+              stampConductance(nIn, nCh, isSampling ? 1 / rOn : 1 / rOff);
+              const vHoldCap = getNodeV(nCh);
+              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vHoldCap);
+            } else {
+              if (isSampling) {
+                const vIn = getNodeV(nIn);
+                const dtStep = Math.max(1e-9, dt);
+                const alpha = 1 - Math.exp(-dtStep / (rOn * cInt));
+                state.heldVoltage = state.heldVoltage + alpha * (vIn - state.heldVoltage);
+              }
+              state.lastT = this.time;
+              this.internalStates.set(comp.id, state);
+              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, state.heldVoltage);
+            }
+            break;
+          }
+
+          case ComponentTypes.VOLTAGE_CONTROLLED_SWITCH: {
+            const nCPos = this.getNode(comp, 'ctrl_pos');
+            const nCNeg = this.getNode(comp, 'ctrl_neg');
+            const nP1 = this.getNode(comp, 'p1');
+            const nP2 = this.getNode(comp, 'p2');
+            const vThresh = p.vThresh ?? 2.5;
+            const rOn = p.rOn || 0.1;
+            const rOff = p.rOff || 1e8;
+
+            const vCtrl = (getNodeV(nCPos) - getNodeV(nCNeg));
+            const isClosed = vCtrl >= vThresh;
+            stampConductance(nP1, nP2, isClosed ? 1 / rOn : 1 / rOff);
+            break;
+          }
+
+          case ComponentTypes.ANALOG_SWITCH_4066: {
+            const nIn = this.getNode(comp, 'in');
+            const nCtrl = this.getNode(comp, 'ctrl');
+            const nOut = this.getNode(comp, 'out');
+            const vThresh = p.vThresh ?? 2.5;
+            const rOn = p.rOn || 50;
+            const rOff = p.rOff || 1e9;
+
+            const isClosed = getNodeV(nCtrl) >= vThresh;
+            stampConductance(nIn, nOut, isClosed ? 1 / rOn : 1 / rOff);
             break;
           }
 
@@ -1219,7 +1385,9 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'in2');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 && getNodeV(n2) > vH / 2) ? vH : 0;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : true;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : true;
+            const out = (in1 && in2) ? vH : 0;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1229,7 +1397,9 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'in2');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 && getNodeV(n2) > vH / 2) ? 0 : vH;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : true;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : true;
+            const out = (in1 && in2) ? 0 : vH;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1239,7 +1409,9 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'in2');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 || getNodeV(n2) > vH / 2) ? vH : 0;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : false;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : false;
+            const out = (in1 || in2) ? vH : 0;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1249,7 +1421,9 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'in2');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 || getNodeV(n2) > vH / 2) ? 0 : vH;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : false;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : false;
+            const out = (in1 || in2) ? 0 : vH;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1258,7 +1432,8 @@ export class CircuitEngine {
             const n1 = this.getNode(comp, 'in');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = getNodeV(n1) > vH / 2 ? 0 : vH;
+            const in1 = this.isPinConnected(comp, 'in') ? (getNodeV(n1) > vH / 2) : false;
+            const out = in1 ? 0 : vH;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1268,8 +1443,8 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'in2');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const in1 = getNodeV(n1) > vH / 2;
-            const in2 = getNodeV(n2) > vH / 2;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : false;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : false;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, (in1 !== in2) ? vH : 0);
             break;
           }
@@ -1279,8 +1454,8 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'in2');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const in1 = getNodeV(n1) > vH / 2;
-            const in2 = getNodeV(n2) > vH / 2;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : false;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : false;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, (in1 === in2) ? vH : 0);
             break;
           }
@@ -1289,7 +1464,8 @@ export class CircuitEngine {
             const n1 = this.getNode(comp, 'in');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = getNodeV(n1) > vH / 2 ? vH : 0;
+            const in1 = this.isPinConnected(comp, 'in') ? (getNodeV(n1) > vH / 2) : false;
+            const out = in1 ? vH : 0;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1300,7 +1476,10 @@ export class CircuitEngine {
             const n3 = this.getNode(comp, 'in3');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 && getNodeV(n2) > vH / 2 && getNodeV(n3) > vH / 2) ? vH : 0;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : true;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : true;
+            const in3 = this.isPinConnected(comp, 'in3') ? (getNodeV(n3) > vH / 2) : true;
+            const out = (in1 && in2 && in3) ? vH : 0;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1311,7 +1490,10 @@ export class CircuitEngine {
             const n3 = this.getNode(comp, 'in3');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 && getNodeV(n2) > vH / 2 && getNodeV(n3) > vH / 2) ? 0 : vH;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : true;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : true;
+            const in3 = this.isPinConnected(comp, 'in3') ? (getNodeV(n3) > vH / 2) : true;
+            const out = (in1 && in2 && in3) ? 0 : vH;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1322,7 +1504,10 @@ export class CircuitEngine {
             const n3 = this.getNode(comp, 'in3');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 || getNodeV(n2) > vH / 2 || getNodeV(n3) > vH / 2) ? vH : 0;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : false;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : false;
+            const in3 = this.isPinConnected(comp, 'in3') ? (getNodeV(n3) > vH / 2) : false;
+            const out = (in1 || in2 || in3) ? vH : 0;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1333,7 +1518,10 @@ export class CircuitEngine {
             const n3 = this.getNode(comp, 'in3');
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
-            const out = (getNodeV(n1) > vH / 2 || getNodeV(n2) > vH / 2 || getNodeV(n3) > vH / 2) ? 0 : vH;
+            const in1 = this.isPinConnected(comp, 'in1') ? (getNodeV(n1) > vH / 2) : false;
+            const in2 = this.isPinConnected(comp, 'in2') ? (getNodeV(n2) > vH / 2) : false;
+            const in3 = this.isPinConnected(comp, 'in3') ? (getNodeV(n3) > vH / 2) : false;
+            const out = (in1 || in2 || in3) ? 0 : vH;
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, out);
             break;
           }
@@ -1348,16 +1536,18 @@ export class CircuitEngine {
             const nOut = this.getNode(comp, 'out');
             const vH = p.vHigh ?? 5;
 
-            const s0 = getNodeV(nS0) > vH / 2 ? 1 : 0;
-            const s1 = getNodeV(nS1) > vH / 2 ? 1 : 0;
+            const s0 = (this.isPinConnected(comp, 's0') && getNodeV(nS0) > vH / 2) ? 1 : 0;
+            const s1 = (this.isPinConnected(comp, 's1') && getNodeV(nS1) > vH / 2) ? 1 : 0;
             const sel = (s1 << 1) | s0;
 
             let chosenNode = nI0;
-            if (sel === 1) chosenNode = nI1;
-            else if (sel === 2) chosenNode = nI2;
-            else if (sel === 3) chosenNode = nI3;
+            let chosenPin = 'i0';
+            if (sel === 1) { chosenNode = nI1; chosenPin = 'i1'; }
+            else if (sel === 2) { chosenNode = nI2; chosenPin = 'i2'; }
+            else if (sel === 3) { chosenNode = nI3; chosenPin = 'i3'; }
 
-            stampVSourceEquation(vSrcEquationIdx++, nOut, 0, getNodeV(chosenNode));
+            const outVal = this.isPinConnected(comp, chosenPin) ? getNodeV(chosenNode) : 0;
+            stampVSourceEquation(vSrcEquationIdx++, nOut, 0, outVal);
             break;
           }
 
@@ -1369,8 +1559,8 @@ export class CircuitEngine {
             const nQn = this.getNode(comp, 'q_not');
             const vH = p.vHigh ?? 5;
 
-            const s = getNodeV(nS) > vH / 2;
-            const r = getNodeV(nR) > vH / 2;
+            const s = this.isPinConnected(comp, 's') && (getNodeV(nS) > vH / 2);
+            const r = this.isPinConnected(comp, 'r') && (getNodeV(nR) > vH / 2);
             let state = this.internalStates.get(comp.id) || { qVal: 0 };
             if (s && !r) state.qVal = 1;
             else if (!s && r) state.qVal = 0;
@@ -1388,12 +1578,13 @@ export class CircuitEngine {
             const nQn = this.getNode(comp, 'q_not');
             const vH = p.vHigh ?? 5;
 
-            const currClk = getNodeV(nClk);
+            const currClk = this.isPinConnected(comp, 'clk') ? getNodeV(nClk) : 0;
             const prevClk = nClk !== -1 ? (this.prevNodeVoltages[nClk] || 0) : 0;
             let state = this.internalStates.get(comp.id) || { qVal: 0 };
             if (currClk > vH / 2 && prevClk <= vH / 2 && state.lastStepTriggered !== this.stepCount) {
               state.lastStepTriggered = this.stepCount;
-              state.qVal = getNodeV(nD) > vH / 2 ? 1 : 0;
+              const dVal = this.isPinConnected(comp, 'd') ? (getNodeV(nD) > vH / 2 ? 1 : 0) : 0;
+              state.qVal = dVal;
             }
             this.internalStates.set(comp.id, state);
 
@@ -1410,13 +1601,13 @@ export class CircuitEngine {
             const nQn = this.getNode(comp, 'q_not');
             const vH = p.vHigh ?? 5;
 
-            const currClk = getNodeV(nClk);
+            const currClk = this.isPinConnected(comp, 'clk') ? getNodeV(nClk) : 0;
             const prevClk = nClk !== -1 ? (this.prevNodeVoltages[nClk] || 0) : 0;
             let state = this.internalStates.get(comp.id) || { qVal: 0 };
             if (currClk > vH / 2 && prevClk <= vH / 2 && state.lastStepTriggered !== this.stepCount) {
               state.lastStepTriggered = this.stepCount;
-              const isJConnected = nJ !== -1 && this.nodes[nJ] && this.nodes[nJ].length > 1;
-              const isKConnected = nK !== -1 && this.nodes[nK] && this.nodes[nK].length > 1;
+              const isJConnected = this.isPinConnected(comp, 'j') && nJ !== -1;
+              const isKConnected = this.isPinConnected(comp, 'k') && nK !== -1;
               const j = isJConnected ? (getNodeV(nJ) > vH / 2) : true;
               const k = isKConnected ? (getNodeV(nK) > vH / 2) : true;
               if (j && !k) state.qVal = 1;
@@ -1437,12 +1628,12 @@ export class CircuitEngine {
             const nQn = this.getNode(comp, 'q_not');
             const vH = p.vHigh ?? 5;
 
-            const currClk = getNodeV(nClk);
+            const currClk = this.isPinConnected(comp, 'clk') ? getNodeV(nClk) : 0;
             const prevClk = nClk !== -1 ? (this.prevNodeVoltages[nClk] || 0) : 0;
             let state = this.internalStates.get(comp.id) || { qVal: 0 };
             if (currClk > vH / 2 && prevClk <= vH / 2 && state.lastStepTriggered !== this.stepCount) {
               state.lastStepTriggered = this.stepCount;
-              const isTConnected = nT !== -1 && this.nodes[nT] && this.nodes[nT].length > 1;
+              const isTConnected = this.isPinConnected(comp, 't') && nT !== -1;
               const t = isTConnected ? (getNodeV(nT) > vH / 2) : true;
               if (t) state.qVal = state.qVal ? 0 : 1;
             }
@@ -1455,18 +1646,26 @@ export class CircuitEngine {
 
           case ComponentTypes.BINARY_COUNTER_4BIT: {
             const nClk = this.getNode(comp, 'clk');
+            const nClr = this.getNode(comp, 'clr');
             const nQ0 = this.getNode(comp, 'q0');
             const nQ1 = this.getNode(comp, 'q1');
             const nQ2 = this.getNode(comp, 'q2');
             const nQ3 = this.getNode(comp, 'q3');
             const vH = p.vHigh ?? 5;
 
-            const currClk = getNodeV(nClk);
-            const prevClk = nClk !== -1 ? (this.prevNodeVoltages[nClk] || 0) : 0;
+            const isClrConnected = this.isPinConnected(comp, 'clr');
+            const clrVal = isClrConnected && nClr !== -1 ? getNodeV(nClr) : 0;
             let state = this.internalStates.get(comp.id) || { count: 0 };
-            if (currClk > vH / 2 && prevClk <= vH / 2 && state.lastStepTriggered !== this.stepCount) {
-              state.lastStepTriggered = this.stepCount;
-              state.count = (state.count + 1) % 16;
+
+            if (isClrConnected && clrVal > vH / 2) {
+              state.count = 0;
+            } else {
+              const currClk = this.isPinConnected(comp, 'clk') ? getNodeV(nClk) : 0;
+              const prevClk = nClk !== -1 ? (this.prevNodeVoltages[nClk] || 0) : 0;
+              if (currClk > vH / 2 && prevClk <= vH / 2 && state.lastStepTriggered !== this.stepCount) {
+                state.lastStepTriggered = this.stepCount;
+                state.count = (state.count + 1) % 16;
+              }
             }
             this.internalStates.set(comp.id, state);
 
@@ -1484,8 +1683,8 @@ export class CircuitEngine {
             const nCarry = this.getNode(comp, 'carry');
             const vH = p.vHigh ?? 5;
 
-            const a = getNodeV(nA) > vH / 2 ? 1 : 0;
-            const b = getNodeV(nB) > vH / 2 ? 1 : 0;
+            const a = (this.isPinConnected(comp, 'a') && getNodeV(nA) > vH / 2) ? 1 : 0;
+            const b = (this.isPinConnected(comp, 'b') && getNodeV(nB) > vH / 2) ? 1 : 0;
             const sum = a ^ b;
             const carry = a & b;
 
@@ -1502,9 +1701,9 @@ export class CircuitEngine {
             const nCout = this.getNode(comp, 'cout');
             const vH = p.vHigh ?? 5;
 
-            const a = getNodeV(nA) > vH / 2 ? 1 : 0;
-            const b = getNodeV(nB) > vH / 2 ? 1 : 0;
-            const cin = getNodeV(nCin) > vH / 2 ? 1 : 0;
+            const a = (this.isPinConnected(comp, 'a') && getNodeV(nA) > vH / 2) ? 1 : 0;
+            const b = (this.isPinConnected(comp, 'b') && getNodeV(nB) > vH / 2) ? 1 : 0;
+            const cin = (this.isPinConnected(comp, 'cin') && getNodeV(nCin) > vH / 2) ? 1 : 0;
             const sum = a ^ b ^ cin;
             const cout = (a & b) | (b & cin) | (a & cin);
 
@@ -1545,7 +1744,25 @@ export class CircuitEngine {
             const ratedV = p.ratedVoltage || 9;
             const ratedP = p.ratedPower || 2;
             const rNominal = p.nominalR || ((ratedV * ratedV) / ratedP) || 40.5;
-            stampConductance(n1, n2, 1 / Math.max(rNominal, 0.1));
+            const rCold = Math.max(rNominal * 0.1, 0.5); // BUG-016: 10x cold inrush resistance
+
+            // Dynamic filament thermal simulation
+            let filamentTemp = this.internalStates.get(`${comp.id}:temp`);
+            if (filamentTemp === undefined) filamentTemp = 0.0; // 0 = ambient cold, 1.0 = hot operating temp
+
+            const vLamp = Math.abs(getNodeV(n1) - getNodeV(n2));
+            const pInst = (vLamp * vLamp) / Math.max(rNominal, 1);
+            const pNorm = Math.min(pInst / Math.max(ratedP, 0.01), 3.0);
+
+            // Thermal time constant ~ 40ms
+            const alpha = Math.min(dt / 0.04, 0.5);
+            filamentTemp = filamentTemp + alpha * (pNorm - filamentTemp);
+            filamentTemp = Math.max(0, Math.min(filamentTemp, 2.0));
+            this.internalStates.set(`${comp.id}:temp`, filamentTemp);
+
+            // Interpolate resistance between cold and hot
+            const currentR = rCold + (rNominal - rCold) * Math.min(filamentTemp, 1.0);
+            stampConductance(n1, n2, 1 / Math.max(currentR, 0.1));
             break;
           }
 
@@ -1669,9 +1886,20 @@ export class CircuitEngine {
 
     this.prevNodeVoltages = [...this.nodeVoltages];
 
-    // Update inductor dynamic states
+    // Update capacitor & inductor dynamic reactive states (Trapezoidal integration - zero numerical damping)
     this.components.forEach(comp => {
-      if (comp.type === ComponentTypes.INDUCTOR) {
+      if (comp.type === ComponentTypes.CAPACITOR || comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) {
+        const n1 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_pos' : 'p1');
+        const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
+        const c = Math.max(comp.params?.capacitance || 1e-6, 1e-15);
+        const gEq = (2 * c) / dt;
+        const vCurr = (this.nodeVoltages[n1] || 0) - (this.nodeVoltages[n2] || 0);
+        const state = this.internalStates.get(comp.id) || { vPrev: 0, iPrev: 0 };
+        const iCurr = gEq * (vCurr - state.vPrev) - state.iPrev;
+        state.vPrev = vCurr;
+        state.iPrev = iCurr;
+        this.internalStates.set(comp.id, state);
+      } else if (comp.type === ComponentTypes.INDUCTOR) {
         const n1 = this.getNode(comp, 'p1');
         const n2 = this.getNode(comp, 'p2');
         const l = Math.max(comp.params?.inductance || 1e-3, 1e-12);
@@ -1745,8 +1973,8 @@ export class CircuitEngine {
     }
 
     this.history.push(dataPoint);
-    if (this.history.length > this.maxHistoryLength) {
-      this.history.shift();
+    if (this.history.length > this.maxHistoryLength + 1000) {
+      this.history = this.history.slice(-this.maxHistoryLength);
     }
   }
 

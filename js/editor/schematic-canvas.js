@@ -212,9 +212,9 @@ export class SchematicCanvas {
     this.render();
   }
 
-  startWiringFromComponent(comp) {
+  startWiringFromComponent(comp, targetPin = null) {
     if (!comp || !comp.pins || comp.pins.length === 0) return;
-    const pin = comp.pins[0];
+    const pin = targetPin || (this.hoveredPin && this.hoveredPin.comp === comp ? this.hoveredPin.pin : comp.pins[0]);
     this.wiringStartPin = {
       comp,
       pin,
@@ -377,13 +377,49 @@ export class SchematicCanvas {
     return dirs[(idx + shift) % 4];
   }
 
-  findPinAt(worldX, worldY, radius = 12) {
+  isICComponent(comp) {
+    if (!comp || !comp.pins) return false;
+    const def = ComponentDefinitions[comp.type];
+    const cat = def?.category;
+    if (
+      cat === 'DIGITAL_LOGIC' ||
+      cat === 'DIGITAL_DISPLAYS' ||
+      cat === 'ANALOG_ICS' ||
+      cat === 'OPTO_DISPLAYS' ||
+      comp.type === ComponentTypes.TIMER555 ||
+      comp.type === ComponentTypes.OPAMP ||
+      comp.type === ComponentTypes.OP_AMP ||
+      comp.type === ComponentTypes.BINARY_COUNTER_4BIT ||
+      comp.type === ComponentTypes.SEVEN_SEGMENT ||
+      comp.type === ComponentTypes.SEVEN_SEG_DISPLAY ||
+      comp.type === ComponentTypes.HALF_ADDER ||
+      comp.type === ComponentTypes.FULL_ADDER ||
+      comp.type === ComponentTypes.MUX_4TO1 ||
+      comp.type === ComponentTypes.SR_LATCH ||
+      comp.type === ComponentTypes.D_FLIPFLOP ||
+      comp.type === ComponentTypes.JK_FLIPFLOP ||
+      comp.type === ComponentTypes.T_FLIPFLOP ||
+      comp.type === ComponentTypes.OPTOCOUPLER ||
+      comp.type === ComponentTypes.RELAY_SPDT ||
+      comp.type === ComponentTypes.TRANSFORMER ||
+      comp.type === ComponentTypes.TRANSFORMER_CENTER_TAP ||
+      comp.type === ComponentTypes.LM7805 ||
+      comp.type === ComponentTypes.LM317 ||
+      comp.pins.length >= 3
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  findPinAt(worldX, worldY, radius = 14) {
+    const effectiveRadius = Math.max(radius, 14 / (this.zoom || 1));
     for (const comp of this.components) {
       if (!comp.pins) continue;
       for (const pin of comp.pins) {
         const pinPos = this.getPinWorldPos(comp, pin);
         const dist = Math.hypot(worldX - pinPos.x, worldY - pinPos.y);
-        if (dist <= radius) {
+        if (dist <= effectiveRadius) {
           return { comp, pin, pinKey: `${comp.id}:${pin.id}`, pos: pinPos };
         }
       }
@@ -679,104 +715,40 @@ export class SchematicCanvas {
         return;
       }
 
-      // 4. Component Selection & Direct Dragging (When clicking inside component body)
+      // 4. Check for Component or Wire under pointer
       const compHit = this.findComponentAt(worldPos.x, worldPos.y, 10);
-      if (compHit) {
-        console.log('COMPONENT DOWN', compHit?.id);
-
-        // Trigger or toggle interactive components immediately on click
-        if (
-          compHit.type === ComponentTypes.PULSE_VOLTAGE ||
-          compHit.type === ComponentTypes.TRIGGER_PULSE ||
-          compHit.type === ComponentTypes.PUSH_BUTTON ||
-          compHit.type === ComponentTypes.PUSH_BUTTON_NC ||
-          compHit.type === ComponentTypes.SPST_SWITCH ||
-          compHit.type === 'SWITCH_SPST' ||
-          compHit.type === ComponentTypes.SPDT_SWITCH ||
-          compHit.type === 'TOGGLE_SWITCH' ||
-          compHit.type === ComponentTypes.DIGITAL_CONSTANT ||
-          compHit.type === ComponentTypes.DIGITAL_SWITCH
-        ) {
-          this.triggerComponentPulse(compHit);
-        }
-
-        // Select component
-        if (!e.shiftKey) {
-          if (!this.selectedComponents.has(compHit)) {
-            this.selectedComponents.clear();
-          }
-        }
-
-        this.selectedComponents.add(compHit);
-        this.selectedComponent = compHit;
-        this.selectedWire = null;
-
-        // Start drag
-        this.drag.active = true;
-        this.drag.pointerId = e.pointerId;
-        this.drag.startWorld = {
-          x: worldPos.x,
-          y: worldPos.y
-        };
-        this.dragStartScreen = {
-          x: e.clientX,
-          y: e.clientY
-        };
-
-        this.drag.initialPositions.clear();
-
-        this.selectedComponents.forEach(component => {
-          this.drag.initialPositions.set(component.id, {
-            x: component.x,
-            y: component.y
-          });
-        });
-
-        this.drag.moved = false;
-
-        this.state = CanvasState.DRAGGING_COMPONENT;
-
-        this.isPanning = false;
-        this.isBoxSelecting = false;
-
-        try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
-
-        if (this.onSelectionChange) {
-          this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
-        }
-
-        this.render();
-
-        return;
-      }
-
-      // 5. Wire Click
       const wireHit = this.findWireAt(worldPos.x, worldPos.y, 8);
-      if (wireHit) {
+
+      // 5. Shift+Click or Shift+Drag: Area Selection (Marquee Box)
+      if (e.shiftKey) {
         this.drag.active = false;
         this.isPanning = false;
-        this.state = CanvasState.IDLE;
-        this.selectWire(wireHit);
+        this.isBoxSelecting = true;
+        this.state = CanvasState.SELECTING;
+        this.boxSelectStart = worldPos;
+        this.boxSelectCurrent = worldPos;
+        this.render();
         return;
       }
 
-      // 6. Empty Canvas Click -> Area Drag (Marquee Box Selection)
+      // 6. Default Canvas Action: Pan the Schematic on Drag, Select/Toggle on Click
+      // Double-clicking a component activates direct dragging / repositioning.
       this.drag.active = false;
-      this.isPanning = false;
-      this.isBoxSelecting = true;
-      this.state = CanvasState.SELECTING;
-      this.boxSelectStart = worldPos;
-      this.boxSelectCurrent = worldPos;
-
-      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-        this.selectedComponents.clear();
-        this.selectedComponent = null;
-        this.selectWire(null);
-        if (this.onSelectionChange) {
-          this.onSelectionChange({ type: 'component', item: null, group: [] });
-        }
-      }
-      this.render();
+      this.isPanning = true;
+      this.isBoxSelecting = false;
+      this.state = CanvasState.PANNING_CANVAS;
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
+      this.pendingClick = {
+        comp: compHit,
+        wire: wireHit,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        worldPos,
+        shiftKey: e.shiftKey,
+        ctrlKey: e.ctrlKey || e.metaKey
+      };
+      this.canvas.style.cursor = 'grab';
     }
   }
 
@@ -811,25 +783,20 @@ export class SchematicCanvas {
 
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
-    // HIGHEST PRIORITY: Authoritative Component Dragging
+    // HIGHEST PRIORITY: Authoritative Component Dragging (Active after Double-Click)
     if (
       this.drag.active &&
       e.pointerId === this.drag.pointerId
     ) {
-      console.log('DRAG MOVE', this.drag.active, e.pointerId, this.drag.pointerId);
-
       const dx = worldPos.x - this.drag.startWorld.x;
       const dy = worldPos.y - this.drag.startWorld.y;
 
       const screenDX = e.clientX - this.dragStartScreen.x;
       const screenDY = e.clientY - this.dragStartScreen.y;
-
       const distance = Math.hypot(screenDX, screenDY);
 
-      // Small movement threshold
       if (distance > 2) {
         if (!this.drag.moved) {
-          // Save undo state ONCE
           this.saveState();
           this.drag.moved = true;
         }
@@ -840,9 +807,9 @@ export class SchematicCanvas {
 
           component.x = this.snapToGrid(initial.x + dx);
           component.y = this.snapToGrid(initial.y + dy);
-          console.log('NEW POSITION', component.x, component.y);
         });
 
+        this.canvas.style.cursor = 'move';
         this.render();
       }
 
@@ -856,6 +823,7 @@ export class SchematicCanvas {
       return;
     }
 
+    // Default: Schematic Canvas Panning on Drag
     if (this.isPanning) {
       const dx = e.clientX - this.dragStartX;
       const dy = e.clientY - this.dragStartY;
@@ -863,6 +831,12 @@ export class SchematicCanvas {
       this.panY += dy;
       this.dragStartX = e.clientX;
       this.dragStartY = e.clientY;
+
+      if (this.pendingClick && Math.hypot(e.clientX - this.pendingClick.clientX, e.clientY - this.pendingClick.clientY) > 4) {
+        this.pendingClick = null;
+        this.canvas.style.cursor = 'grabbing';
+      }
+
       this.render();
       return;
     }
@@ -892,7 +866,7 @@ export class SchematicCanvas {
     if (pinHit !== this.hoveredPin || compHit !== this.hoveredComponent) {
       this.hoveredPin = pinHit;
       this.hoveredComponent = compHit;
-      this.canvas.style.cursor = pinHit ? 'crosshair' : (compHit ? 'grab' : 'default');
+      this.canvas.style.cursor = pinHit ? 'crosshair' : (compHit ? 'pointer' : 'default');
       this.render();
     }
   }
@@ -904,7 +878,7 @@ export class SchematicCanvas {
   handlePointerUp(e) {
     this.activePointers.delete(e.pointerId);
 
-    // HIGHEST PRIORITY: Authoritative Component Drag Release
+    // 1. Authoritative Component Drag Release
     if (
       this.drag.active &&
       e.pointerId === this.drag.pointerId
@@ -917,28 +891,25 @@ export class SchematicCanvas {
       this.drag.initialPositions.clear();
 
       this.state = CanvasState.IDLE;
+      this.canvas.style.cursor = 'default';
 
       try {
         this.canvas.releasePointerCapture(e.pointerId);
-      } catch (error) {
-        // Ignore if pointer capture already released
-      }
+      } catch (error) {}
 
       if (moved) {
         this.notifyModified();
       }
 
       this.render();
-
       return;
     }
 
     try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
 
     this.isPinching = false;
-    this.isPanning = false;
 
-    // Drag-to-Connect Wiring Support (Pin-to-Pin and Pin-to-Wire)
+    // 2. Drag-to-Connect Wiring Support
     if (this.wiringStartPin) {
       const worldPos = this.screenToWorld(e.clientX, e.clientY);
       const pinHit = this.findPinAt(worldPos.x, worldPos.y, 16);
@@ -989,6 +960,71 @@ export class SchematicCanvas {
       }
     }
 
+    // 3. Canvas Panning / Clean Click Resolution
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.canvas.style.cursor = 'default';
+
+      if (this.pendingClick) {
+        // Pointer was clicked without significant dragging -> Process Selection / Toggle
+        if (this.pendingClick.comp) {
+          const compHit = this.pendingClick.comp;
+
+          // Toggle or pulse interactive switch components
+          if (
+            compHit.type === ComponentTypes.PULSE_VOLTAGE ||
+            compHit.type === ComponentTypes.TRIGGER_PULSE ||
+            compHit.type === ComponentTypes.PUSH_BUTTON ||
+            compHit.type === ComponentTypes.PUSH_BUTTON_NC ||
+            compHit.type === ComponentTypes.SPST_SWITCH ||
+            compHit.type === 'SWITCH_SPST' ||
+            compHit.type === ComponentTypes.SPDT_SWITCH ||
+            compHit.type === 'TOGGLE_SWITCH' ||
+            compHit.type === ComponentTypes.DIGITAL_CONSTANT ||
+            compHit.type === ComponentTypes.DIGITAL_SWITCH
+          ) {
+            this.triggerComponentPulse(compHit);
+          }
+
+          // Select component
+          if (!this.pendingClick.shiftKey) {
+            if (!this.selectedComponents.has(compHit)) {
+              this.selectedComponents.clear();
+            }
+          }
+
+          this.selectedComponents.add(compHit);
+          this.selectedComponent = compHit;
+          this.selectedWire = null;
+
+          if (this.onSelectionChange) {
+            this.onSelectionChange({
+              type: 'component',
+              item: this.selectedComponent,
+              group: Array.from(this.selectedComponents)
+            });
+          }
+        } else if (this.pendingClick.wire) {
+          this.selectWire(this.pendingClick.wire);
+        } else {
+          // Clicked empty canvas -> Deselect
+          if (!this.pendingClick.shiftKey && !this.pendingClick.ctrlKey) {
+            this.selectedComponents.clear();
+            this.selectedComponent = null;
+            this.selectWire(null);
+            if (this.onSelectionChange) {
+              this.onSelectionChange({ type: 'component', item: null, group: [] });
+            }
+          }
+        }
+        this.pendingClick = null;
+      }
+
+      this.state = CanvasState.IDLE;
+      this.render();
+      return;
+    }
+
     this.state = CanvasState.IDLE;
 
     if (this.isBoxSelecting) {
@@ -1008,7 +1044,6 @@ export class SchematicCanvas {
           const compTop = c.y - hh;
           const compBottom = c.y + hh;
 
-          // Check if component intersects or is contained in selection box
           if (compRight >= minX && compLeft <= maxX && compBottom >= minY && compTop <= maxY) {
             this.selectedComponents.add(c);
           }
@@ -1021,16 +1056,6 @@ export class SchematicCanvas {
             item: this.selectedComponent,
             group: Array.from(this.selectedComponents)
           });
-        }
-      } else {
-        // Simple click without drag on empty space: ensure selection is cleared
-        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-          this.selectedComponents.clear();
-          this.selectedComponent = null;
-          this.selectWire(null);
-          if (this.onSelectionChange) {
-            this.onSelectionChange({ type: 'component', item: null, group: [] });
-          }
         }
       }
 
@@ -1081,6 +1106,7 @@ export class SchematicCanvas {
     this.wiringStartPin = null;
     this.wiringCurrentPos = null;
     this.hoveredTargetPin = null;
+    this.pendingClick = null;
     this.state = CanvasState.IDLE;
     this.render();
   }
@@ -1107,7 +1133,7 @@ export class SchematicCanvas {
 
   handleDoubleClick(e) {
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
-    const comp = this.findComponentAt(worldPos.x, worldPos.y);
+    const comp = this.findComponentAt(worldPos.x, worldPos.y, 12);
     if (comp) {
       if (comp.type === ComponentTypes.TEXT_LABEL || comp.type === ComponentTypes.ANNOTATION) {
         const newText = prompt('Enter circuit title / annotation text:', comp.params?.text || comp.name);
@@ -1120,14 +1146,35 @@ export class SchematicCanvas {
         }
         return;
       }
-      this.selectComponent(comp);
-      setTimeout(() => {
-        const firstInput = document.querySelector('#propertiesContent input.prop-param-input, #propertiesContent #propNameInput');
-        if (firstInput) {
-          firstInput.focus();
-          firstInput.select();
-        }
-      }, 50);
+
+      // Select component and activate immediate Drag / Repositioning Mode
+      if (!this.selectedComponents.has(comp)) {
+        this.selectedComponents.clear();
+        this.selectedComponents.add(comp);
+        this.selectedComponent = comp;
+        this.selectedWire = null;
+      }
+      if (this.onSelectionChange) {
+        this.onSelectionChange({ type: 'component', item: this.selectedComponent, group: Array.from(this.selectedComponents) });
+      }
+
+      // Enter active component dragging mode
+      this.isPanning = false;
+      this.pendingClick = null;
+      this.drag.active = true;
+      this.drag.pointerId = e.pointerId || 1;
+      this.drag.startWorld = { x: worldPos.x, y: worldPos.y };
+      this.dragStartScreen = { x: e.clientX, y: e.clientY };
+      this.drag.initialPositions.clear();
+      this.selectedComponents.forEach(component => {
+        this.drag.initialPositions.set(component.id, { x: component.x, y: component.y });
+      });
+      this.drag.moved = false;
+      this.state = CanvasState.DRAGGING_COMPONENT;
+      this.canvas.style.cursor = 'move';
+      try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      this.render();
+      return;
     }
   }
 
@@ -1868,6 +1915,80 @@ export class SchematicCanvas {
           ctx.fill();
         }
         ctx.restore();
+
+        // Professional EDA Pin Number Badges:
+        // ICs and multi-terminal devices display clear pin numbers (1, 2, 3, 4, 5, 6, 7, 8...).
+        // Discrete 2-terminal components (resistors, caps, diodes, sources, grounds) remain clean,
+        // and show pin identification whenever hovered or wiring.
+        const shouldShowPinBadge = (this.showNodeNumbers !== false && (this.isICComponent(comp) || this.showAllPinNumbers)) || isHovered || isWiringSource || isWiringTarget;
+        if (shouldShowPinBadge && comp.type !== ComponentTypes.NODE && comp.type !== ComponentTypes.JUNCTION && comp.type !== ComponentTypes.TEXT_LABEL && comp.type !== ComponentTypes.ANNOTATION) {
+          let pinNumStr = '';
+          if (pin.num !== undefined && pin.num !== null) {
+            pinNumStr = String(pin.num);
+          } else if (pin.name && /\((\d+)\)/.test(pin.name)) {
+            pinNumStr = RegExp.$1;
+          } else if (/^p(\d+)$/i.test(pin.id)) {
+            pinNumStr = RegExp.$1;
+          } else if (comp.pins && Array.isArray(comp.pins)) {
+            const idx = comp.pins.indexOf(pin);
+            if (idx !== -1) pinNumStr = String(idx + 1);
+          }
+
+          if (pinNumStr) {
+            ctx.save();
+            const effDir = this.getPinEffectiveDir(comp, pin);
+            let numX = pos.x;
+            let numY = pos.y;
+            let textAlign = 'center';
+
+            if (effDir === 'left') {
+              numX = pos.x + 7;
+              numY = pos.y - 6;
+              textAlign = 'left';
+            } else if (effDir === 'right') {
+              numX = pos.x - 7;
+              numY = pos.y - 6;
+              textAlign = 'right';
+            } else if (effDir === 'top') {
+              numX = pos.x + 6;
+              numY = pos.y + 7;
+              textAlign = 'left';
+            } else if (effDir === 'bottom') {
+              numX = pos.x + 6;
+              numY = pos.y - 7;
+              textAlign = 'left';
+            }
+
+            ctx.font = 'bold 8px "Roboto Mono", Menlo, Consolas, monospace';
+            const numW = ctx.measureText(pinNumStr).width + 5;
+            const numH = 10;
+
+            // Crisp background badge for pin number
+            ctx.fillStyle = isHovered ? '#ecfdf5' : 'rgba(255, 255, 255, 0.92)';
+            ctx.strokeStyle = isHovered ? '#03b585' : '#cbd5e1';
+            ctx.lineWidth = 0.8;
+
+            let rectX = numX;
+            if (textAlign === 'right') rectX = numX - numW;
+            else if (textAlign === 'center') rectX = numX - numW / 2;
+            const rectY = numY - numH / 2;
+
+            ctx.beginPath();
+            if (ctx.roundRect) {
+              ctx.roundRect(rectX, rectY, numW, numH, 2);
+            } else {
+              ctx.rect(rectX, rectY, numW, numH);
+            }
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = isHovered ? '#047857' : '#334155';
+            ctx.textAlign = textAlign;
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pinNumStr, numX, numY + 0.5);
+            ctx.restore();
+          }
+        }
       });
     });
   }
@@ -2132,6 +2253,97 @@ export class SchematicCanvas {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('⚡', 0, 0);
+        break;
+      }
+
+      case ComponentTypes.FUNCTION_GENERATOR: {
+        // Main Instrument Body
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(-35, -30, 70, 60, 4);
+        } else {
+          ctx.rect(-35, -30, 70, 60);
+        }
+        ctx.fillStyle = '#1e293b';
+        ctx.fill();
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Instrument Header Banner
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(-33, -28, 66, 14, [3, 3, 0, 0]);
+        } else {
+          ctx.rect(-33, -28, 66, 14);
+        }
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#38bdf8';
+        ctx.textAlign = 'left';
+        ctx.fillText('XFG1', -28, -18);
+
+        ctx.font = '7.5px sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.textAlign = 'right';
+        ctx.fillText('GEN', 28, -18);
+
+        // LCD Display Screen
+        ctx.beginPath();
+        ctx.rect(-30, -11, 40, 22);
+        ctx.fillStyle = '#051923';
+        ctx.fill();
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Waveform preview on LCD
+        const wf = (p.waveform || 'sine').toLowerCase();
+        ctx.beginPath();
+        ctx.strokeStyle = '#00f5d4';
+        ctx.lineWidth = 1.5;
+        if (wf === 'square') {
+          ctx.moveTo(-26, 4); ctx.lineTo(-26, -5); ctx.lineTo(-16, -5); ctx.lineTo(-16, 4); ctx.lineTo(-6, 4); ctx.lineTo(-6, -5);
+        } else if (wf === 'triangle') {
+          ctx.moveTo(-26, 3); ctx.lineTo(-16, -6); ctx.lineTo(-6, 3);
+        } else if (wf === 'sawtooth') {
+          ctx.moveTo(-26, 3); ctx.lineTo(-10, -6); ctx.lineTo(-10, 3);
+        } else { // sine
+          ctx.moveTo(-26, -1);
+          ctx.bezierCurveTo(-21, -8, -16, -8, -16, -1);
+          ctx.bezierCurveTo(-16, 6, -11, 6, -6, -1);
+        }
+        ctx.stroke();
+
+        // Frequency & Amplitude text on bottom panel
+        const freqText = formatValueWithPrefix(p.frequency || 1000, 'Hz');
+        const ampText = `${formatValueWithPrefix(p.amplitude || 5, 'V')}p`;
+        ctx.font = 'bold 7px monospace';
+        ctx.fillStyle = '#38bdf8';
+        ctx.textAlign = 'left';
+        ctx.fillText(freqText, -30, 22);
+        ctx.fillText(ampText, -6, 22);
+
+        // Terminal Labels on Right
+        ctx.font = 'bold 8.5px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText('+', 28, -12);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('COM', 28, 3);
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillText('-', 28, 18);
+
+        // Output Lead Lines
+        ctx.beginPath();
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(29, -15); ctx.lineTo(35, -15);
+        ctx.moveTo(29, 0); ctx.lineTo(35, 0);
+        ctx.moveTo(29, 15); ctx.lineTo(35, 15);
+        ctx.stroke();
         break;
       }
 
@@ -2602,20 +2814,103 @@ export class SchematicCanvas {
         break;
       }
 
-      case ComponentTypes.TIMER555: {
+      case ComponentTypes.SAMPLE_AND_HOLD: {
+        // Outer IC Box
         ctx.beginPath();
-        ctx.rect(-35, -40, 70, 80);
+        // Pin Leads
+        ctx.moveTo(-35, -15); ctx.lineTo(-25, -15); // IN
+        ctx.moveTo(-35, 15); ctx.lineTo(-25, 15);   // CTRL
+        ctx.moveTo(25, 0); ctx.lineTo(35, 0);       // OUT
+        ctx.moveTo(0, -35); ctx.lineTo(0, -25);     // V+
+        ctx.moveTo(0, 25); ctx.lineTo(0, 35);       // CH
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.rect(-25, -25, 50, 50);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.stroke();
+
+        // Internal S&H Graphics: Switch + Triangle Buffer
+        ctx.beginPath();
+        ctx.moveTo(-18, -15); ctx.lineTo(-10, -15);
+        ctx.moveTo(-10, -15); ctx.lineTo(-2, -8); // Open/switch contact
+        ctx.moveTo(-2, -15); ctx.lineTo(6, -15);
+        ctx.lineTo(6, 0); ctx.lineTo(10, 0);
+        ctx.stroke();
+
+        // Buffer triangle
+        ctx.beginPath();
+        ctx.moveTo(10, -10); ctx.lineTo(22, 0); ctx.lineTo(10, 10);
+        ctx.closePath();
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.stroke();
 
-        ctx.font = 'bold 11px sans-serif';
-        ctx.fillStyle = '#03b585';
+        ctx.font = 'bold 8px monospace';
+        ctx.fillStyle = '#0f172a';
         ctx.textAlign = 'center';
-        ctx.fillText('LM555', 0, -5);
-        ctx.font = '8px sans-serif';
+        ctx.fillText('S&H', 0, 18);
+
+        ctx.font = '6px sans-serif';
         ctx.fillStyle = '#64748b';
-        ctx.fillText('TIMER', 0, 10);
+        ctx.fillText('IN', -18, -18);
+        ctx.fillText('SMP', -16, 20);
+        ctx.fillText('CH', 0, 22);
+        break;
+      }
+
+      case ComponentTypes.VOLTAGE_CONTROLLED_SWITCH: {
+        ctx.beginPath();
+        // Control Leads
+        ctx.moveTo(-30, -15); ctx.lineTo(-15, -15);
+        ctx.moveTo(-30, 15); ctx.lineTo(-15, 15);
+        // Switch Leads
+        ctx.moveTo(15, -15); ctx.lineTo(30, -15);
+        ctx.moveTo(15, 15); ctx.lineTo(30, 15);
+        ctx.stroke();
+
+        // Control box (dashed)
+        ctx.save();
+        ctx.setLineDash([2, 2]);
+        ctx.strokeRect(-18, -20, 15, 40);
+        ctx.restore();
+
+        // Switch contacts
+        ctx.beginPath();
+        ctx.arc(15, -15, 2.5, 0, Math.PI * 2);
+        ctx.arc(15, 15, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(15, 15); ctx.lineTo(24, -8);
+        ctx.stroke();
+
+        ctx.font = '7px sans-serif';
+        ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.fillText('VCSW', 0, 0);
+        break;
+      }
+
+      case ComponentTypes.ANALOG_SWITCH_4066: {
+        ctx.beginPath();
+        ctx.moveTo(-30, -15); ctx.lineTo(-20, -15);
+        ctx.moveTo(-30, 15); ctx.lineTo(-20, 15);
+        ctx.moveTo(20, 0); ctx.lineTo(30, 0);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.rect(-20, -22, 40, 44);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 8px monospace';
+        ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center';
+        ctx.fillText('CD4066', 0, -5);
+        ctx.fillText('SW', 0, 8);
         break;
       }
 
@@ -2909,24 +3204,34 @@ export class SchematicCanvas {
         ctx.fill();
         ctx.stroke();
 
-        ctx.font = 'bold 7.5px sans-serif';
+        // DIP orientation notch
+        ctx.beginPath();
+        ctx.arc(0, -40, 5, 0, Math.PI);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 7px "Roboto Mono", monospace';
         ctx.fillStyle = '#0284c7';
         ctx.textAlign = 'left';
-        ctx.fillText('GND', -30, -28);
-        ctx.fillText('TRIG', -30, -8);
-        ctx.fillText('THRES', -30, 12);
-        ctx.fillText('DISCH', -30, 32);
+        ctx.fillText('GND 1', -31, -27);
+        ctx.fillText('TRIG 2', -31, -7);
+        ctx.fillText('TH 6', -31, 13);
+        ctx.fillText('DIS 7', -31, 33);
 
         ctx.textAlign = 'right';
-        ctx.fillText('OUT', 30, -28);
-        ctx.fillText('RST', 30, -8);
-        ctx.fillText('CTRL', 30, 12);
-        ctx.fillText('VCC', 30, 32);
+        ctx.fillText('3 OUT', 31, -27);
+        ctx.fillText('4 RST', 31, -7);
+        ctx.fillText('5 CV', 31, 13);
+        ctx.fillText('8 VCC', 31, 33);
 
         ctx.font = 'bold 11px sans-serif';
         ctx.fillStyle = '#1e293b';
         ctx.textAlign = 'center';
-        ctx.fillText('NE555', 0, 4);
+        ctx.fillText('NE555', 0, -2);
+        ctx.font = '7px sans-serif';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('TIMER', 0, 8);
         break;
       }
 
@@ -2937,10 +3242,20 @@ export class SchematicCanvas {
         ctx.fill();
         ctx.stroke();
 
-        ctx.font = 'bold 11px sans-serif';
+        // DIP orientation notch
+        ctx.beginPath();
+        ctx.arc(0, -50, 6, 0, Math.PI);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = '#1e293b';
         ctx.textAlign = 'center';
-        ctx.fillText('NE556', 0, 4);
+        ctx.fillText('NE556', 0, 0);
+        ctx.font = '7px sans-serif';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('DUAL TIMER', 0, 10);
         break;
       }
 
@@ -2971,16 +3286,18 @@ export class SchematicCanvas {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-30, 0); ctx.lineTo(-30, 0);
-        ctx.moveTo(30, 0); ctx.lineTo(30, 0);
-        ctx.moveTo(0, 20); ctx.lineTo(0, 20);
-        ctx.stroke();
+        // Heat-sink metallic tab
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(-26, -20, 52, 4);
         ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = '#03b585';
         ctx.textAlign = 'center';
         const label = comp.type.replace('LM', '').replace('ComponentTypes.', '');
-        ctx.fillText(label, 0, 4);
+        ctx.fillText(label, 0, 3);
+        ctx.font = 'bold 7px monospace';
+        ctx.fillStyle = '#475569';
+        ctx.fillText('IN (1)', -16, 12);
+        ctx.fillText('OUT (3)', 14, 12);
         break;
       }
 
@@ -3009,7 +3326,7 @@ export class SchematicCanvas {
         if (comp.type === ComponentTypes.SR_LATCH) label = 'SR-LATCH';
         else if (comp.type === ComponentTypes.T_FLIPFLOP) label = 'T-FF';
         else if (comp.type === ComponentTypes.JK_FLIPFLOP) label = 'JK-FF';
-        ctx.fillText(label, 0, -5);
+        ctx.fillText(label, 0, -8);
         break;
       }
 
@@ -3022,12 +3339,18 @@ export class SchematicCanvas {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.stroke();
+        // Notch indicator
+        ctx.beginPath();
+        ctx.arc(0, -comp.height / 2, 4, 0, Math.PI);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fill();
+        ctx.stroke();
         ctx.font = 'bold 9px sans-serif';
         ctx.fillStyle = '#0284c7';
         ctx.textAlign = 'center';
         let nameTag = 'ALU';
         if (comp.type === ComponentTypes.BINARY_COUNTER_4BIT) nameTag = '74HC161';
-        else if (comp.type === ComponentTypes.MUX_4TO1) nameTag = '4:1 MUX';
+        else if (comp.type === ComponentTypes.MUX_4TO1) nameTag = '74HC153';
         else if (comp.type === ComponentTypes.HALF_ADDER) nameTag = 'HALF ADD';
         else if (comp.type === ComponentTypes.FULL_ADDER) nameTag = 'FULL ADD';
         ctx.fillText(nameTag, 0, 3);
@@ -3159,19 +3482,52 @@ export class SchematicCanvas {
       }
 
       case ComponentTypes.BUZZER: {
+        let isBeeping = false;
+        let vBuzzer = 0;
+        if (this.engine && this.engine.nodeVoltages) {
+          const n1 = this.engine.getNode(comp, 'p1');
+          const n2 = this.engine.getNode(comp, 'p2');
+          const v1 = n1 !== -1 ? (this.engine.nodeVoltages[n1] || 0) : 0;
+          const v2 = n2 !== -1 ? (this.engine.nodeVoltages[n2] || 0) : 0;
+          vBuzzer = Math.abs(v1 - v2);
+          isBeeping = vBuzzer >= 1.5;
+        }
+
         ctx.beginPath();
         ctx.arc(0, 0, 15, 0, Math.PI * 2);
-        ctx.fillStyle = '#f8fafc';
+        ctx.fillStyle = isBeeping ? '#fee2e2' : '#f8fafc';
         ctx.fill();
-        ctx.strokeStyle = '#2b2d2f';
-        ctx.lineWidth = 1.6;
+        ctx.strokeStyle = isBeeping ? '#ef4444' : '#2b2d2f';
+        ctx.lineWidth = isBeeping ? 2.0 : 1.6;
         ctx.stroke();
+
         // Sound waves
         ctx.beginPath();
         ctx.moveTo(-6, -6); ctx.lineTo(-6, 6);
         ctx.moveTo(0, -9); ctx.lineTo(0, 9);
         ctx.moveTo(6, -6); ctx.lineTo(6, 6);
+        ctx.strokeStyle = isBeeping ? '#dc2626' : '#64748b';
+        ctx.lineWidth = isBeeping ? 2.0 : 1.4;
         ctx.stroke();
+
+        if (isBeeping) {
+          // Dynamic radiating acoustic sound wave arcs
+          ctx.save();
+          const phase = (Date.now() / 150) % 3;
+          for (let i = 0; i < 3; i++) {
+            const r = 18 + ((i + phase) % 3) * 6;
+            const alpha = Math.max(0, 1.0 - (((i + phase) % 3) / 3));
+            ctx.strokeStyle = `rgba(239, 68, 68, ${alpha.toFixed(2)})`;
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, -Math.PI / 3, Math.PI / 3);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, r, (2 * Math.PI) / 3, (4 * Math.PI) / 3);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
         break;
       }
 

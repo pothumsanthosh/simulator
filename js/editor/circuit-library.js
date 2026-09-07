@@ -13,6 +13,8 @@ export const CircuitLibrary = {
     description: 'A step-down DC-DC switching regulator converting 12V DC to approx 5V DC using an LC filter and freewheeling diode.',
     author: 'OStep',
     stats: { stars: 108, copies: 954, views: 190318 },
+    timePerDiv: 0.00005, // 50 us/div for 20kHz switching regulator
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -52,6 +54,8 @@ export const CircuitLibrary = {
     description: 'Classic 555 pulse generator circuit producing a continuous square wave oscillation to flash an LED.',
     author: 'GGoodwin',
     stats: { stars: 124, copies: 496, views: 137875 },
+    timePerDiv: 0.002, // 2 ms/div (20ms display window shows multiple clear square wave cycles)
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -61,7 +65,7 @@ export const CircuitLibrary = {
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 320, {}, 0);
       const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 220, 100, { resistance: 10000 }, 90);
       const r2 = canvas.addComponent(ComponentTypes.RESISTOR, 220, 220, { resistance: 47000 }, 90);
-      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 220, 320, { capacitance: 0.00001 }, 90);
+      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 220, 320, { capacitance: 0.0000001 }, 90); // 100nF
       const timer = canvas.addComponent(ComponentTypes.TIMER555, 380, 200, { vcc: 9 }, 0);
       const rLed = canvas.addComponent(ComponentTypes.RESISTOR, 520, 190, { resistance: 330 }, 0);
       const led = canvas.addComponent(ComponentTypes.LED, 600, 190, { color: '#ff3b30' }, 0);
@@ -83,66 +87,56 @@ export const CircuitLibrary = {
         { id: 'w12', fromPin: `${timer.id}:out`, toPin: `${rLed.id}:p1` },
         { id: 'w13', fromPin: `${timer.id}:out`, toPin: `${prOut.id}:tip` },
         { id: 'w14', fromPin: `${rLed.id}:p2`, toPin: `${led.id}:anode` },
-        { id: 'w15', fromPin: `${led.id}:cathode`, toPin: `${gnd.id}:p1` }
+        { id: 'w15', fromPin: `${led.id}:cathode`, toPin: `${gnd.id}:p1` },
+        { id: 'w16', fromPin: `${vcc.id}:p_pos`, toPin: `${timer.id}:reset` }
       ];
       canvas.fitToScreen();
     }
   },
 
-  // 3. Class-AB Push-Pull Audio Power Amplifier
+  // 3. Class-B / AB Push-Pull Audio Power Amplifier
   classABAmplifier: {
     id: 'class-ab-audio',
-    name: 'Class-AB Complementary Audio Power Amplifier',
-    description: 'High-fidelity audio output stage using NPN/PNP complementary transistors with diode thermal bias and negative feedback.',
+    name: 'Class-B Complementary Push-Pull Power Amplifier',
+    description: 'Complementary NPN/PNP audio power amplifier stage demonstrating high power delivery to an 8Ω load and the characteristic crossover distortion deadband.',
     author: 'AudioProLab',
     stats: { stars: 156, copies: 620, views: 184500 },
+    timePerDiv: 0.0005, // 500 us/div (5ms window cleanly displays 5 cycles of 1kHz audio wave)
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
 
-      canvas.addComponent(ComponentTypes.TEXT_LABEL, 370, 30, { text: 'CLASS-AB PUSH-PULL AUDIO POWER AMPLIFIER', fontSize: 14, bold: true, color: '#334155' }, 0);
-      const vPos = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 100, { voltage: 15 }, 0);
-      const vNeg = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 300, { voltage: 15 }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 340, 30, { text: 'CLASS-B COMPLEMENTARY PUSH-PULL POWER AMPLIFIER', fontSize: 14, bold: true, color: '#334155' }, 0);
+      const vPos = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 120, { voltage: 12 }, 0);
+      const vNeg = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 280, { voltage: 12 }, 0);
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 200, {}, 0);
-      const vIn = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 180, 200, { amplitude: 1.0, frequency: 1000 }, 0);
+      const vIn = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 180, 200, { amplitude: 6.0, frequency: 1000 }, 0);
 
-      const qDrv = canvas.addComponent(ComponentTypes.BJT_NPN, 280, 200, { beta: 200 }, 0);
-      const rC = canvas.addComponent(ComponentTypes.RESISTOR, 280, 100, { resistance: 2200 }, 90);
-      const rE = canvas.addComponent(ComponentTypes.RESISTOR, 280, 300, { resistance: 470 }, 90);
+      const tr1 = canvas.addComponent(ComponentTypes.BJT_NPN, 340, 140, { beta: 200 }, 0);
+      const tr2 = canvas.addComponent(ComponentTypes.BJT_PNP, 340, 260, { beta: 200 }, 0);
 
-      const d1 = canvas.addComponent(ComponentTypes.DIODE, 380, 140, { forwardDrop: 0.65 }, 90);
-      const d2 = canvas.addComponent(ComponentTypes.DIODE, 380, 200, { forwardDrop: 0.65 }, 90);
+      const rLoad = canvas.addComponent(ComponentTypes.RESISTOR, 480, 200, { resistance: 8 }, 90);
 
-      const qNpn = canvas.addComponent(ComponentTypes.BJT_NPN, 480, 120, { beta: 100 }, 0);
-      const qPnp = canvas.addComponent(ComponentTypes.BJT_PNP, 480, 240, { beta: 100 }, 0);
-
-      const cOut = canvas.addComponent(ComponentTypes.POLARIZED_CAP, 580, 180, { capacitance: 0.00047 }, 0);
-      const rSpeaker = canvas.addComponent(ComponentTypes.RESISTOR, 660, 240, { resistance: 8 }, 90);
-
-      const prIn = canvas.addComponent(ComponentTypes.PROBE_V, 180, 80, { color: '#007aff', label: 'Audio In (1Vpk)' }, 0);
-      const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 660, 120, { color: '#03b585', label: 'Speaker Out (8Ω)' }, 0);
+      const prIn = canvas.addComponent(ComponentTypes.PROBE_V, 180, 80, { color: '#007aff', label: 'V_in (6Vpk)' }, 0);
+      const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 480, 80, { color: '#03b585', label: 'V_out (8Ω Load)' }, 0);
 
       canvas.wires = [
         { id: 'w1', fromPin: `${vPos.id}:p_neg`, toPin: `${gnd.id}:p1` },
         { id: 'w2', fromPin: `${vNeg.id}:p_pos`, toPin: `${gnd.id}:p1` },
         { id: 'w3', fromPin: `${vIn.id}:p_neg`, toPin: `${gnd.id}:p1` },
-        { id: 'w4', fromPin: `${vIn.id}:p_pos`, toPin: `${qDrv.id}:base` },
+        { id: 'w4', fromPin: `${rLoad.id}:p2`, toPin: `${gnd.id}:p1` },
+
         { id: 'w5', fromPin: `${vIn.id}:p_pos`, toPin: `${prIn.id}:tip` },
-        { id: 'w6', fromPin: `${vPos.id}:p_pos`, toPin: `${rC.id}:p1` },
-        { id: 'w7', fromPin: `${vPos.id}:p_pos`, toPin: `${qNpn.id}:collector` },
-        { id: 'w8', fromPin: `${vNeg.id}:p_neg`, toPin: `${rE.id}:p2` },
-        { id: 'w9', fromPin: `${vNeg.id}:p_neg`, toPin: `${qPnp.id}:collector` },
-        { id: 'w10', fromPin: `${rC.id}:p2`, toPin: `${qDrv.id}:collector` },
-        { id: 'w11', fromPin: `${rC.id}:p2`, toPin: `${d1.id}:anode` },
-        { id: 'w12', fromPin: `${d1.id}:cathode`, toPin: `${d2.id}:anode` },
-        { id: 'w13', fromPin: `${d1.id}:anode`, toPin: `${qNpn.id}:base` },
-        { id: 'w14', fromPin: `${d2.id}:cathode`, toPin: `${qPnp.id}:base` },
-        { id: 'w15', fromPin: `${qNpn.id}:emitter`, toPin: `${qPnp.id}:emitter` },
-        { id: 'w16', fromPin: `${qNpn.id}:emitter`, toPin: `${cOut.id}:p_pos` },
-        { id: 'w17', fromPin: `${cOut.id}:p_neg`, toPin: `${rSpeaker.id}:p1` },
-        { id: 'w18', fromPin: `${cOut.id}:p_neg`, toPin: `${prOut.id}:tip` },
-        { id: 'w19', fromPin: `${rSpeaker.id}:p2`, toPin: `${gnd.id}:p1` },
-        { id: 'w20', fromPin: `${qDrv.id}:emitter`, toPin: `${rE.id}:p1` }
+        { id: 'w6', fromPin: `${vIn.id}:p_pos`, toPin: `${tr1.id}:base` },
+        { id: 'w7', fromPin: `${vIn.id}:p_pos`, toPin: `${tr2.id}:base` },
+
+        { id: 'w8', fromPin: `${vPos.id}:p_pos`, toPin: `${tr1.id}:collector` },
+        { id: 'w9', fromPin: `${vNeg.id}:p_neg`, toPin: `${tr2.id}:collector` },
+
+        { id: 'w10', fromPin: `${tr1.id}:emitter`, toPin: `${tr2.id}:emitter` },
+        { id: 'w11', fromPin: `${tr1.id}:emitter`, toPin: `${rLoad.id}:p1` },
+        { id: 'w12', fromPin: `${tr1.id}:emitter`, toPin: `${prOut.id}:tip` }
       ];
       canvas.fitToScreen();
     }
@@ -155,6 +149,8 @@ export const CircuitLibrary = {
     description: 'Synchronous clock pulse counter cycling 0-9 on a bright 7-segment digital LED readout display.',
     author: 'DigitalLogicX',
     stats: { stars: 210, copies: 840, views: 245000 },
+    timePerDiv: 0.1, // 100 ms/div for 2Hz counter
+    voltsPerDiv: 1.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -195,6 +191,8 @@ export const CircuitLibrary = {
     description: 'Cascaded 2-stage active low-pass filter providing maximally flat passband and steep -80 dB/decade roll-off.',
     author: 'SignalProcessingGuru',
     stats: { stars: 178, copies: 530, views: 112000 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 1.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -250,6 +248,8 @@ export const CircuitLibrary = {
     description: 'RF amplitude modulation generator (40 kHz carrier modulated by 1 kHz tone) and envelope detector receiver.',
     author: 'RF_Engineer_88',
     stats: { stars: 145, copies: 470, views: 98000 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -285,6 +285,8 @@ export const CircuitLibrary = {
     description: 'Precision operational amplifier configured for non-inverting closed-loop voltage gain (Gain = 1 + R2/R1 = 11x).',
     author: 'SiLRing',
     stats: { stars: 92, copies: 380, views: 98450 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 1.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -320,6 +322,8 @@ export const CircuitLibrary = {
     description: 'Converts AC mains voltage into smooth DC power using 4 diodes in bridge formation, a filter capacitor, and resistive load.',
     author: 'GGoodwin',
     stats: { stars: 30, copies: 397, views: 60894 },
+    timePerDiv: 0.005, // 5 ms/div for 60Hz mains
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -363,6 +367,8 @@ export const CircuitLibrary = {
     description: 'Fundamental binary arithmetic circuit with interactive DG digital switches, XOR gate producing SUM and AND gate producing CARRY with active LEDs.',
     author: 'Digitallc',
     stats: { stars: 65, copies: 210, views: 42100 },
+    timePerDiv: 0.001, // 1 ms/div
+    voltsPerDiv: 1.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -411,6 +417,8 @@ export const CircuitLibrary = {
     description: 'First-order RC low-pass passive filter showing high frequency attenuation and phase shift.',
     author: 'ElectronicsLab',
     stats: { stars: 54, copies: 180, views: 35000 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 1.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -443,6 +451,8 @@ export const CircuitLibrary = {
     description: 'Emitter-coupled BJT differential amplifier rejecting common-mode noise while providing high differential gain.',
     author: 'AnalogDesignWorks',
     stats: { stars: 164, copies: 512, views: 142000 },
+    timePerDiv: 0.0005, // 500 us/div (5ms window cleanly displays 5 cycles of 1kHz diff wave)
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -455,8 +465,8 @@ export const CircuitLibrary = {
       const vIn1 = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 160, 180, { amplitude: 0.05, frequency: 1000 }, 0);
       const vIn2 = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 160, 260, { voltage: 0 }, 0);
 
-      const q1 = canvas.addComponent(ComponentTypes.BJT_NPN, 280, 180, { beta: 200 }, 0);
-      const q2 = canvas.addComponent(ComponentTypes.BJT_NPN, 420, 180, { beta: 200 }, 0);
+      const q1 = canvas.addComponent(ComponentTypes.BJT_NPN, 280, 180, { beta: 200, rBE: 2500 }, 0);
+      const q2 = canvas.addComponent(ComponentTypes.BJT_NPN, 420, 180, { beta: 200, rBE: 2500 }, 0);
 
       const rC1 = canvas.addComponent(ComponentTypes.RESISTOR, 280, 90, { resistance: 4700 }, 90);
       const rC2 = canvas.addComponent(ComponentTypes.RESISTOR, 420, 90, { resistance: 4700 }, 90);
@@ -493,6 +503,8 @@ export const CircuitLibrary = {
     description: 'A 100-stage multi-pole distributed transmission ladder network verifying high-capacity matrix solver scalability.',
     author: 'EDA_Benchmark_Suite',
     stats: { stars: 320, copies: 1240, views: 310000 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 0.5,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -531,6 +543,8 @@ export const CircuitLibrary = {
     description: 'Binary Amplitude Shift Keying (ASK) transceiver with 50 kHz RF carrier, 500 Hz digital message, NPN transistor modulator, diode envelope detector, and Op-Amp comparator slicer.',
     author: 'CommunicationSystemsLab',
     stats: { stars: 240, copies: 1120, views: 289000 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -615,6 +629,8 @@ export const CircuitLibrary = {
     description: 'Complete universal realization of NOT, OR, AND, and XOR logic gates using exclusively 2-input NOR gates with interactive DG1-DG7 digital switches and glowing LED indicators.',
     author: 'Switcha Lab',
     stats: { stars: 342, copies: 1205, views: 284900 },
+    timePerDiv: 0.001, // 1 ms/div
+    voltsPerDiv: 1.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -738,6 +754,8 @@ export const CircuitLibrary = {
     description: 'Dual interactive switch setup: SPST toggle switch powering an incandescent light bulb and glowing LED indicator with 9V DC source.',
     author: 'Switcha Studio',
     stats: { stars: 215, copies: 840, views: 154200 },
+    timePerDiv: 0.001, // 1 ms/div
+    voltsPerDiv: 2.0,
     load(canvas) {
       canvas.components = [];
       canvas.wires = [];
@@ -764,5 +782,223 @@ export const CircuitLibrary = {
 
       canvas.fitToScreen();
     }
+  },
+
+  // 16. Dual-Transistor (BJT) Astable Multivibrator
+  bjtAstableMultivibrator: {
+    id: 'bjt-astable-multivibrator',
+    name: 'Transistor (BJT) Astable Multivibrator Flasher',
+    description: 'Classic dual-transistor cross-coupled multivibrator generating complementary anti-phase square waves to flash alternating Red and Green LEDs.',
+    author: 'Switcha Studio',
+    stats: { stars: 188, copies: 730, views: 142000 },
+    timePerDiv: 0.002, // 2 ms/div (20ms display window shows multiple alternating square waves)
+    voltsPerDiv: 2.0,
+    load(canvas) {
+      canvas.components = [];
+      canvas.wires = [];
+
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 360, 30, { text: 'TRANSISTOR (BJT) ASTABLE MULTIVIBRATOR', fontSize: 14, bold: true, color: '#334155' }, 0);
+      const vcc = canvas.addComponent(ComponentTypes.DC_VOLTAGE, 80, 200, { voltage: 9 }, 0);
+      const gnd = canvas.addComponent(ComponentTypes.GROUND, 80, 340, {}, 0);
+
+      // Collector loads and LEDs
+      const rc1 = canvas.addComponent(ComponentTypes.RESISTOR, 200, 100, { resistance: 470 }, 90);
+      const led1 = canvas.addComponent(ComponentTypes.LED, 200, 170, { color: '#ff3b30' }, 90);
+      const rb1 = canvas.addComponent(ComponentTypes.RESISTOR, 300, 120, { resistance: 22000 }, 90);
+      const rb2 = canvas.addComponent(ComponentTypes.RESISTOR, 420, 120, { resistance: 24000 }, 90); // 5% real-world tolerance asymmetry
+      const led2 = canvas.addComponent(ComponentTypes.LED, 520, 170, { color: '#10b981' }, 90);
+      const rc2 = canvas.addComponent(ComponentTypes.RESISTOR, 520, 100, { resistance: 470 }, 90);
+
+      // Cross-coupling capacitors
+      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 310, 230, { capacitance: 0.0000001 }, 0); // 100nF
+      const c2 = canvas.addComponent(ComponentTypes.CAPACITOR, 410, 230, { capacitance: 0.0000001 }, 0); // 100nF
+
+      // NPN Switching Transistors
+      const q1 = canvas.addComponent(ComponentTypes.BJT_NPN, 240, 270, { beta: 200 }, 0);
+      const q2 = canvas.addComponent(ComponentTypes.BJT_NPN, 480, 270, { beta: 200 }, 0);
+
+      // Voltage Probes
+      const pr1 = canvas.addComponent(ComponentTypes.PROBE_V, 140, 220, { color: '#ef4444', label: 'Collector 1 (Q1)' }, 0);
+      const pr2 = canvas.addComponent(ComponentTypes.PROBE_V, 580, 220, { color: '#10b981', label: 'Collector 2 (Q2)' }, 0);
+
+      canvas.wires = [
+        // Power rails
+        { id: 'w1', fromPin: `${vcc.id}:p_neg`, toPin: `${gnd.id}:p1` },
+        { id: 'w2', fromPin: `${vcc.id}:p_pos`, toPin: `${rc1.id}:p1` },
+        { id: 'w3', fromPin: `${vcc.id}:p_pos`, toPin: `${rb1.id}:p1` },
+        { id: 'w4', fromPin: `${vcc.id}:p_pos`, toPin: `${rb2.id}:p1` },
+        { id: 'w5', fromPin: `${vcc.id}:p_pos`, toPin: `${rc2.id}:p1` },
+
+        // Left branch (Q1 collector)
+        { id: 'w6', fromPin: `${rc1.id}:p2`, toPin: `${led1.id}:anode` },
+        { id: 'w7', fromPin: `${led1.id}:cathode`, toPin: `${q1.id}:collector` },
+        { id: 'w8', fromPin: `${q1.id}:collector`, toPin: `${c1.id}:p1` },
+        { id: 'w9', fromPin: `${q1.id}:collector`, toPin: `${pr1.id}:tip` },
+
+        // Right branch (Q2 collector)
+        { id: 'w10', fromPin: `${rc2.id}:p2`, toPin: `${led2.id}:anode` },
+        { id: 'w11', fromPin: `${led2.id}:cathode`, toPin: `${q2.id}:collector` },
+        { id: 'w12', fromPin: `${q2.id}:collector`, toPin: `${c2.id}:p2` },
+        { id: 'w13', fromPin: `${q2.id}:collector`, toPin: `${pr2.id}:tip` },
+
+        // Cross-coupling to bases
+        { id: 'w14', fromPin: `${rb1.id}:p2`, toPin: `${c2.id}:p1` },
+        { id: 'w15', fromPin: `${rb1.id}:p2`, toPin: `${q1.id}:base` },
+        { id: 'w16', fromPin: `${rb2.id}:p2`, toPin: `${c1.id}:p2` },
+        { id: 'w17', fromPin: `${rb2.id}:p2`, toPin: `${q2.id}:base` },
+
+        // Emitters to Ground
+        { id: 'w18', fromPin: `${q1.id}:emitter`, toPin: `${gnd.id}:p1` },
+        { id: 'w19', fromPin: `${q2.id}:emitter`, toPin: `${gnd.id}:p1` }
+      ];
+
+      canvas.fitToScreen();
+    }
+  },
+
+  // 17. Op-Amp RC Phase Shift Oscillator
+  // 17. Op-Amp RC Phase Shift Oscillator (Multisim Standard)
+  rcPhaseShiftOscillator: {
+    id: 'rc-phase-shift-oscillator',
+    name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
+    description: 'Exact Multisim 3-stage RC high-pass ladder oscillator with 741 Op-Amp (R1=33k, R2=1M, R6=33k, C1=C2=C3=0.1uF, R3=R4=R5=3.3k) generating sustained 200Hz sinusoidal oscillations.',
+    author: 'AnalogAudioLab',
+    stats: { stars: 250, copies: 1020, views: 195000 },
+    timePerDiv: 0.002, // 2 ms/div
+    voltsPerDiv: 5.0,  // 5 V/div
+    load(canvas) {
+      canvas.components = [];
+      canvas.wires = [];
+
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 40, { text: 'OP-AMP (741) RC PHASE SHIFT SINE WAVE OSCILLATOR', fontSize: 15, bold: true, color: '#334155' }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'R1=33kΩ, R2=1MΩ, C1=C2=C3=0.1µF, R3=R4=R5=3.3kΩ (Internal ±12V Rails - No RPS Required)', fontSize: 11, bold: false, color: '#64748b' }, 0);
+
+      const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 450, {}, 0);
+
+      // 741 Operational Amplifier (Internal default +/-12V power rails, no external RPS needed)
+      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.0015 }, 0);
+
+      // Feedback Resistor R2 (1MΩ) and Input Resistor R1 (33kΩ)
+      const r2 = canvas.addComponent(ComponentTypes.RESISTOR, 580, 130, { resistance: 1000000 }, 0); // 1M
+      const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 380, 130, { resistance: 33000 }, 0);   // 33k
+
+      // Bias Resistor R6 (33kΩ) to GND from Non-Inverting Pin 3
+      const r6 = canvas.addComponent(ComponentTypes.RESISTOR, 500, 360, { resistance: 33000 }, 90); // 33k
+
+      // 3-Stage High-Pass RC Ladder (C1, C2, C3 = 0.1uF, R3, R4, R5 = 3.3kΩ)
+      const r3 = canvas.addComponent(ComponentTypes.RESISTOR, 180, 360, { resistance: 3300 }, 90);
+      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 240, 260, { capacitance: 1e-7 }, 0);
+
+      const r4 = canvas.addComponent(ComponentTypes.RESISTOR, 300, 360, { resistance: 3300 }, 90);
+      const c2 = canvas.addComponent(ComponentTypes.CAPACITOR, 360, 260, { capacitance: 1e-7 }, 0);
+
+      const r5 = canvas.addComponent(ComponentTypes.RESISTOR, 420, 360, { resistance: 3300 }, 90);
+      const c3 = canvas.addComponent(ComponentTypes.CAPACITOR, 480, 260, { capacitance: 1e-7 }, 0);
+
+      // Dual-Channel Oscilloscope Probes (Channel A: Output Pin 6, Channel B: Inverting Pin 2)
+      const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 690, 240, { color: '#03b585', label: 'V_out (Channel A)' }, 0);
+      const prInv = canvas.addComponent(ComponentTypes.PROBE_V, 480, 80, { color: '#007aff', label: 'V_inv (Channel B)' }, 0);
+
+      canvas.wires = [
+        // Non-inverting input (Pin 3) to R6 to GND
+        { id: 'w1', fromPin: `${opamp.id}:in_noninv`, toPin: `${r6.id}:p1` },
+        { id: 'w2', fromPin: `${r6.id}:p2`, toPin: `${gnd.id}:p1` },
+
+        // Ground connections for ladder resistors R3, R4, R5
+        { id: 'w3', fromPin: `${r3.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w4', fromPin: `${r4.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w5', fromPin: `${r5.id}:p2`, toPin: `${gnd.id}:p1` },
+
+        // Inverting input (Pin 2) node (R1, R2, Channel B Probe)
+        { id: 'w6', fromPin: `${opamp.id}:in_inv`, toPin: `${r1.id}:p2` },
+        { id: 'w7', fromPin: `${opamp.id}:in_inv`, toPin: `${r2.id}:p1` },
+        { id: 'w8', fromPin: `${opamp.id}:in_inv`, toPin: `${prInv.id}:tip` },
+
+        // Op-Amp Output (Pin 6) connects to R2, C3 input, and Channel A Probe
+        { id: 'w9', fromPin: `${opamp.id}:out`, toPin: `${r2.id}:p2` },
+        { id: 'w10', fromPin: `${opamp.id}:out`, toPin: `${c3.id}:p2` },
+        { id: 'w11', fromPin: `${opamp.id}:out`, toPin: `${prOut.id}:tip` },
+
+        // RC Stage 3: C3 to R5 and C2
+        { id: 'w12', fromPin: `${c3.id}:p1`, toPin: `${r5.id}:p1` },
+        { id: 'w13', fromPin: `${c3.id}:p1`, toPin: `${c2.id}:p2` },
+
+        // RC Stage 2: C2 to R4 and C1
+        { id: 'w14', fromPin: `${c2.id}:p1`, toPin: `${r4.id}:p1` },
+        { id: 'w15', fromPin: `${c2.id}:p1`, toPin: `${c1.id}:p2` },
+
+        // RC Stage 1: C1 to R3 and R1
+        { id: 'w16', fromPin: `${c1.id}:p1`, toPin: `${r3.id}:p1` },
+        { id: 'w17', fromPin: `${c1.id}:p1`, toPin: `${r1.id}:p1` }
+      ];
+
+      canvas.fitToScreen();
+    }
+  },
+
+  // 18. Sample and Hold Amplifier Circuit (LF398 / S&H)
+  sampleAndHoldCircuit: {
+    id: 'sample-and-hold-circuit',
+    name: 'Sample & Hold Amplifier Circuit (LF398 / ADC Front-End)',
+    description: 'Precision Analog-to-Digital Converter front-end Sample & Hold circuit sampling a 1 kHz analog sine wave at 10 kHz clock rate with holding capacitor and buffered staircase waveform output.',
+    author: 'DSP_DataAcq_Lab',
+    stats: { stars: 275, copies: 1180, views: 215000 },
+    timePerDiv: 0.0005, // 500 us/div
+    voltsPerDiv: 2.0,  // 2 V/div
+    load(canvas) {
+      canvas.components = [];
+      canvas.wires = [];
+
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 380, 30, { text: 'SAMPLE & HOLD AMPLIFIER CIRCUIT (LF398 / ADC FRONT-END)', fontSize: 14, bold: true, color: '#334155' }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 380, 55, { text: 'Sampling 1 kHz Analog Input at 10 kHz Clock Rate (CH = 10 nF)', fontSize: 11, bold: false, color: '#64748b' }, 0);
+
+      const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 380, {}, 0);
+
+      // 1. Analog Input Signal (1 kHz Sine Wave, 4Vpk)
+      const vIn = canvas.addComponent(ComponentTypes.AC_VOLTAGE, 100, 180, { amplitude: 4.0, frequency: 1000 }, 0);
+
+      // 2. Sampling Control Clock (10 kHz Square Wave, 0V to 5V, 25% duty cycle for clean sampling pulse)
+      const clk = canvas.addComponent(ComponentTypes.CLOCK_VOLTAGE, 100, 280, { vHigh: 5.0, vLow: 0.0, frequency: 10000, dutyCycle: 25 }, 0);
+
+      // 3. Sample & Hold IC (LF398)
+      const sh = canvas.addComponent(ComponentTypes.SAMPLE_AND_HOLD, 320, 220, { vThresh: 2.5, rOn: 5, rOff: 1e9, internalCap: 1e-8 }, 0);
+
+      // 4. Precision Holding Capacitor (10 nF)
+      const cHold = canvas.addComponent(ComponentTypes.CAPACITOR, 320, 320, { capacitance: 1e-8 }, 90);
+
+      // 5. Output Load Resistor (10 kΩ)
+      const rLoad = canvas.addComponent(ComponentTypes.RESISTOR, 460, 280, { resistance: 10000 }, 90);
+
+      // 6. Multi-Channel Probes matching Multisim / Studio Color Codes
+      const prIn = canvas.addComponent(ComponentTypes.PROBE_V, 100, 80, { color: '#007aff', label: 'CH1: Analog Input (1 kHz)' }, 0);
+      const prClk = canvas.addComponent(ComponentTypes.PROBE_V, 180, 320, { color: '#ff9500', label: 'CH2: Sample Clock (10 kHz)' }, 0);
+      const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 460, 120, { color: '#03b585', label: 'CH3: Sampled & Held Output' }, 0);
+
+      canvas.wires = [
+        // Grounds
+        { id: 'w_gnd_vin', fromPin: `${vIn.id}:p_neg`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_clk', fromPin: `${clk.id}:p_neg`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_chold', fromPin: `${cHold.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w_gnd_rload', fromPin: `${rLoad.id}:p2`, toPin: `${gnd.id}:p1` },
+
+        // Input signal to S&H IN and Probe 1
+        { id: 'w_vin_in', fromPin: `${vIn.id}:p_pos`, toPin: `${sh.id}:in` },
+        { id: 'w_vin_pr', fromPin: `${vIn.id}:p_pos`, toPin: `${prIn.id}:tip` },
+
+        // Clock to S&H CTRL and Probe 2
+        { id: 'w_clk_ctrl', fromPin: `${clk.id}:p_pos`, toPin: `${sh.id}:ctrl` },
+        { id: 'w_clk_pr', fromPin: `${clk.id}:p_pos`, toPin: `${prClk.id}:tip` },
+
+        // Hold capacitor to S&H CH pin
+        { id: 'w_sh_ch', fromPin: `${sh.id}:ch`, toPin: `${cHold.id}:p1` },
+
+        // Output to Load and Probe 3
+        { id: 'w_sh_out', fromPin: `${sh.id}:out`, toPin: `${rLoad.id}:p1` },
+        { id: 'w_out_pr', fromPin: `${sh.id}:out`, toPin: `${prOut.id}:tip` }
+      ];
+
+      canvas.fitToScreen();
+    }
   }
 };
+

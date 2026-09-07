@@ -609,22 +609,39 @@ export class CircuitGrapher {
       ctx.beginPath();
 
       let started = false;
+      let lastPt = null;
+
       for (let i = 0; i < history.length; i++) {
         const pt = history[i];
-        if (pt.time < startTime) continue;
+        if (pt.time < startTime) {
+          lastPt = pt;
+          continue;
+        }
 
         const pr = pt.probes[probeId];
-        if (!pr) continue;
+        if (!pr) {
+          lastPt = pt;
+          continue;
+        }
 
         const x = ((pt.time - startTime) / totalTimeSpan) * w;
         const y = centerY - pr.value * yPixelsPerVolt;
 
         if (!started) {
-          ctx.moveTo(x, y);
+          if (lastPt && lastPt.probes[probeId] && pt.time > lastPt.time) {
+            const frac = (startTime - lastPt.time) / (pt.time - lastPt.time);
+            const v0 = lastPt.probes[probeId].value + frac * (pr.value - lastPt.probes[probeId].value);
+            const y0 = centerY - v0 * yPixelsPerVolt;
+            ctx.moveTo(0, y0);
+            ctx.lineTo(x, y);
+          } else {
+            ctx.moveTo(x, y);
+          }
           started = true;
         } else {
           ctx.lineTo(x, y);
         }
+        lastPt = pt;
       }
       ctx.stroke();
       ctx.restore();

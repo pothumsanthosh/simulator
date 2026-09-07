@@ -2046,6 +2046,49 @@ const g10 = startGroup('Group 10: Adversarial Human-Workflow Torture & Real-Worl
     assert(passManualTrigger,
       `[Interactive Trigger] Manual Click Trigger: Rest (${vBefore.toFixed(2)}V) -> Fired Peak (${vDuring.toFixed(2)}V) -> Rest Post-Pulse (${vAfter.toFixed(2)}V)`, g10);
   }
+
+  // 10.28 Function Generator (XFG1) Multi-Waveform Synthesizer (Sine, Square, Triangle, Sawtooth)
+  {
+    const engine = new CircuitEngine();
+    const fg = {
+      id: 'XFG1',
+      type: ComponentTypes.FUNCTION_GENERATOR,
+      params: { waveform: 'square', frequency: 1000, amplitude: 5, offset: 0, dutyCycle: 25 }
+    };
+    const rLoad = { id: 'RL', type: ComponentTypes.RESISTOR, params: { resistance: 10000 } };
+    const gnd = { id: 'GND1', type: ComponentTypes.GROUND, params: {} };
+    const wires = [
+      { fromPin: 'XFG1:com', toPin: 'GND1:p1' },
+      { fromPin: 'XFG1:p_pos', toPin: 'RL:p1' },
+      { fromPin: 'RL:p2', toPin: 'GND1:p1' }
+    ];
+
+    engine.setCircuit([fg, rLoad, gnd], wires);
+    const nLoad = engine.getNode(rLoad, 'p1');
+
+    // At t = 0.1ms (within 25% duty cycle of 1ms period) -> V = +5V
+    engine.time = 0.0001;
+    engine.step(1e-5);
+    const vDutyHigh = engine.nodeVoltages[nLoad];
+
+    // At t = 0.5ms (outside 25% duty cycle of 1ms period) -> V = -5V
+    engine.time = 0.0005;
+    engine.step(1e-5);
+    const vDutyLow = engine.nodeVoltages[nLoad];
+
+    // Switch waveform dynamically to Sawtooth
+    fg.params.waveform = 'sawtooth';
+    engine.time = 0.00075; // 75% through cycle -> -5 + 2*5*0.75 = +2.5V
+    engine.step(1e-5);
+    const vSaw = engine.nodeVoltages[nLoad];
+
+    const passFG = Math.abs(vDutyHigh - 5.0) < 0.05 &&
+                   Math.abs(vDutyLow - (-5.0)) < 0.05 &&
+                   Math.abs(vSaw - 2.5) < 0.15;
+
+    assert(passFG,
+      `[Function Generator XFG1] Verified 25% Square Wave (+5.0V / -5.0V) & Dynamic Sawtooth Synthesis (${vSaw.toFixed(2)}V at 75% phase)`, g10);
+  }
 }
 
 // ----------------------------------------------------------------------

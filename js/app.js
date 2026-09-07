@@ -10,6 +10,16 @@ import { SchematicCanvas } from './editor/schematic-canvas.js';
 import { CircuitGrapher } from './editor/grapher.js';
 import { CircuitLibrary } from './editor/circuit-library.js';
 import { firebaseService } from './services/firebase-service.js';
+import { storageService, SwitchaStorageService } from './services/storage-service.js';
+import { DigitalMultimeter, LogicAnalyzer, SpectrumAnalyzer } from './editor/instruments.js';
+import { BlockTypes, BlockCategory, BlockDefinitions } from './blocks/block-types.js';
+import { BlockEngine, SwitchaBlocksEngine } from './blocks/block-engine.js';
+import { BlockCanvas, SwitchaBlocksCanvas } from './blocks/block-canvas.js';
+import { BlockScope, SwitchaBlocksScope } from './blocks/block-scope.js';
+import { BlockLibrary, SwitchaBlocksLibrary } from './blocks/block-library.js';
+import { SwitchaMath, CodeEngine, SwitchaCodeEngine } from './code/code-engine.js';
+import { SwitchaPlot, SwitchaPlotter } from './code/code-plotter.js';
+import { SwitchaCodeEditor } from './code/code-editor.js';
 
 class SwitchaApp {
   constructor() {
@@ -22,8 +32,23 @@ class SwitchaApp {
     this.activeMyCircuitId = null;
     this._toastTimer = null;
 
+    // Switcha Blocks Environment
+    this.blocksEngine = null;
+    this.blocksCanvas = null;
+    this.blocksScope = null;
+    this.isBlocksSimRunning = false;
+    this.blocksSimAnimFrame = null;
+    this.activeModelId = null;
+
+    // Switcha Code Environment
+    this.codeEditor = null;
+
+    // Lab Instruments Suite
+    this.instruments = { dmm: null, logicAnalyzer: null, spectrumAnalyzer: null };
+
     this.currentView = 'home';
     this.currentMode = 'split'; // 'schematic', 'split', 'grapher'
+    this.currentWorkspaceTab = 'circuits'; // 'circuits', 'models', 'scripts'
 
     this.init();
   }
@@ -74,6 +99,10 @@ class SwitchaApp {
     this.initNetworkSyncMonitor();
     this.initFirebaseAuth();
     this.initMyCircuitsPage();
+    this.initWorkspaceTabs();
+    this.initLabInstruments();
+    this.initBlocksEnvironment();
+    this.initCodeEnvironment();
     this.initRouter();
     this.initToolbarControls();
     this.initModals();
@@ -144,18 +173,28 @@ class SwitchaApp {
 
   // --- My Circuits Hub & Storage Management ---
   getMyCircuits() {
-    try {
-      const data = localStorage.getItem('switcha_my_circuits');
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.warn('[Switcha] Failed to read my circuits from localStorage:', e);
-    }
-
-    // Default starter circuits if none exist
+    // Default starter circuits
     const starterCircuits = [
+      {
+        id: 'circuit_starter_rc_oscillator',
+        name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
+        description: 'Exact Multisim 3-stage RC high-pass ladder oscillator with 741 Op-Amp (R1=33k, R2=1M, R6=33k, C1=C2=C3=0.1µF, R3=R4=R5=3.3k) generating sustained 200Hz sinusoidal oscillations.',
+        author: 'Switcha Studio',
+        updatedAt: Date.now() - 900000,
+        presetKey: 'rcPhaseShiftOscillator',
+        components: [],
+        wires: []
+      },
+      {
+        id: 'circuit_starter_sample_hold',
+        name: 'Sample & Hold Amplifier Circuit',
+        description: 'Precision Analog-to-Digital Converter front-end Sample & Hold circuit sampling a 1 kHz analog sine wave at 10 kHz clock rate with holding capacitor and buffered staircase waveform output.',
+        author: 'Switcha Studio',
+        updatedAt: Date.now() - 600000,
+        presetKey: 'sampleAndHoldCircuit',
+        components: [],
+        wires: []
+      },
       {
         id: 'circuit_starter_1',
         name: 'Interactive Switch & LED Lamp',
@@ -216,6 +255,23 @@ class SwitchaApp {
       }
     ];
 
+    try {
+      const data = localStorage.getItem('switcha_my_circuits');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure essential starter circuits like RC oscillator are present in the list
+          starterCircuits.forEach(sc => {
+            const hasIt = parsed.some(c => c.id === sc.id || (sc.presetKey && c.presetKey === sc.presetKey));
+            if (!hasIt) parsed.push(sc);
+          });
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[Switcha] Failed to read my circuits from localStorage:', e);
+    }
+
     this.saveMyCircuits(starterCircuits);
     return starterCircuits;
   }
@@ -270,14 +326,20 @@ class SwitchaApp {
     firebaseService.saveCircuit(targetCircuit);
   }
 
-  loadCircuitFromMyCircuits(circuitId) {
-    const circuits = this.getMyCircuits();
-    const circuit = circuits.find(c => c.id === circuitId);
+  async loadCircuitFromMyCircuits(circuitId) {
+    let circuits = this.getMyCircuits();
+    let circuit = circuits.find(c => c.id === circuitId);
+
+    if (!circuit && window.SwitchaStorage) {
+      try {
+        circuit = await window.SwitchaStorage.getCircuit(circuitId);
+      } catch (_) {}
+    }
     if (!circuit) return;
 
     this.activeMyCircuitId = circuit.id;
 
-    if (circuit.presetKey && CircuitLibrary[circuit.presetKey] && (!circuit.components || circuit.components.length === 0)) {
+    if (circuit.presetKey && CircuitLibrary[circuit.presetKey] && (!circuit.components || circuit.components.length === 0 || circuit.id.startsWith('circuit_starter_'))) {
       this.loadCircuitPreset(circuit.presetKey);
     } else {
       this.engine.reset();
@@ -286,9 +348,38 @@ class SwitchaApp {
       this.canvas.wires = JSON.parse(JSON.stringify(circuit.wires || []));
       this.engine.setCircuit(this.canvas.components, this.canvas.wires);
 
+      const preset = circuit.presetKey ? CircuitLibrary[circuit.presetKey] : null;
+      const isRcOsc = (circuit.name && circuit.name.toLowerCase().includes('rc phase shift')) || (circuit.presetKey === 'rcPhaseShiftOscillator');
+      const isSH = (circuit.name && (circuit.name.toLowerCase().includes('sample') && circuit.name.toLowerCase().includes('hold'))) || (circuit.presetKey === 'sampleAndHoldCircuit');
+
+      if (this.grapher) {
+        if (circuit.timePerDiv) {
+          this.grapher.setTimeScale(circuit.timePerDiv);
+        } else if (preset && preset.timePerDiv) {
+          this.grapher.setTimeScale(preset.timePerDiv);
+        } else if (isRcOsc) {
+          this.grapher.setTimeScale(0.002);
+        } else if (isSH) {
+          this.grapher.setTimeScale(0.0005);
+        }
+
+        if (circuit.voltsPerDiv) {
+          this.grapher.setVoltScale(circuit.voltsPerDiv);
+        } else if (preset && preset.voltsPerDiv) {
+          this.grapher.setVoltScale(preset.voltsPerDiv);
+        } else if (isRcOsc) {
+          this.grapher.setVoltScale(5.0);
+        } else if (isSH) {
+          this.grapher.setVoltScale(2.0);
+        }
+      }
+
       const nameInput = document.getElementById('circuitNameInput');
       if (nameInput) nameInput.value = circuit.name;
       document.title = `${circuit.name} - Switcha`;
+
+      // Automatically start simulation on loading circuit
+      this.startSimulation();
 
       setTimeout(() => {
         this.canvas.resize();
@@ -535,6 +626,621 @@ class SwitchaApp {
     });
   }
 
+  // --- Workspace Multi-Store Manager (Circuits / Models / Scripts) ---
+  initWorkspaceTabs() {
+    document.querySelectorAll('[data-workspace-tab]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('[data-workspace-tab]').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        this.currentWorkspaceTab = e.target.dataset.workspaceTab;
+        this.renderWorkspaceProjects();
+      });
+    });
+  }
+
+  async renderWorkspaceProjects(filterQuery = '') {
+    const grid = document.getElementById('myCircuitsGrid');
+    const countEl = document.getElementById('myCircuitsCount');
+    if (!grid) return;
+
+    grid.innerHTML = '<div style="padding:20px; color:#94a3b8; text-align:center;">Loading workspace projects...</div>';
+
+    let items = [];
+    if (window.SwitchaStorage) {
+      if (this.currentWorkspaceTab === 'circuits') {
+        items = await window.SwitchaStorage.getCircuits();
+      } else if (this.currentWorkspaceTab === 'models') {
+        items = await window.SwitchaStorage.getModels();
+      } else if (this.currentWorkspaceTab === 'scripts') {
+        items = await window.SwitchaStorage.getScripts();
+      }
+    } else {
+      items = this.getMyCircuits();
+    }
+
+    const filtered = items.filter(item => {
+      if (!filterQuery) return true;
+      return (item.name || '').toLowerCase().includes(filterQuery) ||
+             (item.description || '').toLowerCase().includes(filterQuery) ||
+             (item.author || '').toLowerCase().includes(filterQuery);
+    });
+
+    if (countEl) {
+      const typeLabel = this.currentWorkspaceTab === 'circuits' ? 'Circuit' : (this.currentWorkspaceTab === 'models' ? 'Model' : 'Script');
+      countEl.textContent = `${items.length} ${typeLabel}${items.length === 1 ? '' : 's'} Saved`;
+    }
+
+    grid.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const icon = this.currentWorkspaceTab === 'circuits' ? '🔌' : (this.currentWorkspaceTab === 'models' ? '🧩' : '💻');
+      const actionLink = this.currentWorkspaceTab === 'circuits' ? '#/create' : (this.currentWorkspaceTab === 'models' ? '#/blocks' : '#/code');
+      const actionText = this.currentWorkspaceTab === 'circuits' ? '⚡ Open Circuit Studio' : (this.currentWorkspaceTab === 'models' ? '🧩 Open Blocks Studio' : '💻 Open Code IDE');
+      grid.innerHTML = `
+        <div class="empty-circuits-state">
+          <div class="empty-circuits-icon">${icon}</div>
+          <h3 class="empty-circuits-title">${filterQuery ? 'No matching projects found' : 'No saved ' + this.currentWorkspaceTab + ' yet'}</h3>
+          <p class="empty-circuits-desc">${filterQuery ? 'Try another search query.' : 'Build and save your projects offline on this device.'}</p>
+          <a href="${actionLink}" class="btn btn-primary">${actionText}</a>
+        </div>
+      `;
+      return;
+    }
+
+    filtered.forEach(item => {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'card';
+
+      const timeAgo = (timestamp) => {
+        if (!timestamp) return 'Recently';
+        const sec = Math.floor((Date.now() - timestamp) / 1000);
+        if (sec < 60) return 'Just now';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min}m ago`;
+        const hrs = Math.floor(min / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        return `${Math.floor(hrs / 24)}d ago`;
+      };
+
+      const isCircuit = this.currentWorkspaceTab === 'circuits';
+      const isModel = this.currentWorkspaceTab === 'models';
+      const isScript = this.currentWorkspaceTab === 'scripts';
+
+      const metaInfo = isCircuit ? `⚡ ${item.components?.length || 0} comps` : (isModel ? `🧩 ${item.blocks?.length || 0} blocks` : `💻 Code Script`);
+
+      cardEl.innerHTML = `
+        <div class="card-thumbnail" style="background: #0f172a; display:flex; align-items:center; justify-content:center; height:100px;">
+          <span style="font-size: 36px;">${isCircuit ? '🔌' : (isModel ? '🧩' : '💻')}</span>
+        </div>
+        <div class="card-body">
+          <div class="my-circuit-meta">
+            <span>🕒 ${timeAgo(item.updatedAt)}</span>
+            <span>•</span>
+            <span>${metaInfo}</span>
+          </div>
+          <h3 class="card-title">${item.name}</h3>
+          <p class="card-desc">${item.description || 'Personal saved file.'}</p>
+          <div class="my-circuit-card-actions">
+            <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12px; font-weight: 700;" data-action="open">⚡ Open</button>
+            <button class="btn-card-icon" title="Duplicate" data-action="duplicate">📋 Copy</button>
+            <button class="btn-card-icon" title="Export" data-action="export">📄 Export</button>
+            <button class="btn-card-icon delete" title="Delete" data-action="delete">🗑️</button>
+          </div>
+        </div>
+      `;
+
+      cardEl.querySelector('[data-action="open"]').addEventListener('click', () => {
+        if (isCircuit) {
+          this.loadCircuitFromMyCircuits(item.id);
+        } else if (isModel) {
+          if (this.blocksCanvas) {
+            this.blocksCanvas.blocks = JSON.parse(JSON.stringify(item.blocks || []));
+            this.blocksCanvas.lines = JSON.parse(JSON.stringify(item.lines || []));
+            this.blocksEngine?.setModel(this.blocksCanvas.blocks, this.blocksCanvas.lines);
+            const nameInput = document.getElementById('blockModelNameInput');
+            if (nameInput) nameInput.value = item.name;
+            this.activeModelId = item.id;
+            this.blocksCanvas.fitToScreen();
+          }
+          window.location.hash = '#/blocks';
+          this.showToast(`🧩 Opened "${item.name}" in Blocks Studio`, 'info');
+        } else if (isScript) {
+          if (this.codeEditor) {
+            this.codeEditor.activeScript = item;
+            const textarea = document.getElementById('codeTextarea');
+            if (textarea) textarea.value = item.content || '';
+            const nameEl = document.getElementById('codeScriptName');
+            if (nameEl) nameEl.textContent = item.name;
+          }
+          window.location.hash = '#/code';
+          this.showToast(`💻 Opened "${item.name}" in Code IDE`, 'info');
+        }
+      });
+
+      cardEl.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+        if (confirm(`Delete "${item.name}"?`)) {
+          if (window.SwitchaStorage) {
+            if (isCircuit) await window.SwitchaStorage.deleteCircuit(item.id);
+            if (isModel) await window.SwitchaStorage.deleteModel(item.id);
+            if (isScript) await window.SwitchaStorage.deleteScript(item.id);
+          }
+          this.renderWorkspaceProjects();
+          this.showToast(`🗑️ "${item.name}" deleted`, 'warning');
+        }
+      });
+
+      cardEl.querySelector('[data-action="duplicate"]').addEventListener('click', async () => {
+        const copy = JSON.parse(JSON.stringify(item));
+        copy.id = `${isCircuit ? 'circuit' : (isModel ? 'model' : 'script')}_${Date.now()}`;
+        copy.name = `${item.name} (Copy)`;
+        copy.updatedAt = Date.now();
+        if (window.SwitchaStorage) {
+          if (isCircuit) await window.SwitchaStorage.saveCircuit(copy);
+          if (isModel) await window.SwitchaStorage.saveModel(copy);
+          if (isScript) await window.SwitchaStorage.saveScript(copy);
+        }
+        this.renderWorkspaceProjects();
+        this.showToast(`📋 Duplicated "${item.name}"`, 'success');
+      });
+
+      cardEl.querySelector('[data-action="export"]').addEventListener('click', () => {
+        const ext = isCircuit ? 'swcirc' : (isModel ? 'swblock' : 'swcode');
+        const content = isScript ? (item.content || '') : JSON.stringify(item, null, 2);
+        const type = isScript ? 'text/plain' : 'application/json';
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = item.name.endsWith('.' + ext) ? item.name : `${item.name}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      grid.appendChild(cardEl);
+    });
+  }
+
+  // --- Lab Instruments Suite ---
+  initLabInstruments() {
+    if (typeof DigitalMultimeter !== 'undefined') {
+      this.instruments.dmm = new DigitalMultimeter('dmmModalContent', this.engine);
+    }
+    if (typeof LogicAnalyzer !== 'undefined') {
+      this.instruments.logicAnalyzer = new LogicAnalyzer('logicAnalyzerModalContent', this.engine);
+    }
+    if (typeof SpectrumAnalyzer !== 'undefined') {
+      this.instruments.spectrumAnalyzer = new SpectrumAnalyzer('spectrumAnalyzerModalContent', this.engine);
+    }
+
+    const btnDmm = document.getElementById('btnOpenDMM');
+    if (btnDmm) {
+      btnDmm.addEventListener('click', () => {
+        document.getElementById('dmmModal')?.classList.add('active');
+      });
+    }
+
+    const btnLa = document.getElementById('btnOpenLogicAnalyzer');
+    if (btnLa) {
+      btnLa.addEventListener('click', () => {
+        document.getElementById('logicAnalyzerModal')?.classList.add('active');
+        this.instruments.logicAnalyzer?.resize();
+      });
+    }
+
+    const btnSpec = document.getElementById('btnOpenSpectrumAnalyzer');
+    if (btnSpec) {
+      btnSpec.addEventListener('click', () => {
+        document.getElementById('spectrumAnalyzerModal')?.classList.add('active');
+        this.instruments.spectrumAnalyzer?.resize();
+      });
+    }
+  }
+
+  // --- Switcha Blocks Dynamic Systems Environment ---
+  initBlocksEnvironment() {
+    const canvasEl = document.getElementById('blocksCanvas');
+    const scopeContainer = document.getElementById('blocksScopeContainer');
+    if (!canvasEl) return;
+
+    if (typeof SwitchaBlocksEngine !== 'undefined') {
+      this.blocksEngine = new SwitchaBlocksEngine();
+    }
+    if (typeof SwitchaBlocksScope !== 'undefined' && scopeContainer) {
+      this.blocksScope = new SwitchaBlocksScope(scopeContainer);
+    }
+    if (typeof SwitchaBlocksCanvas !== 'undefined' && canvasEl && this.blocksEngine) {
+      this.blocksCanvas = new SwitchaBlocksCanvas(canvasEl, this.blocksEngine);
+      
+      this.blocksCanvas.onModelModified = (blocks, lines) => {
+        this.blocksEngine.setModel(blocks, lines);
+      };
+
+      this.blocksCanvas.onSelectionChange = (selection) => {
+        this.renderBlocksPropertiesInspector(selection);
+      };
+    }
+
+    this.buildBlocksPalette();
+    this.initBlocksToolbarControls();
+    this.initBlocksSplitGutter();
+
+    // Load default model
+    if (typeof SwitchaBlocksLibrary !== 'undefined' && this.blocksCanvas) {
+      SwitchaBlocksLibrary.loadModel('dc_motor_pid', this.blocksCanvas);
+      const nameInput = document.getElementById('blockModelNameInput');
+      if (nameInput) nameInput.value = 'DC Motor Speed Control with PID';
+    }
+  }
+
+  buildBlocksPalette() {
+    const container = document.getElementById('blocksPaletteContainer');
+    if (!container || typeof BlockDefinitions === 'undefined' || typeof BlockCategory === 'undefined') return;
+    container.innerHTML = '';
+
+    const groups = {};
+    Object.values(BlockCategory).forEach(cat => groups[cat] = []);
+
+    Object.values(BlockDefinitions).forEach(def => {
+      if (groups[def.category]) {
+        groups[def.category].push(def);
+      }
+    });
+
+    Object.entries(groups).forEach(([categoryName, defs]) => {
+      if (defs.length === 0) return;
+
+      const groupEl = document.createElement('div');
+      groupEl.className = 'palette-group';
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'palette-group-header';
+      headerEl.innerHTML = `<span>${categoryName}</span><span>▾</span>`;
+
+      const itemsGrid = document.createElement('div');
+      itemsGrid.className = 'palette-items-grid';
+
+      defs.forEach(def => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'palette-item';
+        itemEl.title = `Add ${def.name}`;
+        itemEl.dataset.type = def.type;
+        itemEl.setAttribute('draggable', 'true');
+        itemEl.innerHTML = `
+          <div class="palette-item-icon" style="font-weight:bold; font-size:11px; color:#38bdf8;">[ ${def.glyph} ]</div>
+          <div class="palette-item-name">${def.name}</div>
+        `;
+
+        itemEl.addEventListener('dragstart', (e) => {
+          if (e.dataTransfer) {
+            e.dataTransfer.setData('text/plain', def.type);
+            e.dataTransfer.effectAllowed = 'copy';
+          }
+        });
+
+        itemEl.addEventListener('click', () => {
+          if (this.blocksCanvas) {
+            this.blocksCanvas.addBlock(def.type, 200, 150);
+          }
+        });
+
+        itemsGrid.appendChild(itemEl);
+      });
+
+      groupEl.appendChild(headerEl);
+      groupEl.appendChild(itemsGrid);
+      container.appendChild(groupEl);
+    });
+
+    const searchInput = document.getElementById('blocksSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase().trim();
+        container.querySelectorAll('.palette-item').forEach(item => {
+          const text = item.textContent.toLowerCase();
+          item.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+        });
+      });
+    }
+  }
+
+  initBlocksToolbarControls() {
+    const btnSimToggle = document.getElementById('btnBlocksSimToggle');
+    const simIcon = document.getElementById('blocksSimToggleIcon');
+    const simText = document.getElementById('blocksSimToggleText');
+
+    if (btnSimToggle) {
+      btnSimToggle.addEventListener('click', () => {
+        this.isBlocksSimRunning = !this.isBlocksSimRunning;
+        if (this.isBlocksSimRunning) {
+          btnSimToggle.classList.add('running');
+          if (simIcon) simIcon.textContent = '⏸';
+          if (simText) simText.textContent = 'Pause Model';
+          this.startBlocksSimulationLoop();
+        } else {
+          btnSimToggle.classList.remove('running');
+          if (simIcon) simIcon.textContent = '▶';
+          if (simText) simText.textContent = 'Run Model';
+          this.stopBlocksSimulationLoop();
+        }
+      });
+    }
+
+    const btnStep = document.getElementById('btnBlocksSimStep');
+    if (btnStep) {
+      btnStep.addEventListener('click', () => {
+        if (!this.blocksEngine) return;
+        const dt = parseFloat(document.getElementById('blocksStepInput')?.value) || 0.001;
+        this.blocksEngine.step(dt);
+        if (this.blocksScope) {
+          const sample = this.blocksEngine.sampleSignals();
+          this.blocksScope.recordSample(this.blocksEngine.time, sample);
+        }
+        this.updateBlocksSimTimeDisplay();
+        this.blocksCanvas?.render();
+      });
+    }
+
+    const btnReset = document.getElementById('btnBlocksSimReset');
+    if (btnReset) {
+      btnReset.addEventListener('click', () => {
+        this.isBlocksSimRunning = false;
+        if (btnSimToggle) btnSimToggle.classList.remove('running');
+        if (simIcon) simIcon.textContent = '▶';
+        if (simText) simText.textContent = 'Run Model';
+        this.stopBlocksSimulationLoop();
+        this.blocksEngine?.reset();
+        this.blocksScope?.reset();
+        this.updateBlocksSimTimeDisplay();
+        this.blocksCanvas?.render();
+        this.showToast('⏮ Blocks simulation reset', 'info');
+      });
+    }
+
+    const solverSelect = document.getElementById('blocksSolverSelect');
+    if (solverSelect) {
+      solverSelect.addEventListener('change', (e) => {
+        if (this.blocksEngine) this.blocksEngine.solver = e.target.value;
+      });
+    }
+
+    const presetSelect = document.getElementById('blocksPresetSelect');
+    if (presetSelect) {
+      presetSelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val && typeof SwitchaBlocksLibrary !== 'undefined' && this.blocksCanvas) {
+          SwitchaBlocksLibrary.loadModel(val, this.blocksCanvas);
+          const nameInput = document.getElementById('blockModelNameInput');
+          if (nameInput) nameInput.value = e.target.options[e.target.selectedIndex].text.replace(/^[0-9]+\.\s*/, '');
+          this.showToast(`⚡ Loaded model: ${val}`, 'info');
+          e.target.value = '';
+        }
+      });
+    }
+
+    const btnSave = document.getElementById('btnSaveBlockModel');
+    if (btnSave) {
+      btnSave.addEventListener('click', async () => {
+        const name = document.getElementById('blockModelNameInput')?.value.trim() || 'Untitled Model';
+        const modelDoc = {
+          id: this.activeModelId || `model_${Date.now()}`,
+          name: name.endsWith('.swblock') ? name : name + '.swblock',
+          blocks: JSON.parse(JSON.stringify(this.blocksCanvas?.blocks || [])),
+          lines: JSON.parse(JSON.stringify(this.blocksCanvas?.lines || [])),
+          updatedAt: Date.now()
+        };
+        if (window.SwitchaStorage) {
+          await window.SwitchaStorage.saveModel(modelDoc);
+          this.activeModelId = modelDoc.id;
+          this.showToast(`💾 Model saved to My Models: ${modelDoc.name}`, 'success');
+        }
+      });
+    }
+
+    const btnExport = document.getElementById('btnBlocksExportJSON');
+    if (btnExport) {
+      btnExport.addEventListener('click', () => {
+        const name = document.getElementById('blockModelNameInput')?.value.trim() || 'model';
+        const data = {
+          name,
+          format: 'swblock',
+          version: '2.0',
+          blocks: this.blocksCanvas?.blocks || [],
+          lines: this.blocksCanvas?.lines || []
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name.replace(/\s+/g, '_').toLowerCase()}.swblock`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    const btnFit = document.getElementById('btnBlocksFit');
+    if (btnFit) {
+      btnFit.addEventListener('click', () => this.blocksCanvas?.fitToScreen());
+    }
+
+    const btnDel = document.getElementById('btnBlocksDelete');
+    if (btnDel) {
+      btnDel.addEventListener('click', () => this.blocksCanvas?.deleteSelected());
+    }
+
+    // View mode pills (Diagram, Split, Scope)
+    document.querySelectorAll('[data-blocks-mode]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('[data-blocks-mode]').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        const mode = e.target.dataset.blocksMode;
+        const canvasPanel = document.getElementById('blocksCanvasPanel');
+        const scopePanel = document.getElementById('blocksScopePanel');
+        const gutter = document.getElementById('blocksSplitGutter');
+
+        if (mode === 'canvas') {
+          if (canvasPanel) canvasPanel.style.display = 'block';
+          if (gutter) gutter.style.display = 'none';
+          if (scopePanel) scopePanel.style.display = 'none';
+        } else if (mode === 'scope') {
+          if (canvasPanel) canvasPanel.style.display = 'none';
+          if (gutter) gutter.style.display = 'none';
+          if (scopePanel) {
+            scopePanel.style.display = 'flex';
+            scopePanel.style.height = '100%';
+          }
+        } else {
+          if (canvasPanel) {
+            canvasPanel.style.display = 'block';
+            canvasPanel.style.flex = '1';
+          }
+          if (gutter) gutter.style.display = 'flex';
+          if (scopePanel) {
+            scopePanel.style.display = 'flex';
+            scopePanel.style.height = '280px';
+          }
+        }
+        setTimeout(() => {
+          this.blocksCanvas?.resize();
+          this.blocksScope?.resize();
+        }, 50);
+      });
+    });
+  }
+
+  initBlocksSplitGutter() {
+    const gutter = document.getElementById('blocksSplitGutter');
+    const scopePanel = document.getElementById('blocksScopePanel');
+    if (!gutter || !scopePanel) return;
+
+    let isDragging = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    gutter.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startY = e.clientY;
+      startHeight = scopePanel.offsetHeight;
+      document.body.style.cursor = 'row-resize';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dy = startY - e.clientY;
+      const newHeight = Math.max(120, Math.min(window.innerHeight - 200, startHeight + dy));
+      scopePanel.style.height = `${newHeight}px`;
+      this.blocksCanvas?.resize();
+      this.blocksScope?.resize();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.cursor = 'default';
+      }
+    });
+  }
+
+  startBlocksSimulationLoop() {
+    const loop = () => {
+      if (!this.isBlocksSimRunning || !this.blocksEngine) return;
+
+      const dt = parseFloat(document.getElementById('blocksStepInput')?.value) || 0.001;
+      const subSteps = Math.max(1, Math.min(50, Math.round(0.016 / dt)));
+      for (let i = 0; i < subSteps; i++) {
+        this.blocksEngine.step(dt);
+        if (this.blocksScope) {
+          const sample = this.blocksEngine.sampleSignals();
+          this.blocksScope.recordSample(this.blocksEngine.time, sample);
+        }
+      }
+
+      this.updateBlocksSimTimeDisplay();
+      this.blocksCanvas?.render();
+
+      this.blocksSimAnimFrame = requestAnimationFrame(loop);
+    };
+
+    this.blocksSimAnimFrame = requestAnimationFrame(loop);
+  }
+
+  stopBlocksSimulationLoop() {
+    if (this.blocksSimAnimFrame) {
+      cancelAnimationFrame(this.blocksSimAnimFrame);
+      this.blocksSimAnimFrame = null;
+    }
+  }
+
+  updateBlocksSimTimeDisplay() {
+    const display = document.getElementById('blocksSimTimeDisplay');
+    if (display && this.blocksEngine) {
+      display.textContent = `t: ${this.blocksEngine.time.toFixed(3)} s`;
+    }
+  }
+
+  renderBlocksPropertiesInspector(selection) {
+    const container = document.getElementById('blocksPropertiesContent');
+    if (!container) return;
+
+    if (selection && selection.type === 'block' && selection.item) {
+      const block = selection.item;
+      const def = BlockDefinitions[block.type];
+
+      let paramsHtml = '';
+      if (block.params) {
+        for (const [key, val] of Object.entries(block.params)) {
+          paramsHtml += `
+            <div class="property-group">
+              <label class="property-label">${key}</label>
+              <input type="text" class="property-input block-param-input" data-key="${key}" value="${Array.isArray(val) ? '[' + val.join(', ') + ']' : val}" style="background:#1e293b; color:#f8fafc; border:1px solid #334155; padding:4px 8px; border-radius:4px; width:100%; font-family:monospace;"/>
+            </div>
+          `;
+        }
+      }
+
+      container.innerHTML = `
+        <div class="property-group">
+          <label class="property-label">Block Name</label>
+          <div style="font-size: 14px; font-weight: 700; color: #38bdf8;">${block.name} (${block.type})</div>
+        </div>
+        <div class="property-group">
+          <label class="property-label">Category</label>
+          <div style="font-size: 12px; color: #94a3b8;">${def?.category || 'General'}</div>
+        </div>
+        ${paramsHtml}
+      `;
+
+      container.querySelectorAll('.block-param-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const key = e.target.dataset.key;
+          let val = e.target.value.trim();
+          if (val.startsWith('[') && val.endsWith(']')) {
+            try {
+              block.params[key] = JSON.parse(val);
+            } catch (_) {
+              block.params[key] = val.slice(1, -1).split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
+            }
+          } else if (!isNaN(parseFloat(val))) {
+            block.params[key] = parseFloat(val);
+          } else {
+            block.params[key] = val;
+          }
+          this.blocksEngine?.setModel(this.blocksCanvas.blocks, this.blocksCanvas.lines);
+          this.blocksCanvas?.render();
+        });
+      });
+    } else {
+      container.innerHTML = '<p class="no-selection-msg">Select a block on the diagram to configure its mathematical parameters.</p>';
+    }
+  }
+
+  // --- Switcha Code Scientific Runtime ---
+  initCodeEnvironment() {
+    const container = document.getElementById('codeEnvironmentContainer');
+    if (container && typeof SwitchaCodeEditor !== 'undefined') {
+      this.codeEditor = new SwitchaCodeEditor(container);
+    }
+  }
+
   populatePresetDropdown() {
     const select = document.getElementById('circuitPresetSelect');
     if (!select) return;
@@ -552,9 +1258,13 @@ class SwitchaApp {
   initRouter() {
     const handleHash = () => {
       const hash = window.location.hash || '#/';
-      if (hash.startsWith('#/create')) {
+      if (hash.startsWith('#/create') || hash.startsWith('#/circuits')) {
         this.switchView('studio');
-      } else if (hash.startsWith('#/my-circuits')) {
+      } else if (hash.startsWith('#/blocks')) {
+        this.switchView('blocks');
+      } else if (hash.startsWith('#/code')) {
+        this.switchView('code');
+      } else if (hash.startsWith('#/my-circuits') || hash.startsWith('#/workspace')) {
         this.switchView('my-circuits');
       } else if (hash.startsWith('#/discover')) {
         this.switchView('discover');
@@ -578,18 +1288,34 @@ class SwitchaApp {
 
     // Update nav links
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    if (viewName === 'features') document.getElementById('nav-features')?.classList.add('active');
+    if (viewName === 'studio') document.getElementById('nav-circuits-env')?.classList.add('active');
+    if (viewName === 'blocks') document.getElementById('nav-blocks-env')?.classList.add('active');
+    if (viewName === 'code') document.getElementById('nav-code-env')?.classList.add('active');
     if (viewName === 'my-circuits') document.getElementById('nav-my-circuits')?.classList.add('active');
+    if (viewName === 'features') document.getElementById('nav-features')?.classList.add('active');
     if (viewName === 'discover') document.getElementById('nav-circuits')?.classList.add('active');
 
     if (viewName === 'my-circuits') {
-      this.renderMyCircuits();
+      this.renderWorkspaceProjects();
     }
 
     if (viewName === 'studio') {
       setTimeout(() => {
-        this.canvas.resize();
-        this.grapher.resize();
+        this.canvas?.resize();
+        this.grapher?.resize();
+      }, 50);
+    }
+
+    if (viewName === 'blocks') {
+      setTimeout(() => {
+        this.blocksCanvas?.resize();
+        this.blocksScope?.resize();
+      }, 50);
+    }
+
+    if (viewName === 'code') {
+      setTimeout(() => {
+        this.codeEditor?.plotter?.resizeCanvas();
       }, 50);
     }
   }
@@ -672,7 +1398,7 @@ class SwitchaApp {
               touchGhost.style.left = `${moveEv.clientX}px`;
               touchGhost.style.top = `${moveEv.clientY}px`;
 
-              const canvasRect = schematicCanvasEl.getBoundingClientRect();
+              const canvasRect = this.canvas.canvas.getBoundingClientRect();
               if (
                 moveEv.clientX >= canvasRect.left &&
                 moveEv.clientX <= canvasRect.right &&
@@ -701,7 +1427,7 @@ class SwitchaApp {
             }
 
             if (hasMoved) {
-              const canvasRect = schematicCanvasEl.getBoundingClientRect();
+              const canvasRect = this.canvas.canvas.getBoundingClientRect();
               if (
                 upEv.clientX >= canvasRect.left &&
                 upEv.clientX <= canvasRect.right &&
@@ -833,6 +1559,8 @@ class SwitchaApp {
         return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><text x="12" y="15" font-size="7.5" text-anchor="middle" fill="#e11d48" font-weight="bold">DC</text></svg>`;
       case ComponentTypes.AC_VOLTAGE:
         return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M7,12 Q9.5,8 12,12 Q14.5,16 17,12" stroke="#0284c7" stroke-width="1.8" fill="none"/></svg>`;
+      case ComponentTypes.FUNCTION_GENERATOR:
+        return `<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" stroke="#0284c7" stroke-width="1.8" fill="#f0f9ff"/><path d="M5,12 Q7,7 9,12 Q11,17 13,12" stroke="#0284c7" stroke-width="1.5" fill="none"/><circle cx="17" cy="8" r="1.5" fill="#ef4444"/><circle cx="17" cy="12" r="1.5" fill="#64748b"/><circle cx="17" cy="16" r="1.5" fill="#3b82f6"/></svg>`;
       case ComponentTypes.CLOCK_VOLTAGE:
       case ComponentTypes.PULSE_VOLTAGE:
         return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke="#03b585" stroke-width="2" fill="none"/><path d="M7,14 L7,9 L12,9 L12,15 L17,15 L17,10" stroke="#0284c7" stroke-width="1.5" fill="none"/></svg>`;
@@ -921,12 +1649,18 @@ class SwitchaApp {
       case ComponentTypes.DIAC:
       case ComponentTypes.IGBT:
         return `<svg viewBox="0 0 24 24"><polygon points="6,6 16,12 6,18" stroke="#2b2d2f" stroke-width="1.5" fill="#f8fafc"/><line x1="16" y1="6" x2="16" y2="18" stroke="#2b2d2f" stroke-width="2"/><path d="M11,15 L16,21" stroke="#e11d48" stroke-width="1.5"/></svg>`;
+      case ComponentTypes.VOLTAGE_CONTROLLED_SWITCH:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" stroke="#64748b" stroke-dasharray="2,2" fill="none"/><line x1="14" y1="6" x2="14" y2="10" stroke="#2b2d2f" stroke-width="1.5"/><line x1="14" y1="18" x2="14" y2="14" stroke="#2b2d2f" stroke-width="1.5"/><line x1="14" y1="14" x2="20" y2="8" stroke="#0284c7" stroke-width="1.8"/></svg>`;
       case ComponentTypes.OPTOCOUPLER:
         return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#2b2d2f" stroke-width="1.5" fill="none"/><polygon points="6,9 10,12 6,15" fill="#ff3b30"/><line x1="15" y1="7" x2="15" y2="17" stroke="#2b2d2f" stroke-width="1.5"/></svg>`;
 
       // 6. Analog & Linear ICs
       case ComponentTypes.OPAMP:
         return `<svg viewBox="0 0 24 24"><polygon points="4,3 21,12 4,21" fill="none" stroke="#2b2d2f" stroke-width="1.8"/><line x1="12" y1="1" x2="12" y2="7.5" stroke="#64748b" stroke-width="1.2"/><line x1="12" y1="23" x2="12" y2="16.5" stroke="#64748b" stroke-width="1.2"/><text x="7" y="9" font-size="7" fill="#0f172a" font-weight="bold">-</text><text x="7" y="18" font-size="7" fill="#0f172a" font-weight="bold">+</text></svg>`;
+      case ComponentTypes.SAMPLE_AND_HOLD:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#f0fdf4" stroke="#03b585" stroke-width="1.5"/><text x="12" y="14" font-size="6" text-anchor="middle" font-weight="bold" fill="#03b585">S&H</text></svg>`;
+      case ComponentTypes.ANALOG_SWITCH_4066:
+        return `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/><text x="12" y="14" font-size="5" text-anchor="middle" font-weight="bold" fill="#1d4ed8">4066</text></svg>`;
       case ComponentTypes.COMPARATOR:
         return `<svg viewBox="0 0 24 24"><polygon points="4,4 20,12 4,20" fill="none" stroke="#0284c7" stroke-width="1.8"/><text x="7" y="10" font-size="6" fill="#0284c7" font-weight="bold">-</text><text x="7" y="17" font-size="6" fill="#0284c7" font-weight="bold">+</text></svg>`;
       case ComponentTypes.TIMER555:
@@ -1056,17 +1790,10 @@ class SwitchaApp {
     const simText = document.getElementById('simToggleText');
 
     btnSimToggle.addEventListener('click', () => {
-      this.isSimRunning = !this.isSimRunning;
       if (this.isSimRunning) {
-        btnSimToggle.classList.add('running');
-        simIcon.textContent = '⏸';
-        simText.textContent = 'Pause Simulation';
-        this.startSimulationLoop();
+        this.stopSimulation();
       } else {
-        btnSimToggle.classList.remove('running');
-        simIcon.textContent = '▶';
-        simText.textContent = 'Run Simulation';
-        this.stopSimulationLoop();
+        this.startSimulation();
       }
     });
 
@@ -1385,16 +2112,27 @@ class SwitchaApp {
     const loop = () => {
       if (!this.isSimRunning) return;
 
+      const now = performance.now();
+      const wallDeltaSec = Math.min((now - (this.lastTimestamp || now)) / 1000, 0.05);
+      this.lastTimestamp = now;
+
       const adaptiveDt = this.engine.getAdaptiveTimeStep(this.grapher?.timePerDiv);
-      // Simulate up to 1ms or appropriate frame window, balanced between 20 and 300 steps per frame
-      const targetSimTime = Math.max(adaptiveDt * 20, Math.min(1e-3, (this.grapher?.timePerDiv || 0.001) * 2));
-      const steps = Math.max(20, Math.min(300, Math.round(targetSimTime / adaptiveDt)));
+      // Target simulation time tracks wall-clock delta seconds (real-time 1:1 progression)
+      // while scaling with the oscilloscope timebase when observing high frequencies
+      const targetSimTime = Math.max(adaptiveDt * 20, Math.min(wallDeltaSec || 0.016, (this.grapher?.timePerDiv || 0.001) * 10));
+      const steps = Math.max(20, Math.min(500, Math.round(targetSimTime / adaptiveDt)));
 
       for (let i = 0; i < steps; i++) {
         this.engine.step(adaptiveDt);
       }
 
+      // Sample lab instruments
+      if (this.instruments.dmm) this.instruments.dmm.update(this.engine);
+      if (this.instruments.logicAnalyzer) this.instruments.logicAnalyzer.recordSample(this.engine.time, this.engine);
+      if (this.instruments.spectrumAnalyzer) this.instruments.spectrumAnalyzer.update(this.engine);
+
       this.updateSimTimeDisplay();
+      this.updateAcousticSynthesizer();
       this.canvas.render();
       this.grapher.render();
 
@@ -1404,10 +2142,92 @@ class SwitchaApp {
     this.simAnimFrame = requestAnimationFrame(loop);
   }
 
+  startSimulation() {
+    if (!this.isSimRunning) {
+      this.isSimRunning = true;
+      const btnSimToggle = document.getElementById('btnSimToggle');
+      const simIcon = document.getElementById('simToggleIcon');
+      const simText = document.getElementById('simToggleText');
+      if (btnSimToggle) btnSimToggle.classList.add('running');
+      if (simIcon) simIcon.textContent = '⏸';
+      if (simText) simText.textContent = 'Pause Simulation';
+      this.startSimulationLoop();
+    }
+  }
+
+  stopSimulation() {
+    if (this.isSimRunning) {
+      this.isSimRunning = false;
+      const btnSimToggle = document.getElementById('btnSimToggle');
+      const simIcon = document.getElementById('simToggleIcon');
+      const simText = document.getElementById('simToggleText');
+      if (btnSimToggle) btnSimToggle.classList.remove('running');
+      if (simIcon) simIcon.textContent = '▶';
+      if (simText) simText.textContent = 'Run Simulation';
+      this.stopSimulationLoop();
+    }
+  }
+
   stopSimulationLoop() {
     if (this.simAnimFrame) {
       cancelAnimationFrame(this.simAnimFrame);
       this.simAnimFrame = null;
+    }
+    this.stopAcousticSynthesizer();
+  }
+
+  updateAcousticSynthesizer() {
+    if (!this.isSimRunning || !this.engine || !this.canvas) {
+      this.stopAcousticSynthesizer();
+      return;
+    }
+
+    let activeBuzzerMaxV = 0;
+    this.canvas.components.forEach(comp => {
+      if (comp.type === ComponentTypes.BUZZER || comp.type === ComponentTypes.SPEAKER) {
+        const n1 = this.engine.getNode(comp, 'p1');
+        const n2 = this.engine.getNode(comp, 'p2');
+        const v1 = n1 !== -1 ? (this.engine.nodeVoltages[n1] || 0) : 0;
+        const v2 = n2 !== -1 ? (this.engine.nodeVoltages[n2] || 0) : 0;
+        const v = Math.abs(v1 - v2);
+        if (v > activeBuzzerMaxV) activeBuzzerMaxV = v;
+      }
+    });
+
+    if (activeBuzzerMaxV >= 1.5) {
+      if (!this.audioCtx && (typeof window !== 'undefined')) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          try { this.audioCtx = new AudioContextClass(); } catch (_) {}
+        }
+      }
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      if (this.audioCtx && !this.buzzerOscillator) {
+        try {
+          const osc = this.audioCtx.createOscillator();
+          const gain = this.audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(2400, this.audioCtx.currentTime); // Standard 2.4kHz piezo frequency
+          gain.gain.setValueAtTime(0.04, this.audioCtx.currentTime); // Comfortable volume
+          osc.connect(gain);
+          gain.connect(this.audioCtx.destination);
+          osc.start();
+          this.buzzerOscillator = osc;
+          this.buzzerGain = gain;
+        } catch (_) {}
+      }
+    } else {
+      this.stopAcousticSynthesizer();
+    }
+  }
+
+  stopAcousticSynthesizer() {
+    if (this.buzzerOscillator) {
+      try { this.buzzerOscillator.stop(); } catch (_) {}
+      this.buzzerOscillator = null;
+      this.buzzerGain = null;
     }
   }
 
@@ -1621,8 +2441,58 @@ class SwitchaApp {
       });
     }
 
+    // Complete IC Architecture & Pinout Table
+    if (comp.pins && comp.pins.length > 0) {
+      html += `
+        <div class="property-group" style="margin-top: 14px;">
+          <label class="property-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>IC Pinout & Architecture</span>
+            <span style="font-size: 10.5px; font-weight: 700; color: #0284c7; background: #e0f2fe; padding: 2px 6px; border-radius: 4px;">${def.package || `${comp.pins.length}-Pin`}</span>
+          </label>
+          ${def.description ? `<p style="font-size: 11px; color: #64748b; margin-bottom: 8px; line-height: 1.35;">${def.description}</p>` : ''}
+          <div style="border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; background: #ffffff; margin-top: 4px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+              <thead>
+                <tr style="background: #f8fafc; border-bottom: 1px solid var(--border-color); color: #475569; font-weight: 700;">
+                  <th style="padding: 4px 6px;">Pin</th>
+                  <th style="padding: 4px 6px;">Name</th>
+                  <th style="padding: 4px 6px;">Role</th>
+                  <th style="padding: 4px 6px; text-align: right;">Live V</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${comp.pins.map(pin => {
+                  const pinKey = `${comp.id}:${pin.id}`;
+                  const nodeId = this.engine?.pinToNodeMap?.get(pinKey);
+                  const volt = (nodeId !== undefined && this.engine.nodeVoltages) ? this.engine.nodeVoltages[nodeId] : null;
+                  const voltStr = volt !== null && !isNaN(volt) && isFinite(volt) ? formatValueWithPrefix(volt, 'V') : '—';
+                  const pinNum = pin.num || (pin.name && pin.name.match(/\((\d+)\)/) ? RegExp.$1 : (pin.id.replace('p', '') || '•'));
+                  const pinNameClean = (pin.name || pin.id).replace(/\s*\(\d+\)/, '');
+                  return `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                      <td style="padding: 4px 6px; font-family: monospace; font-weight: 700; color: #0284c7;">#${pinNum}</td>
+                      <td style="padding: 4px 6px; font-weight: 700; color: #1e293b;">${pinNameClean}</td>
+                      <td style="padding: 4px 6px; color: #64748b; font-size: 10px;">${pin.desc || pin.id}</td>
+                      <td style="padding: 4px 6px; text-align: right; font-family: monospace; font-weight: 700; color: ${nodeId === 0 ? '#10b981' : '#0f172a'}; font-size: 10.5px;">${voltStr}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
     html += `
-      <div style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+      <div style="margin-top: 10px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 11px; color: #166534; display: flex; align-items: center; gap: 6px;">
+        <span>🎯</span>
+        <span><strong>Tip:</strong> Drag to pan canvas. <strong>Double-click</strong> component to drag & move.</span>
+      </div>
+    `;
+
+    html += `
+      <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
         <button class="btn btn-outline" id="btnPropRotate" title="Rotate 90° (R)">↻ Rotate</button>
         <button class="btn btn-outline" id="btnPropFlipH" title="Flip Horizontal (H)">⇄ Flip H</button>
         <button class="btn btn-outline" id="btnPropFlipV" title="Flip Vertical (V)">⇅ Flip V</button>
@@ -1705,11 +2575,21 @@ class SwitchaApp {
     preset.load(this.canvas);
     this.engine.setCircuit(this.canvas.components, this.canvas.wires);
 
+    if (preset.timePerDiv && this.grapher) {
+      this.grapher.setTimeScale(preset.timePerDiv);
+    }
+    if (preset.voltsPerDiv && this.grapher) {
+      this.grapher.setVoltScale(preset.voltsPerDiv);
+    }
+
     const nameInput = document.getElementById('circuitNameInput');
     if (nameInput) nameInput.value = preset.name;
     const select = document.getElementById('circuitPresetSelect');
     if (select) select.value = presetKey;
     document.title = `${preset.name} - Switcha`;
+
+    // Auto-start simulation so waveforms run live immediately upon loading preset
+    this.startSimulation();
 
     setTimeout(() => {
       this.canvas.resize();
@@ -2201,6 +3081,54 @@ class SwitchaApp {
           <line x1="230" y1="50" x2="230" y2="120" stroke="#03b585" stroke-width="2" stroke-dasharray="3 3"/>
           <rect x="75" y="75" width="130" height="26" rx="4" fill="#0f172a" stroke="#6366f1" stroke-width="1.5"/>
           <text x="140" y="91" font-size="8.5" font-weight="bold" fill="#38bdf8" text-anchor="middle">53 Comps / 77 Wires</text>
+        `;
+        break;
+
+      case 'rcPhaseShiftOscillator':
+        innerContent = `
+          <!-- Op-Amp RC Phase Shift Oscillator -->
+          <polygon points="120,40 180,75 120,110" fill="#ffffff" stroke="#0284c7" stroke-width="2.2"/>
+          <text x="133" y="60" font-size="13" font-weight="bold" fill="#ef4444">-</text>
+          <text x="133" y="96" font-size="13" font-weight="bold" fill="#0284c7">+</text>
+          <line x1="180" y1="75" x2="250" y2="75" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="215" cy="75" r="3.5" fill="#1e293b"/>
+          <path d="M215,75 V25 H105 V55 H120" fill="none" stroke="#d97706" stroke-width="2"/>
+          <text x="160" y="20" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">Rf = 1.0 MΩ</text>
+          <!-- 3-Stage High-Pass RC Ladder -->
+          <line x1="250" y1="75" x2="250" y2="125" stroke="#1e293b" stroke-width="2"/>
+          <line x1="250" y1="125" x2="35" y2="125" stroke="#1e293b" stroke-width="2"/>
+          <line x1="35" y1="125" x2="35" y2="55" stroke="#1e293b" stroke-width="2"/>
+          <line x1="35" y1="55" x2="105" y2="55" stroke="#1e293b" stroke-width="2"/>
+          <text x="65" y="48" font-size="7.5" font-weight="bold" fill="#03b585">3x RC 60°</text>
+          <rect x="180" y="95" width="85" height="38" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.5"/>
+          <path d="M185,114 Q192,100 200,114 T215,114 T230,114 T245,114 T260,114" fill="none" stroke="#38bdf8" stroke-width="1.8"/>
+          <text x="222" y="128" font-size="7.5" font-weight="bold" fill="#03b585" text-anchor="middle">200 Hz Sine Wave</text>
+        `;
+        break;
+
+      case 'sampleAndHoldCircuit':
+        innerContent = `
+          <!-- Sample & Hold Amplifier Circuit -->
+          <circle cx="45" cy="65" r="14" fill="#eff6ff" stroke="#007aff" stroke-width="2"/>
+          <path d="M38,65 Q41,57 45,65 T52,65" fill="none" stroke="#007aff" stroke-width="2"/>
+          <text x="45" y="92" font-size="7.5" font-weight="bold" fill="#007aff" text-anchor="middle">1 kHz Sine</text>
+          <line x1="59" y1="65" x2="100" y2="65" stroke="#1e293b" stroke-width="2"/>
+          <!-- LF398 IC Box -->
+          <rect x="100" y="45" width="65" height="40" rx="4" fill="#1e293b" stroke="#0284c7" stroke-width="2"/>
+          <text x="132" y="65" font-size="8.5" font-weight="900" fill="#38bdf8" text-anchor="middle">LF398</text>
+          <text x="132" y="77" font-size="7" font-weight="bold" fill="#94a3b8" text-anchor="middle">S&amp;H IC</text>
+          <line x1="132" y1="20" x2="132" y2="45" stroke="#ff9500" stroke-width="2"/>
+          <text x="132" y="15" font-size="7.5" font-weight="bold" fill="#ff9500" text-anchor="middle">10 kHz CLK</text>
+          <line x1="165" y1="65" x2="195" y2="65" stroke="#1e293b" stroke-width="2"/>
+          <circle cx="195" cy="65" r="3.5" fill="#1e293b"/>
+          <line x1="195" y1="65" x2="195" y2="95" stroke="#1e293b" stroke-width="2"/>
+          <line x1="185" y1="95" x2="205" y2="95" stroke="#0284c7" stroke-width="2.5"/>
+          <line x1="185" y1="102" x2="205" y2="102" stroke="#0284c7" stroke-width="2.5"/>
+          <text x="225" y="102" font-size="7.5" font-weight="bold" fill="#0284c7">CH 10nF</text>
+          <!-- Staircase Output Waveform -->
+          <rect x="180" y="25" width="90" height="48" rx="4" fill="#0f172a" stroke="#03b585" stroke-width="1.5"/>
+          <polyline points="185,55 195,55 195,45 208,45 208,38 222,38 222,43 238,43 238,52 252,52 252,60 265,60" fill="none" stroke="#03b585" stroke-width="2"/>
+          <text x="225" y="67" font-size="7.5" font-weight="bold" fill="#ffffff" text-anchor="middle">Staircase Output</text>
         `;
         break;
 

@@ -259,6 +259,49 @@ console.log('\n[5/5] Rectified Models & Bug Fix Verification');
   assert(Math.abs(vNode - 5.4545) < 0.05, `Multi-wire Junction Node voltage = ${vNode.toFixed(4)}V (Expected: 5.4545V)`);
 }
 
+{
+  // Test G: Function Generator Multi-Waveform Laboratory Instrument (XFG1)
+  const eng = new CircuitEngine();
+  const fg = {
+    id: 'XFG1',
+    type: 'FUNCTION_GENERATOR',
+    pins: [{ id: 'p_pos' }, { id: 'com' }, { id: 'p_neg' }],
+    params: { waveform: 'triangle', frequency: 2000, amplitude: 6.0, offset: 1.0, dutyCycle: 50 }
+  };
+  const gnd = { id: 'G1', type: 'GROUND', pins: [{ id: 'p1' }], params: {} };
+  const r1 = { id: 'R1', type: 'RESISTOR', pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 10000 } };
+  const r2 = { id: 'R2', type: 'RESISTOR', pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 10000 } };
+
+  const wires = [
+    { fromPin: 'XFG1:com', toPin: 'G1:p1' },
+    { fromPin: 'XFG1:p_pos', toPin: 'R1:p1' },
+    { fromPin: 'R1:p2', toPin: 'G1:p1' },
+    { fromPin: 'XFG1:p_neg', toPin: 'R2:p1' },
+    { fromPin: 'R2:p2', toPin: 'G1:p1' }
+  ];
+
+  eng.setCircuit([fg, gnd, r1, r2], wires);
+  const nPos = eng.getNode(fg, 'p_pos');
+  const nNeg = eng.getNode(fg, 'p_neg');
+  let minPos = 999, maxPos = -999;
+  let minNeg = 999, maxNeg = -999;
+
+  for (let i = 0; i < 200; i++) {
+    eng.step(1e-5);
+    const vP = eng.nodeVoltages[nPos] || 0;
+    const vN = eng.nodeVoltages[nNeg] || 0;
+    if (vP < minPos) minPos = vP;
+    if (vP > maxPos) maxPos = vP;
+    if (vN < minNeg) minNeg = vN;
+    if (vN > maxNeg) maxNeg = vN;
+  }
+
+  assert(Math.abs(minPos - (-5.0)) < 0.2 && Math.abs(maxPos - 7.0) < 0.2,
+    `Function Generator (XFG1) Triangle Positive Output Verified: [${minPos.toFixed(2)}V, ${maxPos.toFixed(2)}V] (Expected: [-5.00V, +7.00V])`);
+  assert(Math.abs(minNeg - (-5.0)) < 0.2 && Math.abs(maxNeg - 7.0) < 0.2,
+    `Function Generator (XFG1) Dual Inverted Negative Output Verified: [${minNeg.toFixed(2)}V, ${maxNeg.toFixed(2)}V]`);
+}
+
 // 6. Dynamic Component Movement, Multi-Selection Drag & Wire Rubber-Banding
 console.log('\n[6/6] Dynamic Drag-and-Drop & Wire Rubber-Banding EDA Engine');
 {
