@@ -178,6 +178,7 @@ export class CircuitEngine {
 
     this.nodeVoltages = new Array(this.nodes.length).fill(0);
     this.prevNodeVoltages = new Array(this.nodes.length).fill(0);
+    this.initComponentStates();
   }
 
   getNode(comp, pinId) {
@@ -198,8 +199,43 @@ export class CircuitEngine {
     this.nodeVoltages = new Array(this.nodes.length).fill(0);
     this.prevNodeVoltages = new Array(this.nodes.length).fill(0);
     this.internalStates.clear();
+    this.initComponentStates();
     this.history = [];
     this.branchCurrents.clear();
+  }
+
+  initComponentStates() {
+    if (!Array.isArray(this.components)) return;
+    this.components.forEach(comp => {
+      const p = comp.params || {};
+      if (comp.type === ComponentTypes.CAPACITOR || comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) {
+        let initialV = p.initialVoltage;
+        if (initialV === undefined || initialV === null || initialV === 0) {
+          let h = 0x811c9dc5;
+          for (let i = 0; i < comp.id.length; i++) {
+            h ^= comp.id.charCodeAt(i);
+            h = Math.imul(h, 0x01000193);
+          }
+          const frac = ((h >>> 1) % 1000) / 1000;
+          initialV = (frac - 0.5) * 0.2; // +/- 100mV natural physical component asymmetry / startup imbalance
+        }
+        this.internalStates.set(comp.id, { vPrev: initialV, iPrev: 0 });
+      } else if (comp.type === ComponentTypes.INDUCTOR) {
+        let initialI = p.initialCurrent;
+        if (initialI === undefined || initialI === null || initialI === 0) {
+          let h = 0x811c9dc5;
+          for (let i = 0; i < comp.id.length; i++) {
+            h ^= comp.id.charCodeAt(i);
+            h = Math.imul(h, 0x01000193);
+          }
+          const frac = ((h >>> 0) % 1000) / 1000;
+          initialI = (frac - 0.5) * 1e-4; // +/- 50uA physical noise floor
+        }
+        this.internalStates.set(comp.id, { current: initialI });
+      } else if (comp.type === ComponentTypes.CRYSTAL) {
+        this.internalStates.set(comp.id, { vPrev: 0, iC0Prev: 0, vCmPrev: 0, vLPrev: 0, imPrev: 0 });
+      }
+    });
   }
 
   /**
@@ -453,7 +489,21 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
             const c = Math.max(p.capacitance || 1e-6, 1e-15);
             const gEq = (2 * c) / dt;
-            const state = this.internalStates.get(comp.id) || { vPrev: p.initialVoltage || 0, iPrev: 0 };
+            let state = this.internalStates.get(comp.id);
+            if (!state) {
+              let initialV = p.initialVoltage;
+              if (initialV === undefined || initialV === null || initialV === 0) {
+                let h = 0x811c9dc5;
+                for (let i = 0; i < comp.id.length; i++) {
+                  h ^= comp.id.charCodeAt(i);
+                  h = Math.imul(h, 0x01000193);
+                }
+                const frac = ((h >>> 1) % 1000) / 1000;
+                initialV = (frac - 0.5) * 0.2;
+              }
+              state = { vPrev: initialV, iPrev: 0 };
+              this.internalStates.set(comp.id, state);
+            }
             const iEq = gEq * state.vPrev + state.iPrev;
             stampConductance(n1, n2, gEq);
             stampCurrentSource(n2, n1, iEq);
@@ -465,7 +515,21 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, 'p2');
             const l = Math.max(p.inductance || 1e-3, 1e-12);
             const gEq = dt / l;
-            const state = this.internalStates.get(comp.id) || { current: 0 };
+            let state = this.internalStates.get(comp.id);
+            if (!state) {
+              let initialI = p.initialCurrent;
+              if (initialI === undefined || initialI === null || initialI === 0) {
+                let h = 0x811c9dc5;
+                for (let i = 0; i < comp.id.length; i++) {
+                  h ^= comp.id.charCodeAt(i);
+                  h = Math.imul(h, 0x01000193);
+                }
+                const frac = ((h >>> 0) % 1000) / 1000;
+                initialI = (frac - 0.5) * 1e-4;
+              }
+              state = { current: initialI };
+              this.internalStates.set(comp.id, state);
+            }
             stampConductance(n1, n2, gEq);
             stampCurrentSource(n1, n2, state.current);
             break;
@@ -1109,7 +1173,7 @@ export class CircuitEngine {
             const nVpos = this.getNode(comp, 'v_pos');
             const nVneg = this.getNode(comp, 'v_neg');
             const aOl = Math.max(p.openLoopGain || 200000, 10);
-            const vOffset = (p.vOffset !== undefined) ? p.vOffset : 0.001; // 1mV physical input offset voltage (LM741/TL082)
+            const vOffset = (p.vOffset !== undefined) ? p.vOffset : 0.00005; // 50uV physical input offset voltage (LM741/TL082)
 
             let vSatP = p.vSatPos ?? 14;
             let vSatN = p.vSatNeg ?? -14;
@@ -1129,14 +1193,13 @@ export class CircuitEngine {
             }
 
             const effOffset = vOffset;
-
             const vCurrOut = getNodeV(nOut);
             const vDiff = (getNodeV(nNonInv) - getNodeV(nInv)) + effOffset;
             const vLinear = aOl * vDiff;
 
-            if (vCurrOut > vSatP || (vCurrOut >= vSatP - 1e-4 && vLinear >= vSatP)) {
+            if (vDiff > 1.0 || (vLinear >= vSatP && vCurrOut >= vSatP - 0.05)) {
               stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatP);
-            } else if (vCurrOut < vSatN || (vCurrOut <= vSatN + 1e-4 && vLinear <= vSatN)) {
+            } else if (vDiff < -1.0 || (vLinear <= vSatN && vCurrOut <= vSatN + 0.05)) {
               stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatN);
             } else {
               stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, aOl * effOffset);
@@ -1894,7 +1957,7 @@ export class CircuitEngine {
         const c = Math.max(comp.params?.capacitance || 1e-6, 1e-15);
         const gEq = (2 * c) / dt;
         const vCurr = (this.nodeVoltages[n1] || 0) - (this.nodeVoltages[n2] || 0);
-        const state = this.internalStates.get(comp.id) || { vPrev: 0, iPrev: 0 };
+        const state = this.internalStates.get(comp.id) || { vPrev: vCurr, iPrev: 0 };
         const iCurr = gEq * (vCurr - state.vPrev) - state.iPrev;
         state.vPrev = vCurr;
         state.iPrev = iCurr;

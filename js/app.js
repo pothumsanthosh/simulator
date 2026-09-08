@@ -178,7 +178,7 @@ class SwitchaApp {
       {
         id: 'circuit_starter_rc_oscillator',
         name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
-        description: 'Textbook 3-stage high-pass RC ladder oscillator with 741 Op-Amp (C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=150kΩ) producing spontaneous, sustained ~200Hz sinusoidal oscillations.',
+        description: '3-Stage High-Pass RC Ladder Sine Wave Oscillator with LM741 Op-Amp (C1=C2=C3=100nF, R3=R4=R5=3.3kΩ, Rin=33kΩ, Rf=1.5MΩ, R6=33kΩ) producing spontaneous, continuous ~200Hz sinusoidal oscillations.',
         author: 'Switcha Studio',
         updatedAt: Date.now() - 900000,
         presetKey: 'rcPhaseShiftOscillator',
@@ -3245,7 +3245,7 @@ class SwitchaApp {
           <line x1="180" y1="75" x2="250" y2="75" stroke="#1e293b" stroke-width="2"/>
           <circle cx="215" cy="75" r="3.5" fill="#1e293b"/>
           <path d="M215,75 V25 H105 V55 H120" fill="none" stroke="#d97706" stroke-width="2"/>
-          <text x="160" y="20" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">Rf = 150 kΩ</text>
+          <text x="160" y="20" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">Rf = 1.5 MΩ</text>
           <!-- 3-Stage High-Pass RC Ladder -->
           <line x1="250" y1="75" x2="250" y2="125" stroke="#1e293b" stroke-width="2"/>
           <line x1="250" y1="125" x2="35" y2="125" stroke="#1e293b" stroke-width="2"/>
