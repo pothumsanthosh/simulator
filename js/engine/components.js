@@ -1992,9 +1992,9 @@ export const ComponentDefinitions = {
       { id: 'v_neg', name: 'V- (4)', num: 4, x: 0, y: 25, dir: 'bottom', desc: 'Negative DC Power Supply (-Vee / GND)' },
       { id: 'out', name: 'OUT (6)', num: 6, x: 30, y: 0, dir: 'right', desc: 'Amplified Analog Output' }
     ],
-    params: { model: 'TL082', openLoopGain: 200000, vSatPos: 14, vSatNeg: -14, vOffset: 0.001 },
+    params: { model: 'LM741', openLoopGain: 200000, vSatPos: 14, vSatNeg: -14, vOffset: 0.001 },
     paramSchema: [
-      { key: 'model', label: 'Op-Amp Model', type: 'select', options: ['TL082', 'LM741', 'LM358', 'NE5532', 'Ideal'], default: 'TL082' },
+      { key: 'model', label: 'Op-Amp Model', type: 'select', options: ['LM741', 'TL082', 'LM358', 'NE5532', 'Ideal'], default: 'LM741' },
       { key: 'openLoopGain', label: 'Open Loop Gain (Aol)', type: 'number', unit: '', default: 200000 },
       { key: 'vSatPos', label: '+Vsat Rail Limit', type: 'number', unit: 'V', default: 14 },
       { key: 'vSatNeg', label: '-Vsat Rail Limit', type: 'number', unit: 'V', default: -14 },
@@ -3353,11 +3353,24 @@ export const ComponentDefinitions = {
   }
 };
 
-// Aliases mapping in ComponentDefinitions for maximum compatibility
-ComponentDefinitions.SWITCH_SPST = ComponentDefinitions[ComponentTypes.SPST_SWITCH];
-ComponentDefinitions.TOGGLE_SWITCH = ComponentDefinitions[ComponentTypes.SPDT_SWITCH];
-ComponentDefinitions.SEVEN_SEG_DISPLAY = ComponentDefinitions[ComponentTypes.SEVEN_SEGMENT];
-ComponentDefinitions.LIGHT = ComponentDefinitions[ComponentTypes.LAMP];
-ComponentDefinitions.BULB = ComponentDefinitions[ComponentTypes.LAMP];
-ComponentDefinitions.OP_AMP = ComponentDefinitions[ComponentTypes.OPAMP];
+// Aliases mapping in ComponentDefinitions for maximum backward compatibility without polluting Object.keys/values
+const _componentAliases = {
+  SWITCH_SPST: ComponentDefinitions[ComponentTypes.SPST_SWITCH],
+  TOGGLE_SWITCH: ComponentDefinitions[ComponentTypes.SPDT_SWITCH],
+  SEVEN_SEG_DISPLAY: ComponentDefinitions[ComponentTypes.SEVEN_SEGMENT],
+  LIGHT: ComponentDefinitions[ComponentTypes.LAMP],
+  BULB: ComponentDefinitions[ComponentTypes.LAMP],
+  OP_AMP: ComponentDefinitions[ComponentTypes.OPAMP]
+};
+
+Object.entries(_componentAliases).forEach(([aliasKey, targetDef]) => {
+  if (targetDef) {
+    Object.defineProperty(ComponentDefinitions, aliasKey, {
+      value: targetDef,
+      enumerable: false,
+      writable: true,
+      configurable: true
+    });
+  }
+});
 

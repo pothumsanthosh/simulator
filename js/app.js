@@ -1397,7 +1397,10 @@ class SwitchaApp {
     const groups = {};
     Object.values(ComponentCategory).forEach(cat => groups[cat] = []);
 
+    const seenTypes = new Set();
     Object.values(ComponentDefinitions).forEach(def => {
+      if (!def || !def.type || seenTypes.has(def.type)) return;
+      seenTypes.add(def.type);
       if (groups[def.category]) {
         groups[def.category].push(def);
       }

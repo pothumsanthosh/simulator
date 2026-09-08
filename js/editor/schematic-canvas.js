@@ -2789,8 +2789,7 @@ export class SchematicCanvas {
       }
 
       case ComponentTypes.OPAMP:
-      case ComponentTypes.OP_AMP:
-      case ComponentTypes.COMPARATOR: {
+      case ComponentTypes.OP_AMP: {
         ctx.beginPath();
         // Input and Output Lead lines
         ctx.moveTo(-30, -15); ctx.lineTo(-20, -15);
@@ -2818,6 +2817,29 @@ export class SchematicCanvas {
         ctx.fillStyle = '#64748b';
         ctx.fillText('V+', 0, -4);
         ctx.fillText('V-', 0, 10);
+        break;
+      }
+
+      case ComponentTypes.COMPARATOR: {
+        ctx.beginPath();
+        // Input and Output Lead lines (3 pins only)
+        ctx.moveTo(-30, -15); ctx.lineTo(-20, -15);
+        ctx.moveTo(-30, 15); ctx.lineTo(-20, 15);
+        ctx.moveTo(20, 0); ctx.lineTo(30, 0);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-20, -25); ctx.lineTo(20, 0); ctx.lineTo(-20, 25);
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = '#0284c7';
+        ctx.textAlign = 'center';
+        ctx.fillText('-', -12, -10);
+        ctx.fillText('+', -12, 18);
         break;
       }
 
