@@ -1109,7 +1109,7 @@ export class CircuitEngine {
             const nVpos = this.getNode(comp, 'v_pos');
             const nVneg = this.getNode(comp, 'v_neg');
             const aOl = Math.max(p.openLoopGain || 200000, 10);
-            const vOffset = (p.vOffset !== undefined) ? p.vOffset : 0.00005;
+            const vOffset = (p.vOffset !== undefined) ? p.vOffset : 0.001; // 1mV physical input offset voltage (LM741/TL082)
 
             let vSatP = p.vSatPos ?? 14;
             let vSatN = p.vSatNeg ?? -14;
