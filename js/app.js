@@ -1244,18 +1244,34 @@ class SwitchaApp {
   // --- Router & Views ---
   initRouter() {
     const handleHash = () => {
-      const hash = window.location.hash || '#/';
-      if (hash.startsWith('#/create') || hash.startsWith('#/circuits')) {
+      const hashStr = window.location.hash || '#/';
+      const [routePath, queryString] = hashStr.split('?');
+      if (routePath.startsWith('#/create') || routePath.startsWith('#/circuits')) {
         this.switchView('studio');
-      } else if (hash.startsWith('#/blocks')) {
+        if (queryString) {
+          const params = new URLSearchParams(queryString);
+          const presetKey = params.get('circuit') || params.get('preset') || params.get('id');
+          if (presetKey && CircuitLibrary[presetKey]) {
+            this.loadCircuitPreset(presetKey);
+          }
+        }
+      } else if (routePath.startsWith('#/blocks')) {
         this.switchView('blocks');
-      } else if (hash.startsWith('#/code')) {
+      } else if (routePath.startsWith('#/code')) {
         this.switchView('code');
-      } else if (hash.startsWith('#/my-circuits') || hash.startsWith('#/workspace')) {
+      } else if (routePath.startsWith('#/my-circuits') || routePath.startsWith('#/workspace')) {
         this.switchView('my-circuits');
-      } else if (hash.startsWith('#/discover')) {
+      } else if (routePath.startsWith('#/discover')) {
         this.switchView('discover');
-      } else if (hash.startsWith('#/features')) {
+        if (queryString) {
+          const params = new URLSearchParams(queryString);
+          const filter = params.get('filter');
+          if (filter) {
+            const tab = document.querySelector(`.filter-tab[data-filter="${filter}"]`);
+            if (tab) tab.click();
+          }
+        }
+      } else if (routePath.startsWith('#/features')) {
         this.switchView('features');
       } else {
         this.switchView('home');
@@ -1305,8 +1321,18 @@ class SwitchaApp {
     if (viewName === 'studio') {
       setTimeout(() => {
         this.canvas?.resize();
+        this.canvas?.fitToScreen();
         this.grapher?.resize();
+        this.canvas?.render();
+        this.grapher?.render();
       }, 50);
+      setTimeout(() => {
+        this.canvas?.resize();
+        this.canvas?.fitToScreen();
+        this.grapher?.resize();
+        this.canvas?.render();
+        this.grapher?.render();
+      }, 200);
     }
 
     if (viewName === 'blocks') {
@@ -2651,6 +2677,14 @@ class SwitchaApp {
       this.canvas.render();
       this.grapher.render();
     }, 50);
+
+    setTimeout(() => {
+      this.canvas.resize();
+      this.canvas.fitToScreen();
+      this.grapher.resize();
+      this.canvas.render();
+      this.grapher.render();
+    }, 200);
   }
 
   // --- Progressive Web App (PWA) Offline & Install Handler ---
@@ -3146,7 +3180,7 @@ class SwitchaApp {
           <line x1="180" y1="75" x2="250" y2="75" stroke="#1e293b" stroke-width="2"/>
           <circle cx="215" cy="75" r="3.5" fill="#1e293b"/>
           <path d="M215,75 V25 H105 V55 H120" fill="none" stroke="#d97706" stroke-width="2"/>
-          <text x="160" y="20" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">Rf = 1.0 MΩ</text>
+          <text x="160" y="20" font-size="8" font-weight="bold" fill="#d97706" text-anchor="middle">Rf = 150 kΩ</text>
           <!-- 3-Stage High-Pass RC Ladder -->
           <line x1="250" y1="75" x2="250" y2="125" stroke="#1e293b" stroke-width="2"/>
           <line x1="250" y1="125" x2="35" y2="125" stroke="#1e293b" stroke-width="2"/>
@@ -3235,16 +3269,17 @@ class SwitchaApp {
       const filtered = circuits.filter(c => {
         const matchesQuery = !query || c.name.toLowerCase().includes(query) || c.description.toLowerCase().includes(query) || c.author.toLowerCase().includes(query);
         const matchesFilter = filter === 'all' ||
-          (filter === 'analog' && (c.id.includes('opamp') || c.id.includes('timer') || c.id.includes('diff') || c.id.includes('audio') || c.id.includes('transceiver'))) ||
+          (filter === 'analog' && (c.id.includes('opamp') || c.id.includes('timer') || c.id.includes('diff') || c.id.includes('audio') || c.id.includes('transceiver') || c.id.includes('oscillator') || c.id.includes('rc') || c.id.includes('sample') || c.id.includes('bjt'))) ||
           (filter === 'digital' && (c.id.includes('adder') || c.id.includes('counter') || c.id.includes('ask') || c.id.includes('nor') || c.id.includes('gate') || c.id.includes('logic'))) ||
-          (filter === 'power' && (c.id.includes('buck') || c.id.includes('bridge') || c.id.includes('boost'))) ||
-          (filter === 'filters' && c.id.includes('filter'));
+          (filter === 'power' && (c.id.includes('buck') || c.id.includes('bridge') || c.id.includes('boost') || c.id.includes('switch'))) ||
+          (filter === 'filters' && (c.id.includes('filter') || c.id.includes('oscillator') || c.id.includes('rc') || c.id.includes('transceiver') || c.id.includes('multivibrator')));
         return matchesQuery && matchesFilter;
       });
 
       filtered.forEach(c => {
         const cardEl = document.createElement('div');
         cardEl.className = 'card';
+        cardEl.style.cursor = 'pointer';
         cardEl.innerHTML = `
           ${this.renderCircuitThumbnailSvg(c.key, 'Public')}
           <div class="card-body">
@@ -3266,7 +3301,7 @@ class SwitchaApp {
           </div>
         `;
 
-        cardEl.querySelector('button').addEventListener('click', () => {
+        cardEl.addEventListener('click', () => {
           this.loadCircuitPreset(c.key);
           window.location.hash = '#/create';
         });
@@ -3294,11 +3329,26 @@ class SwitchaApp {
       });
     });
 
+    // Home Page & Discover Cards delegation
+    document.querySelectorAll('.card[data-circuit]').forEach(card => {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', (e) => {
+        const circuitKey = card.dataset.circuit;
+        if (circuitKey) {
+          this.loadCircuitPreset(circuitKey);
+          window.location.hash = '#/create';
+        }
+      });
+    });
+
     document.querySelectorAll('.btn-open-circuit').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const circuitKey = e.target.dataset.circuit;
-        this.loadCircuitPreset(circuitKey);
-        window.location.hash = '#/create';
+        if (circuitKey) {
+          this.loadCircuitPreset(circuitKey);
+          window.location.hash = '#/create';
+        }
       });
     });
   }
