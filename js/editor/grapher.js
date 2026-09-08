@@ -475,6 +475,61 @@ export class CircuitGrapher {
     a.click();
   }
 
+  findTriggerStartTime(history, baseStartTime, totalTimeSpan) {
+    if (!this.triggerEnabled || history.length < 3) return baseStartTime;
+
+    const sample = history[history.length - 1];
+    const probeIds = Object.keys(sample.probes);
+    if (probeIds.length === 0) return baseStartTime;
+
+    const targetProbe = (this.selectedChannel !== 'ALL' && probeIds.includes(this.selectedChannel))
+      ? this.selectedChannel
+      : probeIds[0];
+
+    const latestTime = sample.time;
+    const trigLvl = this.triggerLevel || 0.0;
+    const isRising = this.triggerSlope !== 'FALLING';
+    const hyst = Math.max(0.01 * this.voltsPerDiv, 1e-4);
+
+    const searchEndT = Math.max(0, latestTime - 2.5 * totalTimeSpan);
+
+    let trigTime = null;
+
+    // Search backwards for the most recent edge transition
+    for (let i = history.length - 2; i >= 0; i--) {
+      const p1 = history[i];
+      const p2 = history[i + 1];
+      if (p2.time < searchEndT) break;
+      if (p1.time > latestTime - 0.05 * totalTimeSpan) continue;
+
+      const v1 = p1.probes[targetProbe]?.value;
+      const v2 = p2.probes[targetProbe]?.value;
+      if (v1 === undefined || v2 === undefined) continue;
+
+      if (isRising) {
+        if (v1 <= trigLvl - hyst && v2 >= trigLvl + hyst) {
+          const frac = (trigLvl - v1) / (v2 - v1 || 1e-9);
+          trigTime = p1.time + frac * (p2.time - p1.time);
+          break;
+        }
+      } else {
+        if (v1 >= trigLvl + hyst && v2 <= trigLvl - hyst) {
+          const frac = (trigLvl - v1) / (v2 - v1 || 1e-9);
+          trigTime = p1.time + frac * (p2.time - p1.time);
+          break;
+        }
+      }
+    }
+
+    if (trigTime !== null) {
+      // Align trigger to 10% from the left division of the grid
+      const alignedStart = trigTime - (0.1 * totalTimeSpan);
+      return Math.max(0, alignedStart);
+    }
+
+    return baseStartTime;
+  }
+
   // --- Waveform Rendering Pipeline ---
   render() {
     const ctx = this.ctx;
@@ -496,10 +551,15 @@ export class CircuitGrapher {
       return;
     }
 
-    // Time window bounds with timeOffset
+    // Time window bounds with timeOffset and hardware-accurate trigger lock
     const totalTimeSpan = Math.max(this.timePerDiv * 10, 1e-12);
     const latestTime = history[history.length - 1].time;
-    const baseStartTime = Math.max(0, latestTime - totalTimeSpan);
+    let baseStartTime = Math.max(0, latestTime - totalTimeSpan);
+
+    if (this.triggerEnabled) {
+      baseStartTime = this.findTriggerStartTime(history, baseStartTime, totalTimeSpan);
+    }
+
     const startTime = baseStartTime + (this.timeOffset || 0);
 
     // Auto-scale vertical range only if explicitly set to auto

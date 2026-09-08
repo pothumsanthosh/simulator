@@ -1376,6 +1376,13 @@ export class SchematicCanvas {
   }
 
   cancelAction() {
+    try {
+      if (this.drag.pointerId !== null) {
+        this.canvas.releasePointerCapture(this.drag.pointerId);
+      }
+    } catch (_) {}
+    this.activePointers.clear();
+    this.pendingClick = null;
     this.wiringStartPin = null;
     this.wiringCurrentPos = null;
     this.hoveredTargetPin = null;
