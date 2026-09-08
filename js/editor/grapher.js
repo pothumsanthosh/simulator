@@ -35,8 +35,8 @@ export class CircuitGrapher {
     this.isQuickPanelOpen = false;
     this.selectedChannel = 'ALL';
 
-    // Trigger Settings
-    this.triggerEnabled = true;
+    // Trigger Settings (Default: Live Roll Mode for continuous streaming waveforms)
+    this.triggerEnabled = false;
     this.triggerLevel = 0.0;
     this.triggerSlope = 'RISING'; // 'RISING' or 'FALLING'
 

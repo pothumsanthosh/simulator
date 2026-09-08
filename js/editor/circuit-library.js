@@ -876,10 +876,10 @@ export const CircuitLibrary = {
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 450, {}, 0);
 
       // 741 Operational Amplifier (Internal default +/-12V power rails)
-      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.05 }, 0);
+      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.002 }, 0);
 
       // 3-Stage High-Pass RC Ladder (C1, C2, C3 = 0.1uF, R1, R2, Rin = 3.3kΩ)
-      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 200, 180, { capacitance: 1e-7 }, 0);
+      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 200, 180, { capacitance: 1e-7, initialVoltage: 1.0 }, 0);
       const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 280, 280, { resistance: 3300 }, 90);
 
       const c2 = canvas.addComponent(ComponentTypes.CAPACITOR, 320, 180, { capacitance: 1e-7 }, 0);

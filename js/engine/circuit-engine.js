@@ -453,7 +453,7 @@ export class CircuitEngine {
             const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
             const c = Math.max(p.capacitance || 1e-6, 1e-15);
             const gEq = (2 * c) / dt;
-            const state = this.internalStates.get(comp.id) || { vPrev: 0, iPrev: 0 };
+            const state = this.internalStates.get(comp.id) || { vPrev: p.initialVoltage || 0, iPrev: 0 };
             const iEq = gEq * state.vPrev + state.iPrev;
             stampConductance(n1, n2, gEq);
             stampCurrentSource(n2, n1, iEq);
