@@ -1849,7 +1849,7 @@ class SwitchaApp {
     const simIcon = document.getElementById('simToggleIcon');
     const simText = document.getElementById('simToggleText');
 
-    btnSimToggle.addEventListener('click', () => {
+    btnSimToggle?.addEventListener('click', () => {
       if (this.isSimRunning) {
         this.stopSimulation();
       } else {
@@ -1857,14 +1857,14 @@ class SwitchaApp {
       }
     });
 
-    document.getElementById('btnSimReset').addEventListener('click', () => {
+    document.getElementById('btnSimReset')?.addEventListener('click', () => {
       this.engine.reset();
       this.updateSimTimeDisplay();
       this.canvas.render();
       this.grapher.render();
     });
 
-    document.getElementById('circuitPresetSelect').addEventListener('change', (e) => {
+    document.getElementById('circuitPresetSelect')?.addEventListener('change', (e) => {
       if (e.target.value) {
         this.loadCircuitPreset(e.target.value);
       }
@@ -1926,13 +1926,13 @@ class SwitchaApp {
     document.getElementById('btnDelete')?.addEventListener('click', () => this.canvas.removeSelected());
     document.getElementById('btnDeleteFloating')?.addEventListener('click', () => this.canvas.removeSelected());
 
-    document.getElementById('btnUndo').addEventListener('click', () => this.canvas.undo());
-    document.getElementById('btnRedo').addEventListener('click', () => this.canvas.redo());
+    document.getElementById('btnUndo')?.addEventListener('click', () => this.canvas.undo());
+    document.getElementById('btnRedo')?.addEventListener('click', () => this.canvas.redo());
 
-    document.getElementById('btnRotate').addEventListener('click', () => this.canvas.rotateSelected(90));
+    document.getElementById('btnRotate')?.addEventListener('click', () => this.canvas.rotateSelected(90));
     document.getElementById('btnFlipH')?.addEventListener('click', () => this.canvas.flipSelected('x'));
     document.getElementById('btnFlipV')?.addEventListener('click', () => this.canvas.flipSelected('y'));
-    document.getElementById('btnFitScreen').addEventListener('click', () => this.canvas.fitToScreen());
+    document.getElementById('btnFitScreen')?.addEventListener('click', () => this.canvas.fitToScreen());
 
     document.getElementById('btnZoomIn')?.addEventListener('click', () => this.canvas.zoomIn());
     document.getElementById('btnZoomOut')?.addEventListener('click', () => this.canvas.zoomOut());
@@ -1962,7 +1962,7 @@ class SwitchaApp {
       this.grapher.toggleTrigger();
     });
 
-    document.getElementById('btnToggleCursors').addEventListener('click', () => {
+    document.getElementById('btnToggleCursors')?.addEventListener('click', () => {
       const isShown = this.grapher.toggleCursors();
       const btn = document.getElementById('btnToggleCursors');
       if (btn) btn.classList.toggle('active', isShown);
@@ -2026,14 +2026,15 @@ class SwitchaApp {
       const newTheme = this.grapher.toggleTheme();
       e.target.textContent = `Theme: ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)}`;
     });
-    document.getElementById('btnExportCSV').addEventListener('click', () => this.grapher.exportCSV());
-    document.getElementById('btnExportPlotPNG').addEventListener('click', () => this.grapher.exportPNG());
+    document.getElementById('btnExportCSV')?.addEventListener('click', () => this.grapher.exportCSV());
+    document.getElementById('btnExportPlotPNG')?.addEventListener('click', () => this.grapher.exportPNG());
 
-    document.getElementById('btnSaveMyCircuit')?.addEventListener('click', () => {
+    document.getElementById('btnSaveMyCircuit')?.addEventListener('click', (e) => {
+      e?.preventDefault();
       this.saveCurrentCircuitToMyCircuits();
     });
 
-    document.getElementById('circuitNameInput').addEventListener('change', (e) => {
+    document.getElementById('circuitNameInput')?.addEventListener('change', (e) => {
       document.title = `${e.target.value} - Switcha`;
     });
 
@@ -3595,11 +3596,25 @@ class SwitchaApp {
   }
 }
 
-// Start Application on DOM Load
+// Start Application safely whether DOMContentLoaded has already fired or not
 if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', () => {
-    window.app = new SwitchaApp();
-  });
+  const startApp = () => {
+    try {
+      if (!window.app) {
+        window.app = new SwitchaApp();
+        console.log('⚡ Switcha EDA Platform initialized successfully.');
+      }
+    } catch (err) {
+      console.error('Fatal initialization error in SwitchaApp:', err);
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', startApp);
+  } else {
+    // DOM is already ready (interactive or complete), launch immediately
+    startApp();
+  }
 }
 
 export { SwitchaApp };
