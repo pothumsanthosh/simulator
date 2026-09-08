@@ -261,10 +261,15 @@ class SwitchaApp {
         const parsed = JSON.parse(data);
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Ensure essential starter circuits like RC oscillator are present in the list
+          let added = false;
           starterCircuits.forEach(sc => {
             const hasIt = parsed.some(c => c.id === sc.id || (sc.presetKey && c.presetKey === sc.presetKey));
-            if (!hasIt) parsed.push(sc);
+            if (!hasIt) {
+              parsed.push(sc);
+              added = true;
+            }
           });
+          if (added) this.saveMyCircuits(parsed);
           return parsed;
         }
       }
@@ -328,7 +333,11 @@ class SwitchaApp {
     this.showToast(`💾 "${name}" saved to My Circuits!`, 'success');
 
     // Sync to Cloud Firestore if user is authenticated
-    firebaseService.saveCircuit(targetCircuit);
+    try {
+      if (firebaseService && typeof firebaseService.saveCircuit === 'function') {
+        firebaseService.saveCircuit(targetCircuit);
+      }
+    } catch (_) {}
   }
 
   async loadCircuitFromMyCircuits(circuitId) {
@@ -396,6 +405,7 @@ class SwitchaApp {
     }
 
     window.location.hash = '#/create';
+    this.switchView('studio');
     this.showToast(`⚡ Opened "${circuit.name}" in Studio`, 'info');
   }
 
@@ -519,6 +529,7 @@ class SwitchaApp {
         this.canvas.render();
         this.grapher.render();
         window.location.hash = '#/create';
+        this.switchView('studio');
         this.showToast('✨ Started a new blank circuit', 'info');
       });
     }
@@ -545,6 +556,15 @@ class SwitchaApp {
         }
       });
     }
+
+    // Direct event listener for all My Circuits buttons across UI
+    const openMyCircuitsDirect = (e) => {
+      e?.preventDefault();
+      window.location.hash = '#/my-circuits';
+      this.switchView('my-circuits');
+    };
+    document.getElementById('nav-my-circuits')?.addEventListener('click', openMyCircuitsDirect);
+    document.getElementById('btnStudioMyCircuits')?.addEventListener('click', openMyCircuitsDirect);
 
     this.renderMyCircuits();
   }
@@ -667,7 +687,7 @@ class SwitchaApp {
       const metaInfo = isCircuit ? `⚡ ${item.components?.length || 0} comps` : (isModel ? `🧩 ${item.blocks?.length || 0} blocks` : `💻 Code Script`);
 
       cardEl.innerHTML = `
-        <div class="card-thumbnail" style="background: #0f172a; display:flex; align-items:center; justify-content:center; height:100px;">
+        <div class="card-thumbnail" style="background: #0f172a; display:flex; align-items:center; justify-content:center; height:100px; cursor: pointer;">
           <span style="font-size: 36px;">${isCircuit ? '🔌' : (isModel ? '🧩' : '💻')}</span>
         </div>
         <div class="card-body">
@@ -676,7 +696,7 @@ class SwitchaApp {
             <span>•</span>
             <span>${metaInfo}</span>
           </div>
-          <h3 class="card-title">${item.name}</h3>
+          <h3 class="card-title" style="cursor: pointer;">${item.name}</h3>
           <p class="card-desc">${item.description || 'Personal saved file.'}</p>
           <div class="my-circuit-card-actions">
             <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12px; font-weight: 700;" data-action="open">⚡ Open</button>
@@ -688,7 +708,7 @@ class SwitchaApp {
         </div>
       `;
 
-      cardEl.querySelector('[data-action="open"]').addEventListener('click', () => {
+      const openProject = () => {
         if (isCircuit) {
           this.loadCircuitFromMyCircuits(item.id);
         } else if (isModel) {
@@ -702,6 +722,7 @@ class SwitchaApp {
             this.blocksCanvas.fitToScreen();
           }
           window.location.hash = '#/blocks';
+          this.switchView('blocks');
           this.showToast(`🧩 Opened "${item.name}" in Blocks Studio`, 'info');
         } else if (isScript) {
           if (this.codeEditor) {
@@ -712,9 +733,18 @@ class SwitchaApp {
             if (nameEl) nameEl.textContent = item.name;
           }
           window.location.hash = '#/code';
+          this.switchView('code');
           this.showToast(`💻 Opened "${item.name}" in Code IDE`, 'info');
         }
+      };
+
+      cardEl.querySelector('[data-action="open"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openProject();
       });
+
+      cardEl.querySelector('.card-thumbnail')?.addEventListener('click', () => openProject());
+      cardEl.querySelector('.card-title')?.addEventListener('click', () => openProject());
 
       cardEl.querySelector('[data-action="delete"]').addEventListener('click', async () => {
         if (confirm(`Delete "${item.name}"?`)) {
@@ -1288,11 +1318,8 @@ class SwitchaApp {
         const href = link.getAttribute('href');
         if (href) {
           e.preventDefault();
-          if (window.location.hash !== href) {
-            window.location.hash = href;
-          } else {
-            handleHash();
-          }
+          window.location.hash = href;
+          handleHash();
         }
       }
     });
@@ -1315,6 +1342,10 @@ class SwitchaApp {
     if (viewName === 'discover') document.getElementById('nav-circuits')?.classList.add('active');
 
     if (viewName === 'my-circuits') {
+      if (!this.currentWorkspaceTab) this.currentWorkspaceTab = 'circuits';
+      document.querySelectorAll('[data-workspace-tab]').forEach(b => {
+        b.classList.toggle('active', b.dataset.workspaceTab === this.currentWorkspaceTab);
+      });
       this.renderWorkspaceProjects();
     }
 
