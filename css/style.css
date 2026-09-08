@@ -856,7 +856,7 @@ body.announcement-hidden .studio-wrapper {
 
 /* Responsive */
 @media (max-width: 900px) {
-  .howitworks-columns, .pricing-cards, .features-grid {
+  .howitworks-columns, .features-grid {
     grid-template-columns: 1fr;
   }
   .banner-title {

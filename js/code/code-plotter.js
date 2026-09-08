@@ -804,8 +804,6 @@ class SwitchaPlotter {
 if (typeof window !== 'undefined') {
     window.SwitchaPlotter = SwitchaPlotter;
 }
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { SwitchaPlotter };
-}
-export { SwitchaPlotter };
+export { SwitchaPlotter, SwitchaPlotter as SwitchaPlot };
+
 

@@ -563,3 +563,6 @@ export class BlockCanvas {
     }
   }
 }
+
+export const SwitchaBlocksCanvas = BlockCanvas;
+

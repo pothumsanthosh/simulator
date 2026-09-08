@@ -178,7 +178,7 @@ class SwitchaApp {
       {
         id: 'circuit_starter_rc_oscillator',
         name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
-        description: 'Exact Multisim 3-stage RC high-pass ladder oscillator with 741 Op-Amp (R1=33k, R2=1M, R6=33k, C1=C2=C3=0.1µF, R3=R4=R5=3.3k) generating sustained 200Hz sinusoidal oscillations.',
+        description: 'Textbook 3-stage high-pass RC ladder oscillator with 741 Op-Amp (C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=150kΩ) producing spontaneous, sustained ~200Hz sinusoidal oscillations.',
         author: 'Switcha Studio',
         updatedAt: Date.now() - 900000,
         presetKey: 'rcPhaseShiftOscillator',
@@ -284,7 +284,7 @@ class SwitchaApp {
     }
   }
 
-  saveCurrentCircuitToMyCircuits(customName = null) {
+  async saveCurrentCircuitToMyCircuits(customName = null) {
     const circuits = this.getMyCircuits();
     const nameInput = document.getElementById('circuitNameInput');
     const name = customName || (nameInput ? nameInput.value.trim() : 'Untitled Circuit') || 'Untitled Circuit';
@@ -319,7 +319,12 @@ class SwitchaApp {
     }
 
     this.saveMyCircuits(circuits);
-    this.renderMyCircuits();
+    if (window.SwitchaStorage) {
+      try {
+        await window.SwitchaStorage.saveCircuit(targetCircuit);
+      } catch (_) {}
+    }
+    this.renderWorkspaceProjects();
     this.showToast(`💾 "${name}" saved to My Circuits!`, 'success');
 
     // Sync to Cloud Firestore if user is authenticated
@@ -575,94 +580,7 @@ class SwitchaApp {
   }
 
   renderMyCircuits(filterQuery = '') {
-    const grid = document.getElementById('myCircuitsGrid');
-    const countEl = document.getElementById('myCircuitsCount');
-    if (!grid) return;
-
-    const circuits = this.getMyCircuits();
-    const filtered = circuits.filter(c => {
-      if (!filterQuery) return true;
-      return (c.name || '').toLowerCase().includes(filterQuery) ||
-             (c.description || '').toLowerCase().includes(filterQuery) ||
-             (c.author || '').toLowerCase().includes(filterQuery);
-    });
-
-    if (countEl) {
-      countEl.textContent = `${circuits.length} Circuit${circuits.length === 1 ? '' : 's'} Saved`;
-    }
-
-    grid.innerHTML = '';
-
-    if (filtered.length === 0) {
-      grid.innerHTML = `
-        <div class="empty-circuits-state">
-          <div class="empty-circuits-icon">🔌</div>
-          <h3 class="empty-circuits-title">${filterQuery ? 'No matching circuits found' : 'No saved circuits yet'}</h3>
-          <p class="empty-circuits-desc">${filterQuery ? 'Try another search query.' : 'Build switches, logic gates, and analog circuits and save them to your library.'}</p>
-          <a href="#/create" class="btn btn-primary">⚡ Create Your First Circuit</a>
-        </div>
-      `;
-      return;
-    }
-
-    filtered.forEach(c => {
-      const cardEl = document.createElement('div');
-      cardEl.className = 'card';
-
-      const timeAgo = (timestamp) => {
-        if (!timestamp) return 'Recently';
-        const sec = Math.floor((Date.now() - timestamp) / 1000);
-        if (sec < 60) return 'Just now';
-        const min = Math.floor(sec / 60);
-        if (min < 60) return `${min}m ago`;
-        const hrs = Math.floor(min / 60);
-        if (hrs < 24) return `${hrs}h ago`;
-        const days = Math.floor(hrs / 24);
-        return `${days}d ago`;
-      };
-
-      const presetKey = c.presetKey || 'custom';
-      const numComps = c.components ? c.components.length : 0;
-      const numWires = c.wires ? c.wires.length : 0;
-
-      cardEl.innerHTML = `
-        ${this.renderCircuitThumbnailSvg(presetKey, 'Saved')}
-        <div class="card-body">
-          <div class="my-circuit-meta">
-            <span>🕒 Edited ${timeAgo(c.updatedAt)}</span>
-            <span>•</span>
-            <span>⚡ ${numComps} comps</span>
-          </div>
-          <h3 class="card-title">${c.name}</h3>
-          <p class="card-desc">${c.description || 'Personal circuit schematic.'}</p>
-          <div class="my-circuit-card-actions">
-            <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12px; font-weight: 700;" data-action="open" data-id="${c.id}">⚡ Open</button>
-            <button class="btn-card-icon" title="Duplicate Circuit" data-action="duplicate" data-id="${c.id}">📋 Copy</button>
-            <button class="btn-card-icon" title="Rename Circuit" data-action="rename" data-id="${c.id}">✏️ Rename</button>
-            <button class="btn-card-icon" title="Export JSON" data-action="export" data-id="${c.id}">📄 JSON</button>
-            <button class="btn-card-icon delete" title="Delete Circuit" data-action="delete" data-id="${c.id}">🗑️</button>
-          </div>
-        </div>
-      `;
-
-      cardEl.querySelector('[data-action="open"]').addEventListener('click', () => {
-        this.loadCircuitFromMyCircuits(c.id);
-      });
-      cardEl.querySelector('[data-action="duplicate"]').addEventListener('click', () => {
-        this.duplicateCircuit(c.id);
-      });
-      cardEl.querySelector('[data-action="rename"]').addEventListener('click', () => {
-        this.renameCircuit(c.id);
-      });
-      cardEl.querySelector('[data-action="export"]').addEventListener('click', () => {
-        this.exportCircuitFromMyCircuits(c.id);
-      });
-      cardEl.querySelector('[data-action="delete"]').addEventListener('click', () => {
-        this.deleteCircuit(c.id);
-      });
-
-      grid.appendChild(cardEl);
-    });
+    return this.renderWorkspaceProjects(filterQuery);
   }
 
   // --- Workspace Multi-Store Manager (Circuits / Models / Scripts) ---
@@ -693,7 +611,8 @@ class SwitchaApp {
       } else if (this.currentWorkspaceTab === 'scripts') {
         items = await window.SwitchaStorage.getScripts();
       }
-    } else {
+    }
+    if ((!items || items.length === 0) && this.currentWorkspaceTab === 'circuits') {
       items = this.getMyCircuits();
     }
 
@@ -762,6 +681,7 @@ class SwitchaApp {
           <div class="my-circuit-card-actions">
             <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12px; font-weight: 700;" data-action="open">⚡ Open</button>
             <button class="btn-card-icon" title="Duplicate" data-action="duplicate">📋 Copy</button>
+            <button class="btn-card-icon" title="Rename" data-action="rename">✏️ Rename</button>
             <button class="btn-card-icon" title="Export" data-action="export">📄 Export</button>
             <button class="btn-card-icon delete" title="Delete" data-action="delete">🗑️</button>
           </div>
@@ -805,6 +725,34 @@ class SwitchaApp {
           }
           this.renderWorkspaceProjects();
           this.showToast(`🗑️ "${item.name}" deleted`, 'warning');
+        }
+      });
+
+      cardEl.querySelector('[data-action="rename"]')?.addEventListener('click', async () => {
+        const newName = prompt('Enter new project name:', item.name);
+        if (newName && newName.trim()) {
+          item.name = newName.trim();
+          item.updatedAt = Date.now();
+          if (window.SwitchaStorage) {
+            try {
+              if (isCircuit) await window.SwitchaStorage.saveCircuit(item);
+              if (isModel) await window.SwitchaStorage.saveModel(item);
+              if (isScript) await window.SwitchaStorage.saveScript(item);
+            } catch (_) {}
+          }
+          if (isCircuit) {
+            const list = this.getMyCircuits();
+            const idx = list.findIndex(c => c.id === item.id);
+            if (idx >= 0) list[idx].name = item.name;
+            this.saveMyCircuits(list);
+            if (this.activeMyCircuitId === item.id) {
+              const nameInput = document.getElementById('circuitNameInput');
+              if (nameInput) nameInput.value = item.name;
+              document.title = `${item.name} - Switcha`;
+            }
+          }
+          this.renderWorkspaceProjects();
+          this.showToast(`✏️ Renamed to "${item.name}"`, 'info');
         }
       });
 
@@ -1316,6 +1264,22 @@ class SwitchaApp {
 
     window.addEventListener('hashchange', handleHash);
     handleHash();
+
+    // Global delegated router click handler for instantaneous navigation
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a[href^="#/"]');
+      if (link) {
+        const href = link.getAttribute('href');
+        if (href) {
+          e.preventDefault();
+          if (window.location.hash !== href) {
+            window.location.hash = href;
+          } else {
+            handleHash();
+          }
+        }
+      }
+    });
   }
 
   switchView(viewName) {
@@ -1886,6 +1850,17 @@ class SwitchaApp {
       this.updatePlacementBanner();
     });
 
+    // Studio Quick File & Simulation Controls
+    document.getElementById('btnStudioNew')?.addEventListener('click', () => {
+      this.createNewCircuit();
+    });
+    document.getElementById('btnStudioImportJSON')?.addEventListener('click', () => {
+      document.getElementById('fileInputJSON')?.click();
+    });
+    document.getElementById('btnSimStep')?.addEventListener('click', () => {
+      this.stepSimulation();
+    });
+
     document.getElementById('btnSelectAll')?.addEventListener('click', () => this.canvas.selectAll());
     document.getElementById('btnSelectAllFloating')?.addEventListener('click', () => this.canvas.selectAll());
     document.getElementById('btnCut')?.addEventListener('click', () => this.canvas.cutSelection());
@@ -1902,9 +1877,11 @@ class SwitchaApp {
     document.getElementById('btnFlipV')?.addEventListener('click', () => this.canvas.flipSelected('y'));
     document.getElementById('btnFitScreen').addEventListener('click', () => this.canvas.fitToScreen());
 
-    document.getElementById('btnZoomIn').addEventListener('click', () => this.canvas.zoomIn());
-    document.getElementById('btnZoomOut').addEventListener('click', () => this.canvas.zoomOut());
-    document.getElementById('btnZoomReset').addEventListener('click', () => this.canvas.resetZoom());
+    document.getElementById('btnZoomIn')?.addEventListener('click', () => this.canvas.zoomIn());
+    document.getElementById('btnZoomOut')?.addEventListener('click', () => this.canvas.zoomOut());
+    document.getElementById('btnZoomReset')?.addEventListener('click', () => this.canvas.resetZoom());
+    document.getElementById('btnZoomInToolbar')?.addEventListener('click', () => this.canvas.zoomIn());
+    document.getElementById('btnZoomOutToolbar')?.addEventListener('click', () => this.canvas.zoomOut());
 
     const toggleNodesHandler = () => {
       const isShown = this.canvas.toggleNodeNumbers();
@@ -2205,6 +2182,43 @@ class SwitchaApp {
       if (simText) simText.textContent = 'Run Simulation';
       this.stopSimulationLoop();
     }
+  }
+
+  createNewCircuit() {
+    if (this.isSimRunning) this.stopSimulation();
+    this.activeMyCircuitId = null;
+    this.engine.reset();
+    this.canvas.saveState();
+    this.canvas.components = [];
+    this.canvas.wires = [];
+    this.engine.setCircuit([], []);
+    const nameInput = document.getElementById('circuitNameInput');
+    if (nameInput) nameInput.value = 'Untitled Circuit';
+    document.title = 'Untitled Circuit - Switcha';
+    this.canvas.render();
+    this.grapher.render();
+    window.location.hash = '#/create';
+    this.showToast('✨ Started a new blank circuit', 'info');
+  }
+
+  stepSimulation(stepDt = null) {
+    if (this.isSimRunning) {
+      this.stopSimulation();
+    }
+    const adaptiveDt = stepDt || this.engine.getAdaptiveTimeStep(this.grapher?.timePerDiv);
+    const steps = 50;
+    for (let i = 0; i < steps; i++) {
+      this.engine.step(adaptiveDt);
+    }
+    if (this.instruments.dmm) this.instruments.dmm.update(this.engine);
+    if (this.instruments.logicAnalyzer) this.instruments.logicAnalyzer.recordSample(this.engine.time, this.engine);
+    if (this.instruments.spectrumAnalyzer) this.instruments.spectrumAnalyzer.update(this.engine);
+
+    this.updateSimTimeDisplay();
+    this.updateAcousticSynthesizer();
+    this.canvas.render();
+    this.grapher.render();
+    this.showToast(`⏭ Stepped simulation to t = ${(this.engine.time * 1000).toFixed(2)} ms`, 'info', 1500);
   }
 
   stopSimulationLoop() {
@@ -3497,6 +3511,11 @@ class SwitchaApp {
 }
 
 // Start Application on DOM Load
-window.addEventListener('DOMContentLoaded', () => {
-  window.app = new SwitchaApp();
-});
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    window.app = new SwitchaApp();
+  });
+}
+
+export { SwitchaApp };
+

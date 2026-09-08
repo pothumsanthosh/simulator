@@ -861,7 +861,7 @@ export const CircuitLibrary = {
   rcPhaseShiftOscillator: {
     id: 'rc-phase-shift-oscillator',
     name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
-    description: 'Textbook 3-stage high-pass RC ladder oscillator with 741 Op-Amp (C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=120kΩ) producing spontaneous, sustained ~200Hz sinusoidal oscillations.',
+    description: 'Textbook 3-stage high-pass RC ladder oscillator with 741 Op-Amp (C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=150kΩ) producing spontaneous, sustained ~200Hz sinusoidal oscillations.',
     author: 'AnalogAudioLab',
     stats: { stars: 250, copies: 1020, views: 195000 },
     timePerDiv: 0.002, // 2 ms/div
@@ -871,12 +871,12 @@ export const CircuitLibrary = {
       canvas.wires = [];
 
       canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 40, { text: 'OP-AMP (741) RC PHASE SHIFT SINE WAVE OSCILLATOR', fontSize: 15, bold: true, color: '#334155' }, 0);
-      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=120kΩ (Sustained ~200Hz Sinusoid)', fontSize: 11, bold: false, color: '#64748b' }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=150kΩ (Sustained ~200Hz Sinusoid)', fontSize: 11, bold: false, color: '#64748b' }, 0);
 
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 450, {}, 0);
 
       // 741 Operational Amplifier (Internal default +/-12V power rails)
-      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.002 }, 0);
+      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.05 }, 0);
 
       // 3-Stage High-Pass RC Ladder (C1, C2, C3 = 0.1uF, R1, R2, Rin = 3.3kΩ)
       const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 200, 180, { capacitance: 1e-7 }, 0);
@@ -888,8 +888,8 @@ export const CircuitLibrary = {
       const c3 = canvas.addComponent(ComponentTypes.CAPACITOR, 440, 180, { capacitance: 1e-7 }, 0);
       const rIn = canvas.addComponent(ComponentTypes.RESISTOR, 520, 180, { resistance: 3300 }, 0);
 
-      // Feedback Resistor Rf (120kΩ)
-      const rf = canvas.addComponent(ComponentTypes.RESISTOR, 580, 100, { resistance: 120000 }, 0);
+      // Feedback Resistor Rf (150kΩ for instant startup)
+      const rf = canvas.addComponent(ComponentTypes.RESISTOR, 580, 100, { resistance: 150000 }, 0);
 
       // Dual-Channel Oscilloscope Probes (Channel A: Output Pin 6, Channel B: Inverting Pin 2)
       const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 690, 240, { color: '#03b585', label: 'V_out (Channel A)' }, 0);

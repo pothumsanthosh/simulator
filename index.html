@@ -388,14 +388,18 @@
         <div class="studio-toolbar">
           <div class="studio-toolbar-left">
             <button class="tool-btn active" id="btnTogglePalette" title="Toggle Components Palette Sidebar (P)" style="font-weight: bold; font-size: 14px;">☰</button>
-            <input type="text" class="circuit-title-input" id="circuitNameInput" value="Untitled Circuit" title="Click to rename circuit"/>
+            <button class="btn btn-outline" id="btnStudioNew" title="New Blank Circuit" style="font-size: 12px; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px;">✨ New</button>
+            <button class="btn btn-outline" id="btnStudioImportJSON" title="Open / Import Circuit File" style="font-size: 12px; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px;">📂 Open</button>
             <button class="btn btn-primary" id="btnSaveMyCircuit" title="Save to My Circuits (Ctrl+S)" style="font-size: 12px; font-weight: 700; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">💾 Save</button>
+            <a href="#/my-circuits" class="btn btn-outline" id="btnStudioMyCircuits" title="Open My Circuits Workspace (📁)" style="font-size: 12px; font-weight: 700; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; color: #0f172a; text-decoration: none;">📁 My Circuits</a>
+            <input type="text" class="circuit-title-input" id="circuitNameInput" value="Untitled Circuit" title="Click to rename circuit"/>
             <div class="toolbar-divider"></div>
             
             <button class="btn-sim-run" id="btnSimToggle" title="Run / Pause Simulation (Space)">
               <span id="simToggleIcon">▶</span>
               <span id="simToggleText">Run Simulation</span>
             </button>
+            <button class="tool-btn" id="btnSimStep" title="Step Simulation (+1ms)">⏭</button>
             <button class="tool-btn" id="btnSimReset" title="Reset Simulation Time">⏮</button>
             <div class="sim-time-indicator" id="simTimeDisplay" title="Simulation Time">t: 0.00 ms</div>
           </div>
@@ -447,7 +451,6 @@
               <button class="quick-comp-btn" data-type="DIGITAL_CONSTANT" title="Add Interactive Digital Generator Switch (DG)" style="border-color: #0284c7; font-weight: 700;">🎛️ DG Switch</button>
               <button class="quick-comp-btn" data-type="PUSH_BUTTON" title="Add Push Button">🔘 Button</button>
               <button class="quick-comp-btn" data-type="TOGGLE_SWITCH" title="Add SPDT Toggle Switch">🎚️ SPDT</button>
-              <button class="quick-comp-btn" data-type="TEXT_LABEL" title="Add Text Annotation / Title">🔤 Text</button>
               <button class="quick-comp-btn" data-type="LAMP" title="Add Light Bulb">💡 Lamp</button>
               <button class="quick-comp-btn" data-type="LED" title="Add LED (Glowing Indicator)">🔴 LED</button>
               <button class="quick-comp-btn" data-type="SEVEN_SEG_DISPLAY" title="Add 7-Segment Digital Display">🔢 7-Seg</button>
@@ -457,6 +460,8 @@
               <button class="quick-comp-btn" data-type="AND_GATE" title="Add AND Logic Gate">AND</button>
               <button class="quick-comp-btn" data-type="OR_GATE" title="Add OR Logic Gate">OR</button>
               <button class="quick-comp-btn" data-type="NOT_GATE" title="Add NOT Inverter Gate">NOT</button>
+              <button class="quick-comp-btn" data-type="NAND_GATE" title="Add NAND Logic Gate">NAND</button>
+              <button class="quick-comp-btn" data-type="NOR_GATE" title="Add NOR Logic Gate">NOR</button>
               <button class="quick-comp-btn" data-type="XOR_GATE" title="Add XOR Logic Gate">XOR</button>
               <button class="quick-comp-btn" data-type="GROUND" title="Add Ground (GND)">⏚ GND</button>
               <button class="quick-comp-btn" data-type="DC_VOLTAGE" title="Add DC Voltage Source">⚡ DC</button>
@@ -467,10 +472,15 @@
               <button class="quick-comp-btn" data-type="CAPACITOR" title="Add Capacitor (C)">⫞ Cap</button>
               <button class="quick-comp-btn" data-type="INDUCTOR" title="Add Inductor (L)">∿ Ind</button>
               <button class="quick-comp-btn" data-type="DIODE" title="Add Diode (D)">▷| Diode</button>
+              <button class="quick-comp-btn" data-type="ZENER_DIODE" title="Add Zener Diode (Z)">⚡ Zener</button>
               <button class="quick-comp-btn" data-type="OPAMP" title="Add Operational Amplifier">⪢ OpAmp</button>
               <button class="quick-comp-btn" data-type="BJT_NPN" title="Add NPN BJT Transistor">⑆ NPN</button>
+              <button class="quick-comp-btn" data-type="BJT_PNP" title="Add PNP BJT Transistor">⑇ PNP</button>
+              <button class="quick-comp-btn" data-type="MOSFET_NMOS" title="Add N-Channel MOSFET">⫸ NMOS</button>
               <button class="quick-comp-btn" data-type="NODE" title="Add Junction Node / Multi-Wire Hub (J)">➕ Node</button>
+              <button class="quick-comp-btn" data-type="TEXT_LABEL" title="Add Text Annotation / Title">🔤 Text</button>
               <button class="quick-comp-btn" data-type="VOLTMETER" title="Add Voltage Probe">🔴 Probe</button>
+              <button class="quick-comp-btn" data-type="AMMETER" title="Add Current Meter / Probe">🟡 Ammeter</button>
             </div>
           </div>
 
@@ -491,6 +501,8 @@
               <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
               <button class="tool-btn" id="btnFlipH" title="Flip Horizontal (H)">⇄</button>
               <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
+              <button class="tool-btn" id="btnZoomInToolbar" title="Zoom In (+)">🔍+</button>
+              <button class="tool-btn" id="btnZoomOutToolbar" title="Zoom Out (−)">🔍−</button>
               <button class="tool-btn" id="btnFitScreen" title="Fit Circuit to Screen (F)">⛶</button>
               <button class="tool-btn active" id="btnToggleNodesToolbar" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
             </div>
