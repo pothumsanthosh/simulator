@@ -857,11 +857,11 @@ export const CircuitLibrary = {
   },
 
   // 17. Op-Amp RC Phase Shift Oscillator
-  // 17. Op-Amp RC Phase Shift Oscillator (Multisim Standard)
+  // 17. Op-Amp RC Phase Shift Oscillator
   rcPhaseShiftOscillator: {
     id: 'rc-phase-shift-oscillator',
     name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
-    description: 'Exact Multisim 3-stage RC high-pass ladder oscillator with 741 Op-Amp (R1=33k, R2=1M, R6=33k, C1=C2=C3=0.1uF, R3=R4=R5=3.3k) generating sustained 200Hz sinusoidal oscillations.',
+    description: 'Textbook 3-stage high-pass RC ladder oscillator with 741 Op-Amp (C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=120kΩ) producing spontaneous, sustained ~200Hz sinusoidal oscillations.',
     author: 'AnalogAudioLab',
     stats: { stars: 250, copies: 1020, views: 195000 },
     timePerDiv: 0.002, // 2 ms/div
@@ -871,65 +871,58 @@ export const CircuitLibrary = {
       canvas.wires = [];
 
       canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 40, { text: 'OP-AMP (741) RC PHASE SHIFT SINE WAVE OSCILLATOR', fontSize: 15, bold: true, color: '#334155' }, 0);
-      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'R1=33kΩ, R2=1MΩ, C1=C2=C3=0.1µF, R3=R4=R5=3.3kΩ (Internal ±12V Rails - No RPS Required)', fontSize: 11, bold: false, color: '#64748b' }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'C1=C2=C3=0.1µF, R1=R2=Rin=3.3kΩ, Rf=120kΩ (Sustained ~200Hz Sinusoid)', fontSize: 11, bold: false, color: '#64748b' }, 0);
 
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 100, 450, {}, 0);
 
-      // 741 Operational Amplifier (Internal default +/-12V power rails, no external RPS needed)
-      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.0015 }, 0);
+      // 741 Operational Amplifier (Internal default +/-12V power rails)
+      const opamp = canvas.addComponent(ComponentTypes.OPAMP, 580, 240, { model: 'LM741', openLoopGain: 200000, vSatPos: 12, vSatNeg: -12, vOffset: 0.002 }, 0);
 
-      // Feedback Resistor R2 (1MΩ) and Input Resistor R1 (33kΩ)
-      const r2 = canvas.addComponent(ComponentTypes.RESISTOR, 580, 130, { resistance: 1000000 }, 0); // 1M
-      const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 380, 130, { resistance: 33000 }, 0);   // 33k
+      // 3-Stage High-Pass RC Ladder (C1, C2, C3 = 0.1uF, R1, R2, Rin = 3.3kΩ)
+      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 200, 180, { capacitance: 1e-7 }, 0);
+      const r1 = canvas.addComponent(ComponentTypes.RESISTOR, 280, 280, { resistance: 3300 }, 90);
 
-      // Bias Resistor R6 (33kΩ) to GND from Non-Inverting Pin 3
-      const r6 = canvas.addComponent(ComponentTypes.RESISTOR, 500, 360, { resistance: 33000 }, 90); // 33k
+      const c2 = canvas.addComponent(ComponentTypes.CAPACITOR, 320, 180, { capacitance: 1e-7 }, 0);
+      const r2 = canvas.addComponent(ComponentTypes.RESISTOR, 400, 280, { resistance: 3300 }, 90);
 
-      // 3-Stage High-Pass RC Ladder (C1, C2, C3 = 0.1uF, R3, R4, R5 = 3.3kΩ)
-      const r3 = canvas.addComponent(ComponentTypes.RESISTOR, 180, 360, { resistance: 3300 }, 90);
-      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 240, 260, { capacitance: 1e-7 }, 0);
+      const c3 = canvas.addComponent(ComponentTypes.CAPACITOR, 440, 180, { capacitance: 1e-7 }, 0);
+      const rIn = canvas.addComponent(ComponentTypes.RESISTOR, 520, 180, { resistance: 3300 }, 0);
 
-      const r4 = canvas.addComponent(ComponentTypes.RESISTOR, 300, 360, { resistance: 3300 }, 90);
-      const c2 = canvas.addComponent(ComponentTypes.CAPACITOR, 360, 260, { capacitance: 1e-7 }, 0);
-
-      const r5 = canvas.addComponent(ComponentTypes.RESISTOR, 420, 360, { resistance: 3300 }, 90);
-      const c3 = canvas.addComponent(ComponentTypes.CAPACITOR, 480, 260, { capacitance: 1e-7 }, 0);
+      // Feedback Resistor Rf (120kΩ)
+      const rf = canvas.addComponent(ComponentTypes.RESISTOR, 580, 100, { resistance: 120000 }, 0);
 
       // Dual-Channel Oscilloscope Probes (Channel A: Output Pin 6, Channel B: Inverting Pin 2)
       const prOut = canvas.addComponent(ComponentTypes.PROBE_V, 690, 240, { color: '#03b585', label: 'V_out (Channel A)' }, 0);
       const prInv = canvas.addComponent(ComponentTypes.PROBE_V, 480, 80, { color: '#007aff', label: 'V_inv (Channel B)' }, 0);
 
       canvas.wires = [
-        // Non-inverting input (Pin 3) to R6 to GND
-        { id: 'w1', fromPin: `${opamp.id}:in_noninv`, toPin: `${r6.id}:p1` },
-        { id: 'w2', fromPin: `${r6.id}:p2`, toPin: `${gnd.id}:p1` },
+        // Non-inverting input (Pin 3) to GND
+        { id: 'w1', fromPin: `${opamp.id}:in_noninv`, toPin: `${gnd.id}:p1` },
 
-        // Ground connections for ladder resistors R3, R4, R5
-        { id: 'w3', fromPin: `${r3.id}:p2`, toPin: `${gnd.id}:p1` },
-        { id: 'w4', fromPin: `${r4.id}:p2`, toPin: `${gnd.id}:p1` },
-        { id: 'w5', fromPin: `${r5.id}:p2`, toPin: `${gnd.id}:p1` },
+        // Ground connections for ladder resistors R1, R2
+        { id: 'w2', fromPin: `${r1.id}:p2`, toPin: `${gnd.id}:p1` },
+        { id: 'w3', fromPin: `${r2.id}:p2`, toPin: `${gnd.id}:p1` },
 
-        // Inverting input (Pin 2) node (R1, R2, Channel B Probe)
-        { id: 'w6', fromPin: `${opamp.id}:in_inv`, toPin: `${r1.id}:p2` },
-        { id: 'w7', fromPin: `${opamp.id}:in_inv`, toPin: `${r2.id}:p1` },
-        { id: 'w8', fromPin: `${opamp.id}:in_inv`, toPin: `${prInv.id}:tip` },
+        // Op-Amp Output connects to Rf, C1, and Channel A Probe
+        { id: 'w4', fromPin: `${opamp.id}:out`, toPin: `${rf.id}:p2` },
+        { id: 'w5', fromPin: `${opamp.id}:out`, toPin: `${c1.id}:p1` },
+        { id: 'w6', fromPin: `${opamp.id}:out`, toPin: `${prOut.id}:tip` },
 
-        // Op-Amp Output (Pin 6) connects to R2, C3 input, and Channel A Probe
-        { id: 'w9', fromPin: `${opamp.id}:out`, toPin: `${r2.id}:p2` },
-        { id: 'w10', fromPin: `${opamp.id}:out`, toPin: `${c3.id}:p2` },
-        { id: 'w11', fromPin: `${opamp.id}:out`, toPin: `${prOut.id}:tip` },
+        // Stage 1 to Stage 2: C1:p2 connects to R1:p1 and C2:p1
+        { id: 'w7', fromPin: `${c1.id}:p2`, toPin: `${r1.id}:p1` },
+        { id: 'w8', fromPin: `${c1.id}:p2`, toPin: `${c2.id}:p1` },
 
-        // RC Stage 3: C3 to R5 and C2
-        { id: 'w12', fromPin: `${c3.id}:p1`, toPin: `${r5.id}:p1` },
-        { id: 'w13', fromPin: `${c3.id}:p1`, toPin: `${c2.id}:p2` },
+        // Stage 2 to Stage 3: C2:p2 connects to R2:p1 and C3:p1
+        { id: 'w9', fromPin: `${c2.id}:p2`, toPin: `${r2.id}:p1` },
+        { id: 'w10', fromPin: `${c2.id}:p2`, toPin: `${c3.id}:p1` },
 
-        // RC Stage 2: C2 to R4 and C1
-        { id: 'w14', fromPin: `${c2.id}:p1`, toPin: `${r4.id}:p1` },
-        { id: 'w15', fromPin: `${c2.id}:p1`, toPin: `${c1.id}:p2` },
+        // Stage 3: C3:p2 connects to Rin:p1
+        { id: 'w11', fromPin: `${c3.id}:p2`, toPin: `${rIn.id}:p1` },
 
-        // RC Stage 1: C1 to R3 and R1
-        { id: 'w16', fromPin: `${c1.id}:p1`, toPin: `${r3.id}:p1` },
-        { id: 'w17', fromPin: `${c1.id}:p1`, toPin: `${r1.id}:p1` }
+        // Rin:p2 connects to Op-Amp inverting input (Pin 2), Rf:p1, and Channel B Probe
+        { id: 'w12', fromPin: `${rIn.id}:p2`, toPin: `${opamp.id}:in_inv` },
+        { id: 'w13', fromPin: `${rf.id}:p1`, toPin: `${opamp.id}:in_inv` },
+        { id: 'w14', fromPin: `${prInv.id}:tip`, toPin: `${opamp.id}:in_inv` }
       ];
 
       canvas.fitToScreen();
