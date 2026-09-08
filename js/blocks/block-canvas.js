@@ -13,7 +13,7 @@ import { BlockDefinitions, BlockTypes } from './block-types.js';
 export class BlockCanvas {
   constructor(canvasElement) {
     this.canvas = canvasElement;
-    this.ctx = canvasElement ? canvasElement.getContext('2d') : null;
+    this.ctx = (canvasElement && typeof canvasElement.getContext === 'function') ? canvasElement.getContext('2d') : null;
     this.blocks = [];
     this.wires = []; // { id, fromBlock, fromPort, toBlock, toPort }
 

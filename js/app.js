@@ -855,18 +855,19 @@ class SwitchaApp {
 
   // --- Switcha Blocks Dynamic Systems Environment ---
   initBlocksEnvironment() {
-    const canvasEl = document.getElementById('blocksCanvas');
-    const scopeContainer = document.getElementById('blocksScopeContainer');
-    if (!canvasEl) return;
+    try {
+      const canvasEl = document.getElementById('blocksCanvas');
+      const scopeContainer = document.getElementById('blocksScopeCanvas') || document.getElementById('blocksScopeContainer');
+      if (!canvasEl) return;
 
-    if (typeof SwitchaBlocksEngine !== 'undefined') {
-      this.blocksEngine = new SwitchaBlocksEngine();
-    }
-    if (typeof SwitchaBlocksScope !== 'undefined' && scopeContainer) {
-      this.blocksScope = new SwitchaBlocksScope(scopeContainer);
-    }
-    if (typeof SwitchaBlocksCanvas !== 'undefined' && canvasEl && this.blocksEngine) {
-      this.blocksCanvas = new SwitchaBlocksCanvas(canvasEl, this.blocksEngine);
+      if (typeof SwitchaBlocksEngine !== 'undefined') {
+        this.blocksEngine = new SwitchaBlocksEngine();
+      }
+      if (typeof SwitchaBlocksScope !== 'undefined' && scopeContainer) {
+        this.blocksScope = new SwitchaBlocksScope(scopeContainer);
+      }
+      if (typeof SwitchaBlocksCanvas !== 'undefined' && canvasEl && this.blocksEngine) {
+        this.blocksCanvas = new SwitchaBlocksCanvas(canvasEl, this.blocksEngine);
       
       this.blocksCanvas.onModelModified = (blocks, lines) => {
         this.blocksEngine.setModel(blocks, lines);
@@ -881,11 +882,14 @@ class SwitchaApp {
     this.initBlocksToolbarControls();
     this.initBlocksSplitGutter();
 
-    // Load default model
-    if (typeof SwitchaBlocksLibrary !== 'undefined' && this.blocksCanvas) {
-      SwitchaBlocksLibrary.loadModel('dc_motor_pid', this.blocksCanvas);
-      const nameInput = document.getElementById('blockModelNameInput');
-      if (nameInput) nameInput.value = 'DC Motor Speed Control with PID';
+      // Load default model
+      if (typeof SwitchaBlocksLibrary !== 'undefined' && this.blocksCanvas) {
+        SwitchaBlocksLibrary.loadModel('dc_motor_pid', this.blocksCanvas);
+        const nameInput = document.getElementById('blockModelNameInput');
+        if (nameInput) nameInput.value = 'DC Motor Speed Control with PID';
+      }
+    } catch (err) {
+      console.warn('Blocks environment initialization warning:', err);
     }
   }
 
@@ -1252,9 +1256,13 @@ class SwitchaApp {
 
   // --- Switcha Code Scientific Runtime ---
   initCodeEnvironment() {
-    const container = document.getElementById('codeEnvironmentContainer');
-    if (container && typeof SwitchaCodeEditor !== 'undefined') {
-      this.codeEditor = new SwitchaCodeEditor(container);
+    try {
+      const container = document.getElementById('codeEnvironmentContainer');
+      if (container && typeof SwitchaCodeEditor !== 'undefined') {
+        this.codeEditor = new SwitchaCodeEditor(container);
+      }
+    } catch (err) {
+      console.warn('Code environment initialization warning:', err);
     }
   }
 
@@ -2809,6 +2817,7 @@ class SwitchaApp {
 
       const cardEl = document.createElement('div');
       cardEl.className = 'card';
+      cardEl.dataset.circuit = key;
       cardEl.style.cursor = 'pointer';
       cardEl.innerHTML = `
         ${this.renderCircuitThumbnailSvg(key, 'Featured')}
@@ -2827,7 +2836,7 @@ class SwitchaApp {
             <span class="card-stat-item">⎘ ${c.stats.copies}</span>
             <span class="card-stat-item">👁 ${c.stats.views.toLocaleString()}</span>
           </div>
-          <button class="btn btn-primary card-action-btn" data-key="${key}">⚡ Simulate Circuit</button>
+          <button class="btn btn-primary card-action-btn btn-open-circuit" data-circuit="${key}" data-key="${key}">⚡ Simulate Circuit</button>
         </div>
       `;
 

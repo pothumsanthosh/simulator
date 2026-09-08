@@ -15,8 +15,22 @@ import { formatValueWithPrefix } from '../engine/components.js';
 
 export class BlockScope {
   constructor(canvasElement) {
-    this.canvas = canvasElement;
-    this.ctx = canvasElement ? canvasElement.getContext('2d') : null;
+    let canvas = canvasElement;
+    if (canvasElement && !(canvasElement instanceof (typeof HTMLCanvasElement !== 'undefined' ? HTMLCanvasElement : Object))) {
+      if (typeof document !== 'undefined') {
+        let existingCanvas = canvasElement.querySelector ? canvasElement.querySelector('canvas') : null;
+        if (!existingCanvas && canvasElement.appendChild) {
+          existingCanvas = document.createElement('canvas');
+          existingCanvas.style.width = '100%';
+          existingCanvas.style.height = '100%';
+          existingCanvas.style.display = 'block';
+          canvasElement.appendChild(existingCanvas);
+        }
+        canvas = existingCanvas;
+      }
+    }
+    this.canvas = canvas;
+    this.ctx = (canvas && typeof canvas.getContext === 'function') ? canvas.getContext('2d') : null;
     this.timeData = [];
     this.channels = new Map(); // channelKey -> Array<number>
     this.history = []; // Array of { time, signals: { 'blk_1:CH1': val, ... } }
@@ -37,13 +51,13 @@ export class BlockScope {
       finalValue: 0
     };
 
-    if (this.canvas) {
+    if (this.canvas && this.ctx) {
       this.resize();
     }
   }
 
   resize() {
-    if (!this.canvas || !this.canvas.parentElement) return;
+    if (!this.canvas || !this.ctx || !this.canvas.parentElement) return;
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     this.canvas.width = Math.round(rect.width * dpr);
