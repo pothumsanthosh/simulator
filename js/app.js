@@ -2784,19 +2784,32 @@ class SwitchaApp {
     });
   }
 
+  // --- Central Helper: Instantaneously Open Any Circuit in Studio ---
+  openCircuitInStudio(presetKey) {
+    if (presetKey && CircuitLibrary[presetKey]) {
+      this.loadCircuitPreset(presetKey);
+    }
+    window.location.hash = '#/create';
+    this.switchView('studio');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    const name = (presetKey && CircuitLibrary[presetKey]?.name) || 'Circuit';
+    this.showToast(`⚡ Opened "${name}" in Studio`, 'info');
+  }
+
   // --- Featured Circuits on Homepage ---
   initFeaturedCards() {
     const grid = document.getElementById('featured-cards-grid');
     if (!grid) return;
     grid.innerHTML = '';
 
-    const featuredKeys = ['buckConverter', 'timer555', 'opAmpAmplifier', 'bridgeRectifier', 'classABAmplifier', 'binaryCounter7Seg'];
+    const featuredKeys = ['buckConverter', 'timer555', 'opAmpAmplifier', 'bridgeRectifier', 'classABAmplifier', 'binaryCounter7Seg', 'rcPhaseShiftOscillator'];
     featuredKeys.forEach(key => {
       const c = CircuitLibrary[key];
       if (!c) return;
 
       const cardEl = document.createElement('div');
       cardEl.className = 'card';
+      cardEl.style.cursor = 'pointer';
       cardEl.innerHTML = `
         ${this.renderCircuitThumbnailSvg(key, 'Featured')}
         <div class="card-body">
@@ -2818,10 +2831,14 @@ class SwitchaApp {
         </div>
       `;
 
-      cardEl.querySelector('button').addEventListener('click', () => {
-        this.loadCircuitPreset(key);
-        window.location.hash = '#/create';
-      });
+      const openThisCircuit = (e) => {
+        e?.preventDefault();
+        e?.stopPropagation();
+        this.openCircuitInStudio(key);
+      };
+
+      cardEl.addEventListener('click', openThisCircuit);
+      cardEl.querySelector('button')?.addEventListener('click', openThisCircuit);
 
       grid.appendChild(cardEl);
     });
@@ -3337,10 +3354,14 @@ class SwitchaApp {
           </div>
         `;
 
-        cardEl.addEventListener('click', () => {
-          this.loadCircuitPreset(c.key);
-          window.location.hash = '#/create';
-        });
+        const openThis = (e) => {
+          e?.preventDefault();
+          e?.stopPropagation();
+          this.openCircuitInStudio(c.key);
+        };
+
+        cardEl.addEventListener('click', openThis);
+        cardEl.querySelector('button')?.addEventListener('click', openThis);
 
         grid.appendChild(cardEl);
       });
@@ -3369,23 +3390,36 @@ class SwitchaApp {
     document.querySelectorAll('.card[data-circuit]').forEach(card => {
       card.style.cursor = 'pointer';
       card.addEventListener('click', (e) => {
+        e.preventDefault();
         const circuitKey = card.dataset.circuit;
         if (circuitKey) {
-          this.loadCircuitPreset(circuitKey);
-          window.location.hash = '#/create';
+          this.openCircuitInStudio(circuitKey);
         }
       });
     });
 
     document.querySelectorAll('.btn-open-circuit').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
-        const circuitKey = e.target.dataset.circuit;
+        const circuitKey = btn.dataset.circuit || btn.getAttribute('data-circuit');
         if (circuitKey) {
-          this.loadCircuitPreset(circuitKey);
-          window.location.hash = '#/create';
+          this.openCircuitInStudio(circuitKey);
         }
       });
+    });
+
+    // Global document-level click handler for any Simulate Circuit button or card
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-open-circuit, button[data-circuit], button[data-key], .card[data-circuit]');
+      if (btn) {
+        const key = btn.dataset.circuit || btn.dataset.key || btn.getAttribute('data-circuit') || btn.getAttribute('data-key');
+        if (key && CircuitLibrary[key]) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openCircuitInStudio(key);
+        }
+      }
     });
   }
 
