@@ -1927,6 +1927,10 @@ class SwitchaApp {
       });
     });
 
+    document.getElementById('btnToggleTrigger')?.addEventListener('click', () => {
+      this.grapher.toggleTrigger();
+    });
+
     document.getElementById('btnToggleCursors').addEventListener('click', () => {
       const isShown = this.grapher.toggleCursors();
       const btn = document.getElementById('btnToggleCursors');

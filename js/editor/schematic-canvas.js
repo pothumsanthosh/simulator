@@ -3604,13 +3604,36 @@ export class SchematicCanvas {
         ctx.beginPath();
         ctx.moveTo(0, 20); ctx.lineTo(-12, 0); ctx.lineTo(-12, -18); ctx.lineTo(12, -18); ctx.lineTo(12, 0);
         ctx.closePath();
-        ctx.fillStyle = p.color || (comp.type === ComponentTypes.PROBE_V ? '#03b585' : '#ff9500');
+        const probeColor = p.color || (comp.type === ComponentTypes.PROBE_V ? '#03b585' : '#ff9500');
+        ctx.fillStyle = probeColor;
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(comp.type === ComponentTypes.PROBE_V ? 'V' : 'I', 0, -5);
+
+        // Live Voltage / Current reading badge next to probe
+        if (this.engine && this.engine.nodeVoltages && this.engine.getNode) {
+          const node = this.engine.getNode(comp, 'tip');
+          const val = node !== -1 ? (this.engine.nodeVoltages[node] || 0) : 0;
+          const displayVal = comp.type === ComponentTypes.PROBE_V
+            ? formatValueWithPrefix(val, 'V')
+            : formatValueWithPrefix(val / 1000, 'A');
+
+          ctx.save();
+          ctx.font = 'bold 10px Roboto Mono, monospace';
+          const textW = ctx.measureText(displayVal).width;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+          ctx.fillRect(16, -15, textW + 8, 16);
+          ctx.strokeStyle = probeColor;
+          ctx.lineWidth = 1.2;
+          ctx.strokeRect(16, -15, textW + 8, 16);
+          ctx.fillStyle = '#f8fafc';
+          ctx.textAlign = 'left';
+          ctx.fillText(displayVal, 20, -3);
+          ctx.restore();
+        }
         break;
       }
 

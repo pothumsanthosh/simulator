@@ -329,6 +329,30 @@ export class CircuitGrapher {
     return this.showCursors;
   }
 
+  toggleTrigger() {
+    this.triggerEnabled = !this.triggerEnabled;
+    this.syncTriggerButton();
+    this.render();
+    return this.triggerEnabled;
+  }
+
+  setTriggerEnabled(enabled) {
+    this.triggerEnabled = !!enabled;
+    this.syncTriggerButton();
+    this.render();
+  }
+
+  syncTriggerButton() {
+    const btn = document.getElementById('btnToggleTrigger');
+    if (btn) {
+      btn.innerHTML = this.triggerEnabled ? '🎯 Trigger: ON' : '📜 Roll Mode';
+      btn.classList.toggle('active', this.triggerEnabled);
+      btn.title = this.triggerEnabled
+        ? 'Oscilloscope Edge Triggering is ON (Stable waveform lock). Click to switch to Live Rolling Waveform.'
+        : 'Live Roll Mode is ON (Waveforms continuously stream from right to left). Click to switch to Edge Trigger Lock.';
+    }
+  }
+
   setCursorMode(mode) {
     if (['TIME', 'VOLTAGE', 'DUAL'].includes(mode)) {
       this.cursorMode = mode;
@@ -587,6 +611,15 @@ export class CircuitGrapher {
     }
 
     this.drawLegendAndMeasurements(ctx, w, h, isLight);
+
+    // Live CRO status indicator badge on top right of canvas
+    ctx.save();
+    ctx.font = 'bold 10px Roboto Mono, monospace';
+    ctx.fillStyle = isLight ? '#0284c7' : '#38bdf8';
+    ctx.textAlign = 'right';
+    const trigText = this.triggerEnabled ? '🎯 TRIG: AUTO' : '📜 ROLL: LIVE';
+    ctx.fillText(`${trigText} | t = ${(latestTime * 1000).toFixed(2)} ms`, w - 16, 18);
+    ctx.restore();
 
     if (this.isQuickPanelOpen) {
       this.updateQuickPanelDOM();
