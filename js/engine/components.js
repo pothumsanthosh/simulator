@@ -1043,8 +1043,11 @@ export const ComponentDefinitions = {
             "desc": "Plate 2"
       }
     ],
-    params: { capacitance: 1e-7 },
-    paramSchema: [{ key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 1e-7, step: 1e-9 }]
+    params: { capacitance: 1e-7, initialVoltage: 0 },
+    paramSchema: [
+      { key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 1e-7, step: 1e-9 },
+      { key: 'initialVoltage', label: 'Initial Voltage (IC)', type: 'number', unit: 'V', default: 0, step: 0.1 }
+    ]
   },
   [ComponentTypes.POLARIZED_CAP]: {
     name: 'Electrolytic Polarized Capacitor',
@@ -1072,8 +1075,11 @@ export const ComponentDefinitions = {
             "desc": "Cathode Lead (-) (Pin 2)"
       }
     ],
-    params: { capacitance: 1e-4 },
-    paramSchema: [{ key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 1e-4, step: 1e-6 }]
+    params: { capacitance: 1e-4, initialVoltage: 0 },
+    paramSchema: [
+      { key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 1e-4, step: 1e-6 },
+      { key: 'initialVoltage', label: 'Initial Voltage (IC)', type: 'number', unit: 'V', default: 0, step: 0.1 }
+    ]
   },
   [ComponentTypes.TANTALUM_CAP]: {
     name: 'Tantalum Capacitor',
@@ -1101,8 +1107,11 @@ export const ComponentDefinitions = {
             "desc": "Tantalum Cathode (-) (Pin 2)"
       }
     ],
-    params: { capacitance: 2.2e-5, esr: 0.1 },
-    paramSchema: [{ key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 2.2e-5 }]
+    params: { capacitance: 2.2e-5, esr: 0.1, initialVoltage: 0 },
+    paramSchema: [
+      { key: 'capacitance', label: 'Capacitance', type: 'number', unit: 'F', default: 2.2e-5 },
+      { key: 'initialVoltage', label: 'Initial Voltage (IC)', type: 'number', unit: 'V', default: 0, step: 0.1 }
+    ]
   },
   [ComponentTypes.INDUCTOR]: {
     name: 'Inductor',
@@ -1130,8 +1139,11 @@ export const ComponentDefinitions = {
             "desc": "Coil Terminal 2"
       }
     ],
-    params: { inductance: 1e-3 },
-    paramSchema: [{ key: 'inductance', label: 'Inductance', type: 'number', unit: 'H', default: 1e-3, step: 1e-4 }]
+    params: { inductance: 1e-3, initialCurrent: 0 },
+    paramSchema: [
+      { key: 'inductance', label: 'Inductance', type: 'number', unit: 'H', default: 1e-3, step: 1e-4 },
+      { key: 'initialCurrent', label: 'Initial Current (IC)', type: 'number', unit: 'A', default: 0, step: 0.01 }
+    ]
   },
   [ComponentTypes.COUPLED_INDUCTOR]: {
     name: 'Coupled Inductor Pair',
@@ -1980,12 +1992,13 @@ export const ComponentDefinitions = {
       { id: 'v_neg', name: 'V- (4)', num: 4, x: 0, y: 25, dir: 'bottom', desc: 'Negative DC Power Supply (-Vee / GND)' },
       { id: 'out', name: 'OUT (6)', num: 6, x: 30, y: 0, dir: 'right', desc: 'Amplified Analog Output' }
     ],
-    params: { model: 'TL082', openLoopGain: 200000, vSatPos: 14, vSatNeg: -14 },
+    params: { model: 'TL082', openLoopGain: 200000, vSatPos: 14, vSatNeg: -14, vOffset: 0.001 },
     paramSchema: [
       { key: 'model', label: 'Op-Amp Model', type: 'select', options: ['TL082', 'LM741', 'LM358', 'NE5532', 'Ideal'], default: 'TL082' },
       { key: 'openLoopGain', label: 'Open Loop Gain (Aol)', type: 'number', unit: '', default: 200000 },
       { key: 'vSatPos', label: '+Vsat Rail Limit', type: 'number', unit: 'V', default: 14 },
-      { key: 'vSatNeg', label: '-Vsat Rail Limit', type: 'number', unit: 'V', default: -14 }
+      { key: 'vSatNeg', label: '-Vsat Rail Limit', type: 'number', unit: 'V', default: -14 },
+      { key: 'vOffset', label: 'Input Offset Voltage (Vos)', type: 'number', unit: 'V', default: 0.001, step: 0.0005 }
     ]
   },
   [ComponentTypes.COMPARATOR]: {
