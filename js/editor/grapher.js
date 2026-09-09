@@ -270,6 +270,10 @@ export class CircuitGrapher {
     } else if (typeof scale === 'number' && scale > 0) {
       this.timePerDiv = Math.max(1e-12, Math.min(1e4, scale));
     }
+    // Prevent timeOffset from launching view outside available data when switching scales
+    if (Math.abs(this.timeOffset || 0) > this.timePerDiv * 8) {
+      this.timeOffset = 0.0;
+    }
     this.syncInputs();
     this.render();
   }
@@ -306,9 +310,23 @@ export class CircuitGrapher {
     if (timeInput && document.activeElement !== timeInput) {
       timeInput.value = formatValueWithPrefix(this.timePerDiv, 's');
     }
+    const timeSelect = document.getElementById('timeScaleSelect');
+    if (timeSelect) {
+      const matchingOpt = Array.from(timeSelect.options).find(opt => Math.abs(parseFloat(opt.value) - this.timePerDiv) / this.timePerDiv < 0.05);
+      if (matchingOpt) timeSelect.value = matchingOpt.value;
+    }
     const voltInput = document.getElementById('voltScaleInput');
     if (voltInput && document.activeElement !== voltInput) {
       voltInput.value = this.autoScale ? 'Auto' : formatValueWithPrefix(this.voltsPerDiv, 'V');
+    }
+    const voltSelect = document.getElementById('voltScaleSelect');
+    if (voltSelect) {
+      if (this.autoScale) {
+        voltSelect.value = 'auto';
+      } else {
+        const matchingVolt = Array.from(voltSelect.options).find(opt => Math.abs(parseFloat(opt.value) - this.voltsPerDiv) / this.voltsPerDiv < 0.05);
+        if (matchingVolt) voltSelect.value = matchingVolt.value;
+      }
     }
   }
 
@@ -683,12 +701,26 @@ export class CircuitGrapher {
 
   drawTraces(ctx, w, h, startTime, totalTimeSpan) {
     const history = this.engine.history;
-    if (history.length === 0) return;
+    if (!history || history.length === 0) return;
 
     const sample = history[history.length - 1];
     const probeIds = Object.keys(sample.probes);
     const yPixelsPerVolt = (h / 8) / this.voltsPerDiv;
     const centerY = (h / 2) + (this.voltOffset || 0) * yPixelsPerVolt;
+    const endTime = startTime + totalTimeSpan;
+
+    // Fast binary search for start index near startTime
+    let startIdx = 0;
+    let low = 0, high = history.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (history[mid].time < startTime) {
+        startIdx = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
 
     probeIds.forEach(probeId => {
       const probeInfo = sample.probes[probeId];
@@ -704,7 +736,7 @@ export class CircuitGrapher {
       let started = false;
       let lastPt = null;
 
-      for (let i = 0; i < history.length; i++) {
+      for (let i = startIdx; i < history.length; i++) {
         const pt = history[i];
         if (pt.time < startTime) {
           lastPt = pt;
@@ -734,6 +766,10 @@ export class CircuitGrapher {
         } else {
           ctx.lineTo(x, y);
         }
+
+        if (pt.time >= endTime) {
+          break; // Stop iterating outside visible bounds
+        }
         lastPt = pt;
       }
       ctx.stroke();
@@ -743,10 +779,11 @@ export class CircuitGrapher {
 
   calculateMeasurements(history, startTime, totalTimeSpan) {
     this.measurements.clear();
-    if (history.length === 0) return;
+    if (!history || history.length === 0) return;
 
     const sample = history[history.length - 1];
     const probeIds = Object.keys(sample.probes);
+    const endTime = startTime + totalTimeSpan;
     const t1 = startTime + this.cursor1 * totalTimeSpan;
     const t2 = startTime + this.cursor2 * totalTimeSpan;
     const dt = Math.abs(t2 - t1);
@@ -762,53 +799,76 @@ export class CircuitGrapher {
       probes: {}
     };
 
+    // Fast binary search for visible window start
+    let startIdx = 0;
+    let low = 0, high = history.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (history[mid].time < startTime) {
+        startIdx = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
     probeIds.forEach(id => {
-      const vals = [];
       let sum = 0;
       let sumSq = 0;
       let min = Infinity;
       let max = -Infinity;
+      let count = 0;
+      let firstT = 0, lastT = 0;
 
-      for (let i = 0; i < history.length; i++) {
+      for (let i = startIdx; i < history.length; i++) {
         const pt = history[i];
         if (pt.time < startTime) continue;
+        if (pt.time > endTime) break;
+
         const v = pt.probes[id]?.value;
-        if (v !== undefined) {
-          vals.push({ t: pt.time, v });
+        if (v !== undefined && !isNaN(v)) {
+          if (count === 0) firstT = pt.time;
+          lastT = pt.time;
           sum += v;
           sumSq += v * v;
-          min = Math.min(min, v);
-          max = Math.max(max, v);
+          if (v < min) min = v;
+          if (v > max) max = v;
+          count++;
         }
       }
 
-      const count = vals.length;
       if (count > 0) {
         const mean = sum / count;
-        const rms = Math.sqrt(sumSq / count);
+        const rms = Math.sqrt(Math.max(0, sumSq / count));
         const vpp = max - min;
         const amp = vpp / 2;
 
-        // Enhanced zero-crossing frequency detection with noise hysteresis
+        // Zero-crossing detection in-line without object allocation
         let crossings = 0;
         const hyst = Math.max(vpp * 0.05, 1e-4);
-        let lastState = (vals[0].v > mean + hyst) ? 1 : ((vals[0].v < mean - hyst) ? -1 : 0);
+        let lastState = 0;
 
-        for (let i = 1; i < count; i++) {
-          const v = vals[i].v;
-          if (lastState <= 0 && v > mean + hyst) {
-            if (lastState === -1) crossings++;
-            lastState = 1;
-          } else if (lastState >= 0 && v < mean - hyst) {
-            if (lastState === 1) crossings++;
-            lastState = -1;
+        for (let i = startIdx; i < history.length; i++) {
+          const pt = history[i];
+          if (pt.time < startTime) continue;
+          if (pt.time > endTime) break;
+          const v = pt.probes[id]?.value;
+          if (v !== undefined && !isNaN(v)) {
+            if (lastState === 0) {
+              lastState = (v > mean + hyst) ? 1 : ((v < mean - hyst) ? -1 : 0);
+            } else if (lastState <= 0 && v > mean + hyst) {
+              if (lastState === -1) crossings++;
+              lastState = 1;
+            } else if (lastState >= 0 && v < mean - hyst) {
+              if (lastState === 1) crossings++;
+              lastState = -1;
+            }
           }
         }
-        const timeSpan = vals[count - 1].t - vals[0].t;
+        const timeSpan = lastT - firstT;
         const freq = timeSpan > 0 ? (crossings / (2 * timeSpan)) : 0;
         const period = freq > 0 ? (1 / freq) : 0;
 
-        // Exact interpolated voltages at Cursor 1 and Cursor 2
         const vCursor1 = this.getVoltageAtTime(id, t1);
         const vCursor2 = this.getVoltageAtTime(id, t2);
         const dvCursor = vCursor2 - vCursor1;

@@ -32,6 +32,10 @@ export class BlockCanvas {
     this.connectingFrom = null; // { blockId, portId, x, y }
     this.tempWirePos = { x: 0, y: 0 };
 
+    this.hoveredWire = null;
+    this.hoveredPort = null;
+    this.hoveredPos = null;
+
     this.undoStack = [];
     this.redoStack = [];
     this.onSelectionChanged = null;
@@ -189,6 +193,43 @@ export class BlockCanvas {
     return null;
   }
 
+  distToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  getWireAt(worldX, worldY, tolerance = 6) {
+    for (let i = this.wires.length - 1; i >= 0; i--) {
+      const wire = this.wires[i];
+      const fromBlock = this.blocks.find(b => b.id === wire.fromBlock);
+      const toBlock = this.blocks.find(b => b.id === wire.toBlock);
+      if (!fromBlock || !toBlock) continue;
+
+      const fromPort = fromBlock.outputs?.find(p => p.id === wire.fromPort) || { x: fromBlock.width / 2, y: 0 };
+      const toPort = toBlock.inputs?.find(p => p.id === wire.toPort) || { x: -toBlock.width / 2, y: 0 };
+
+      const x1 = fromBlock.x + fromPort.x;
+      const y1 = fromBlock.y + fromPort.y;
+      const x2 = toBlock.x + toPort.x;
+      const y2 = toBlock.y + toPort.y;
+      const midX = x1 + (x2 - x1) * 0.5;
+
+      const d1 = this.distToSegment(worldX, worldY, x1, y1, midX, y1);
+      const d2 = this.distToSegment(worldX, worldY, midX, y1, midX, y2);
+      const d3 = this.distToSegment(worldX, worldY, midX, y2, x2, y2);
+
+      if (Math.min(d1, d2, d3) <= tolerance) {
+        return wire;
+      }
+    }
+    return null;
+  }
+
   initEvents() {
     let isPanning = false;
     let panStartX = 0;
@@ -242,6 +283,15 @@ export class BlockCanvas {
         if (this.onSelectionChanged) this.onSelectionChanged(null);
         this.render();
       }
+
+      // Check wire click if no block clicked
+      const hitWire = this.getWireAt(pos.x, pos.y);
+      if (hitWire) {
+        this.selectedBlocks.clear();
+        this.selectedWire = hitWire;
+        if (this.onSelectionChanged) this.onSelectionChanged(null);
+        this.render();
+      }
     });
 
     window.addEventListener('pointermove', (e) => {
@@ -267,6 +317,17 @@ export class BlockCanvas {
           b.x = this.snapToGrid((b._origX || b.x) + dx);
           b.y = this.snapToGrid((b._origY || b.y) + dy);
         });
+        this.render();
+        return;
+      }
+
+      // Live hover inspection on wires and ports
+      const prevHoveredWire = this.hoveredWire;
+      const prevHoveredPort = this.hoveredPort;
+      this.hoveredPort = this.getPortAt(pos.x, pos.y, 12);
+      this.hoveredWire = !this.hoveredPort ? this.getWireAt(pos.x, pos.y, 6) : null;
+      this.hoveredPos = pos;
+      if (this.hoveredWire !== prevHoveredWire || this.hoveredPort !== prevHoveredPort) {
         this.render();
       }
     });
@@ -316,6 +377,20 @@ export class BlockCanvas {
       this.zoom = newZoom;
       this.render();
     }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.selectedWire) {
+          this.saveState();
+          this.wires = this.wires.filter(w => w !== this.selectedWire);
+          this.selectedWire = null;
+          this.render();
+        } else if (this.selectedBlocks.size > 0) {
+          this.removeSelected();
+        }
+      }
+    });
   }
 
   // --- Rendering ---
@@ -364,6 +439,58 @@ export class BlockCanvas {
       this.drawOrthogonalSignalBus(ctx, this.connectingFrom.x, this.connectingFrom.y, this.tempWirePos.x, this.tempWirePos.y);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+
+    // Render Port Snapping Halo
+    if (this.hoveredPort) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.hoveredPort.x, this.hoveredPort.y, 7, 0, Math.PI * 2);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Render Live Wire Value Inspection Tooltip
+    if (this.hoveredWire && this.hoveredPos) {
+      const wire = this.hoveredWire;
+      const key = `${wire.fromBlock}:${wire.fromPort}`;
+      let val = undefined;
+      if (typeof window !== 'undefined' && window.SwitchaApp?.blocksEngine) {
+        val = window.SwitchaApp.blocksEngine.signals?.get(key) ?? window.SwitchaApp.blocksEngine.outputs?.get(key);
+      }
+
+      const fromB = this.blocks.find(b => b.id === wire.fromBlock);
+      const label = fromB ? `${fromB.name}` : 'Signal';
+      const valStr = val !== undefined ? (typeof val === 'number' ? (Math.abs(val) < 1e-4 && val !== 0 ? val.toExponential(3) : val.toFixed(4)) : String(val)) : '0.0000';
+      const text = `${label}: ${valStr}`;
+
+      ctx.save();
+      ctx.font = 'bold 9.5px monospace';
+      const tw = ctx.measureText(text).width;
+      const bx = this.hoveredPos.x + 10;
+      const by = this.hoveredPos.y - 22;
+
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1;
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(bx, by, tw + 14, 18, 4);
+      } else {
+        ctx.rect(bx, by, tw + 14, 18);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, bx + 7, by + 9);
+      ctx.restore();
     }
 
     ctx.restore();

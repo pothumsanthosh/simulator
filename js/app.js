@@ -17,9 +17,9 @@ import { BlockEngine, SwitchaBlocksEngine } from './blocks/block-engine.js';
 import { BlockCanvas, SwitchaBlocksCanvas } from './blocks/block-canvas.js';
 import { BlockScope, SwitchaBlocksScope } from './blocks/block-scope.js';
 import { BlockLibrary, SwitchaBlocksLibrary } from './blocks/block-library.js';
-import { SwitchaMath, CodeEngine, SwitchaCodeEngine } from './code/code-engine.js';
-import { SwitchaPlot, SwitchaPlotter } from './code/code-plotter.js';
-import { SwitchaCodeEditor } from './code/code-editor.js';
+import { SwitchaMath, CodeEngine, SwitchaCodeEngine } from './code/code-engine.js?v=2.3';
+import { SwitchaPlot, SwitchaPlotter } from './code/code-plotter.js?v=2.3';
+import { SwitchaCodeEditor } from './code/code-editor.js?v=2.3';
 
 class SwitchaApp {
   constructor() {

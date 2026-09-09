@@ -209,16 +209,7 @@ export class CircuitEngine {
     this.components.forEach(comp => {
       const p = comp.params || {};
       if (comp.type === ComponentTypes.CAPACITOR || comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) {
-        let initialV = p.initialVoltage;
-        if (initialV === undefined || initialV === null || initialV === 0) {
-          let h = 0x811c9dc5;
-          for (let i = 0; i < comp.id.length; i++) {
-            h ^= comp.id.charCodeAt(i);
-            h = Math.imul(h, 0x01000193);
-          }
-          const frac = ((h >>> 1) % 1000) / 1000;
-          initialV = (frac - 0.5) * 0.2; // +/- 100mV natural physical component asymmetry / startup imbalance
-        }
+        let initialV = p.initialVoltage ?? 0;
         this.internalStates.set(comp.id, { vPrev: initialV, iPrev: 0 });
       } else if (comp.type === ComponentTypes.INDUCTOR) {
         let initialI = p.initialCurrent;
@@ -251,6 +242,15 @@ export class CircuitEngine {
       if (p.freq && p.freq > maxFreq) maxFreq = p.freq;
       if (p.carrierFreq && p.carrierFreq > maxFreq) maxFreq = p.carrierFreq;
       if (p.modFreq && p.modFreq > maxFreq) maxFreq = p.modFreq;
+      if (c.type === ComponentTypes.CLOCK_VOLTAGE && p.frequency) {
+        const rawDuty = (p.dutyCycle !== undefined && p.dutyCycle !== null) ? parseFloat(p.dutyCycle) : 50;
+        const duty = Math.max(0.01, Math.min(0.99, (isNaN(rawDuty) ? 50 : rawDuty) / 100));
+        const minPulse = Math.min(duty, 1 - duty) / p.frequency;
+        if (minPulse > 0) {
+          const fEffective = 1 / (2 * minPulse);
+          if (fEffective > maxFreq) maxFreq = fEffective;
+        }
+      }
       if (p.period && p.period > 0) {
         const fFromPeriod = 1 / p.period;
         if (fFromPeriod > maxFreq) maxFreq = fFromPeriod;
@@ -488,23 +488,14 @@ export class CircuitEngine {
             const n1 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_pos' : 'p1');
             const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
             const c = Math.max(p.capacitance || 1e-6, 1e-15);
-            const gEq = (2 * c) / dt;
+            const gEq = c / dt;
             let state = this.internalStates.get(comp.id);
             if (!state) {
-              let initialV = p.initialVoltage;
-              if (initialV === undefined || initialV === null || initialV === 0) {
-                let h = 0x811c9dc5;
-                for (let i = 0; i < comp.id.length; i++) {
-                  h ^= comp.id.charCodeAt(i);
-                  h = Math.imul(h, 0x01000193);
-                }
-                const frac = ((h >>> 1) % 1000) / 1000;
-                initialV = (frac - 0.5) * 0.2;
-              }
+              let initialV = p.initialVoltage ?? 0;
               state = { vPrev: initialV, iPrev: 0 };
               this.internalStates.set(comp.id, state);
             }
-            const iEq = gEq * state.vPrev + state.iPrev;
+            const iEq = gEq * state.vPrev;
             stampConductance(n1, n2, gEq);
             stampCurrentSource(n2, n1, iEq);
             break;
@@ -635,13 +626,14 @@ export class CircuitEngine {
             const vH = p.vHigh ?? 5;
             const vL = p.vLow ?? 0;
             const freq = Math.max(p.frequency ?? 1000, 0.01);
-            const duty = Math.max(0.01, Math.min(0.99, (p.dutyCycle ?? 50) / 100));
+            const rawDuty = (p.dutyCycle !== undefined && p.dutyCycle !== null) ? parseFloat(p.dutyCycle) : 50;
+            const duty = Math.max(0.001, Math.min(0.999, (isNaN(rawDuty) ? 50 : rawDuty) / 100));
             const tDelay = Math.max(p.tDelay ?? 0, 0);
             const period = 1 / freq;
 
             let v = vL;
             if (this.time >= tDelay) {
-              const tInPeriod = (this.time - tDelay) % period;
+              const tInPeriod = ((this.time - tDelay) % period + period) % period;
               v = (tInPeriod < period * duty) ? vH : vL;
             }
             stampVSourceEquation(vSrcEquationIdx++, nPos, nNeg, v);
@@ -1027,21 +1019,38 @@ export class CircuitEngine {
             const nG = this.getNode(comp, 'gate');
             const nD = this.getNode(comp, 'drain');
             const nS = this.getNode(comp, 'source');
-            const vGS = getNodeV(nG) - getNodeV(nS);
-            const vDS = getNodeV(nD) - getNodeV(nS);
-            const vTh = p.vth || 3.5;
-            const kp = p.kp || 0.8;
-            const rdsOn = p.rdsOn || 0.05;
+            const vG = getNodeV(nG);
+            const vD = getNodeV(nD);
+            const vS = getNodeV(nS);
 
-            if (vGS > vTh) {
-              if (vDS > vGS - vTh) {
-                const id = 0.5 * kp * (vGS - vTh) ** 2;
-                stampCurrentSource(nD, nS, id);
+            const vDS = Math.abs(vD - vS);
+            const vTh = p.vth ?? 3.5;
+            const kp = p.kp ?? 0.8;
+            const rdsOn = Math.max(p.rdsOn ?? 0.05, 1e-4);
+            const gMax = 1 / rdsOn;
+            const gOff = 1e-9;
+
+            // Gate overdrive: active when gate is actively pulled above threshold and channel
+            const vGS = vG - vS;
+            const vChannelMin = Math.min(vD, vS);
+            const isGatedOn = (vG > vTh) && (vG - vChannelMin > 0.1);
+
+            if (isGatedOn) {
+              const vOv = Math.max(vGS - vTh, vG - Math.min(vD, vS) - vTh, 0.01);
+              let gCh;
+              if (vDS <= vOv) {
+                // Linear / Triode region
+                const gLin = kp * Math.max(vOv - 0.5 * vDS, 1e-4);
+                gCh = Math.min(gMax, Math.max(gLin, gMax));
               } else {
-                stampConductance(nD, nS, 1 / rdsOn);
+                // Saturation region: Id = 0.5 * kp * vOv^2
+                const idSat = 0.5 * kp * vOv * vOv;
+                const gChord = idSat / Math.max(vDS, 1e-4);
+                gCh = Math.min(gMax, Math.max(gChord, 1e-4));
               }
+              stampConductance(nD, nS, Math.max(gCh, 1e-6));
             } else {
-              stampConductance(nD, nS, 1e-9);
+              stampConductance(nD, nS, gOff);
             }
             break;
           }
@@ -1193,17 +1202,7 @@ export class CircuitEngine {
             }
 
             const effOffset = vOffset;
-            const vCurrOut = getNodeV(nOut);
-            const vDiff = (getNodeV(nNonInv) - getNodeV(nInv)) + effOffset;
-            const vLinear = aOl * vDiff;
-
-            if (vDiff > 1.0 || (vLinear >= vSatP && vCurrOut >= vSatP - 0.05)) {
-              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatP);
-            } else if (vDiff < -1.0 || (vLinear <= vSatN && vCurrOut <= vSatN + 0.05)) {
-              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, vSatN);
-            } else {
-              stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, aOl * effOffset);
-            }
+            stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, aOl * effOffset);
             break;
           }
 
@@ -1947,20 +1946,44 @@ export class CircuitEngine {
       this.nodeVoltages[i] = solution[i - 1] || 0;
     }
 
+    // Clamp OP-AMP output nodes strictly within physical saturation power rails
+    this.components.forEach(comp => {
+      if (comp.type === ComponentTypes.OPAMP || comp.type === ComponentTypes.OP_AMP) {
+        const nOut = this.getNode(comp, 'out');
+        if (nOut > 0 && nOut < numNodes) {
+          const p = comp.params || {};
+          let vSatP = p.vSatPos ?? 14;
+          let vSatN = p.vSatNeg ?? -14;
+          const nVpos = this.getNode(comp, 'v_pos');
+          const nVneg = this.getNode(comp, 'v_neg');
+          if (this.isPinConnected(comp, 'v_pos') && nVpos !== -1) {
+            vSatP = (this.nodeVoltages[nVpos] || 0) - 1.2;
+          }
+          if (this.isPinConnected(comp, 'v_neg') && nVneg !== -1) {
+            vSatN = (this.nodeVoltages[nVneg] || 0) + 1.2;
+          }
+          if (vSatP < vSatN) {
+            const tmp = vSatP; vSatP = vSatN; vSatN = tmp;
+          }
+          if (this.nodeVoltages[nOut] > vSatP) this.nodeVoltages[nOut] = vSatP;
+          else if (this.nodeVoltages[nOut] < vSatN) this.nodeVoltages[nOut] = vSatN;
+        }
+      }
+    });
+
     this.prevNodeVoltages = [...this.nodeVoltages];
 
-    // Update capacitor & inductor dynamic reactive states (Trapezoidal integration - zero numerical damping)
+    // Update capacitor & inductor dynamic reactive states (Backward Euler - L-stable, prevents trapezoidal ringing on switches)
     this.components.forEach(comp => {
       if (comp.type === ComponentTypes.CAPACITOR || comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) {
         const n1 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_pos' : 'p1');
         const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
         const c = Math.max(comp.params?.capacitance || 1e-6, 1e-15);
-        const gEq = (2 * c) / dt;
+        const gEq = c / dt;
         const vCurr = (this.nodeVoltages[n1] || 0) - (this.nodeVoltages[n2] || 0);
         const state = this.internalStates.get(comp.id) || { vPrev: vCurr, iPrev: 0 };
-        const iCurr = gEq * (vCurr - state.vPrev) - state.iPrev;
+        state.iPrev = gEq * (vCurr - state.vPrev);
         state.vPrev = vCurr;
-        state.iPrev = iCurr;
         this.internalStates.set(comp.id, state);
       } else if (comp.type === ComponentTypes.INDUCTOR) {
         const n1 = this.getNode(comp, 'p1');

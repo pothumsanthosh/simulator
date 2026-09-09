@@ -31,6 +31,7 @@ export const BlockTypes = {
   PULSE_GEN: 'PULSE_GEN',
   NOISE_GEN: 'NOISE_GEN',
   CLOCK_GEN: 'CLOCK_GEN',
+  CHIRP_GEN: 'CHIRP_GEN',
 
   // Math
   SUM: 'SUM',
@@ -39,6 +40,10 @@ export const BlockTypes = {
   DIVIDE: 'DIVIDE',
   GAIN: 'GAIN',
   MATH_FUNC: 'MATH_FUNC',
+  LOOKUP_TABLE_1D: 'LOOKUP_TABLE_1D',
+  LOGIC_OP: 'LOGIC_OP',
+  RELATIONAL_OP: 'RELATIONAL_OP',
+  MIN_MAX: 'MIN_MAX',
 
   // Continuous
   INTEGRATOR: 'INTEGRATOR',
@@ -60,6 +65,7 @@ export const BlockTypes = {
   RATE_LIMITER: 'RATE_LIMITER',
   DEAD_ZONE: 'DEAD_ZONE',
   RELAY_HYSTERESIS: 'RELAY_HYSTERESIS',
+  SWITCH_2WAY: 'SWITCH_2WAY',
 
   // DSP
   FIR_FILTER: 'FIR_FILTER',
@@ -446,6 +452,100 @@ export const BlockDefinitions = {
     outputs: [],
     params: { variableName: 'simout', maxSamples: 10000 },
     paramSchema: [{ key: 'variableName', label: 'Export Variable Name', type: 'string', default: 'simout' }]
+  },
+  [BlockTypes.CHIRP_GEN]: {
+    type: BlockTypes.CHIRP_GEN,
+    name: 'Chirp Frequency Sweep Generator',
+    category: BlockCategory.SOURCES,
+    width: 65, height: 45,
+    inputs: [],
+    outputs: [{ id: 'out', label: 'y', x: 32, y: 0, dir: 'right' }],
+    glyph: 'Chirp',
+    params: { f0: 1.0, t1: 10.0, f1: 50.0 },
+    paramSchema: [
+      { key: 'f0', label: 'Initial Frequency (Hz)', type: 'number', default: 1.0 },
+      { key: 't1', label: 'Target Sweep Time (s)', type: 'number', default: 10.0 },
+      { key: 'f1', label: 'Target Frequency (Hz)', type: 'number', default: 50.0 }
+    ]
+  },
+  [BlockTypes.LOOKUP_TABLE_1D]: {
+    type: BlockTypes.LOOKUP_TABLE_1D,
+    name: '1-D Lookup Table (LUT)',
+    category: BlockCategory.MATH,
+    width: 70, height: 45,
+    inputs: [{ id: 'in', label: 'u', x: -35, y: 0, dir: 'left' }],
+    outputs: [{ id: 'out', label: 'y', x: 35, y: 0, dir: 'right' }],
+    glyph: 'LUT',
+    params: { tableX: '[-1, 0, 1]', tableY: '[-1, 0, 1]' },
+    paramSchema: [
+      { key: 'tableX', label: 'Table Breakpoints X [x0, x1, ...]', type: 'string', default: '[-1, 0, 1]' },
+      { key: 'tableY', label: 'Table Output Data Y [y0, y1, ...]', type: 'string', default: '[-1, 0, 1]' }
+    ]
+  },
+  [BlockTypes.LOGIC_OP]: {
+    type: BlockTypes.LOGIC_OP,
+    name: 'Logical Operator',
+    category: BlockCategory.MATH,
+    width: 60, height: 45,
+    inputs: [
+      { id: 'in1', label: 'A', x: -30, y: -10, dir: 'left' },
+      { id: 'in2', label: 'B', x: -30, y: 10, dir: 'left' }
+    ],
+    outputs: [{ id: 'out', label: 'Y', x: 30, y: 0, dir: 'right' }],
+    glyph: 'LOGIC',
+    params: { operator: 'AND' },
+    paramSchema: [
+      { key: 'operator', label: 'Logic Function', type: 'select', options: ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'NOT'], default: 'AND' }
+    ]
+  },
+  [BlockTypes.RELATIONAL_OP]: {
+    type: BlockTypes.RELATIONAL_OP,
+    name: 'Relational Operator',
+    category: BlockCategory.MATH,
+    width: 60, height: 45,
+    inputs: [
+      { id: 'in1', label: 'A', x: -30, y: -10, dir: 'left' },
+      { id: 'in2', label: 'B', x: -30, y: 10, dir: 'left' }
+    ],
+    outputs: [{ id: 'out', label: 'Y', x: 30, y: 0, dir: 'right' }],
+    glyph: 'REL',
+    params: { operator: '<=' },
+    paramSchema: [
+      { key: 'operator', label: 'Operator', type: 'select', options: ['==', '~=', '<', '<=', '>', '>='], default: '<=' }
+    ]
+  },
+  [BlockTypes.MIN_MAX]: {
+    type: BlockTypes.MIN_MAX,
+    name: 'Min / Max Function',
+    category: BlockCategory.MATH,
+    width: 60, height: 45,
+    inputs: [
+      { id: 'in1', label: 'u1', x: -30, y: -10, dir: 'left' },
+      { id: 'in2', label: 'u2', x: -30, y: 10, dir: 'left' }
+    ],
+    outputs: [{ id: 'out', label: 'y', x: 30, y: 0, dir: 'right' }],
+    glyph: 'MIN/MAX',
+    params: { function: 'min' },
+    paramSchema: [
+      { key: 'function', label: 'Mode', type: 'select', options: ['min', 'max'], default: 'min' }
+    ]
+  },
+  [BlockTypes.SWITCH_2WAY]: {
+    type: BlockTypes.SWITCH_2WAY,
+    name: 'Manual / Threshold 2-Way Switch',
+    category: BlockCategory.CONTROL,
+    width: 65, height: 50,
+    inputs: [
+      { id: 'in1', label: 'u1', x: -32, y: -14, dir: 'left' },
+      { id: 'ctrl', label: 'sw', x: 0, y: -25, dir: 'top' },
+      { id: 'in2', label: 'u2', x: -32, y: 14, dir: 'left' }
+    ],
+    outputs: [{ id: 'out', label: 'y', x: 32, y: 0, dir: 'right' }],
+    glyph: 'SW',
+    params: { threshold: 0.0 },
+    paramSchema: [
+      { key: 'threshold', label: 'Threshold Condition (ctrl >= threshold)', type: 'number', default: 0.0 }
+    ]
   }
 };
 

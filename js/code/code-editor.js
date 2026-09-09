@@ -1,7 +1,10 @@
 /**
  * SWITCHA CODE — SCIENTIFIC CODE IDE, REPL CONSOLE & SCRIPT RUNTIME
- * Professional interactive MATLAB / Python NumPy style programming environment.
+ * Professional interactive MATLAB / MathWorks style programming environment.
  */
+
+import { SwitchaCodeEngine, SwitchaMath } from './code-engine.js?v=2.3';
+import { SwitchaPlotter } from './code-plotter.js?v=2.3';
 
 class SwitchaCodeEditor {
     constructor(containerId, options = {}) {
@@ -12,7 +15,7 @@ class SwitchaCodeEditor {
         this.historyIdx = -1;
         this.activeScript = {
             id: 'scratch',
-            name: 'untitled_script.swcode',
+            name: 'untitled_script.m',
             content: this.getDefaultScript()
         };
 
@@ -20,48 +23,51 @@ class SwitchaCodeEditor {
     }
 
     getDefaultScript() {
-        return `// ==========================================================
-// 🚀 SWITCHA CODE — SCIENTIFIC COMPUTING & DSP SIMULATION
-// Try running this script with [Ctrl + Enter] or the Run button
-// ==========================================================
+        return `% ==========================================================
+% 🚀 SWITCHA CODE — SCIENTIFIC COMPUTING & DSP SIMULATION
+% Professional MATLAB-compatible script environment
+% Press [Ctrl + Enter] or click ▶ Run Script
+% ==========================================================
 
-// 1. Time vector & Signal Generation
-const Fs = 10000;              // Sampling frequency: 10 kHz
-const t = linspace(0, 0.05, 500); // 50ms duration
-const f1 = 120, f2 = 800;      // Frequencies
+% 1. Time vector & Signal Generation
+Fs = 10000;                      % Sampling frequency: 10 kHz
+t = 0:0.0001:0.05;              % 50 ms duration
+f1 = 120; f2 = 800;             % Fundamental and harmonic frequencies
 
-// 2. Pure multi-tone signal + Gaussian Noise
-const sig = add(sin(mul(2 * Math.PI * f1, t)), mul(0.5, cos(mul(2 * Math.PI * f2, t))));
-const noisySig = awgn(sig, 12); // Add AWGN (SNR = 12 dB)
+% 2. Multi-tone signal + Gaussian noise
+sig = sin(2 * pi * f1 * t) + 0.5 * cos(2 * pi * f2 * t);
+noisySig = awgn(sig, 12);       % Add AWGN (SNR = 12 dB)
 
-// 3. Compute 512-point Fast Fourier Transform (FFT)
-const N = 512;
-const X = fft(noisySig.slice(0, N));
-const fAxis = linspace(0, Fs / 2, N / 2);
-const magSpectrum = X.mag.slice(0, N / 2);
+% 3. Fast Fourier Transform (FFT)
+N = 512;
+X = fft(noisySig(1:N));
+fAxis = linspace(0, Fs / 2, N / 2);
+magSpectrum = X.mag(1:N / 2);
 
-// 4. Multi-Pane Scientific Visualization
+% 4. Multi-Pane Scientific Visualization
 clf();
 
-// Subplot 1: Time Domain Waveform
+% Subplot 1: Time Domain Waveform
 subplot(2, 1, 1);
-plot(mul(t, 1000), noisySig, { color: '#00ffcc', label: 'Noisy Signal' });
-hold(true);
-plot(mul(t, 1000), sig, { color: '#ff007f', lineWidth: 2.5, label: 'Clean Signal' });
+plot(t * 1000, noisySig, { color: '#00ffcc', label: 'Noisy Signal' });
+hold on;
+plot(t * 1000, sig, { color: '#ff007f', lineWidth: 2.5, label: 'Clean Signal' });
 title('Time-Domain Signal (120 Hz + 800 Hz + AWGN)');
 xlabel('Time (ms)');
 ylabel('Amplitude (V)');
 legend('Noisy', 'Clean');
+grid on;
 
-// Subplot 2: Frequency Spectrum (FFT)
+% Subplot 2: Frequency Spectrum
 subplot(2, 1, 2);
 stem(fAxis, magSpectrum, { color: '#38bdf8' });
 title('Single-Sided FFT Amplitude Spectrum');
 xlabel('Frequency (Hz)');
 ylabel('|X(f)|');
 xlim([0, 2000]);
+grid on;
 
-disp("✅ Simulation finished! Total samples: " + t.length);
+disp('✅ Simulation finished successfully!');
 `;
     }
 
@@ -99,15 +105,22 @@ disp("✅ Simulation finished! Total samples: " + t.length);
             <button id="codeBtnRun" style="background:#059669; color:#fff; border:none; padding:4px 12px; border-radius:4px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">▶ Run Script</button>
             <button id="codeBtnClearCons" style="background:#1f2937; color:#9ca3af; border:1px solid #374151; padding:4px 8px; border-radius:4px; cursor:pointer;">Clear Console</button>
             <select id="codeTemplateSelect" style="background:#1f2937; color:#38bdf8; border:1px solid #374151; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;">
-                <option value="">⚡ Load Template Script...</option>
+                <option value="">⚡ Load MATLAB Template...</option>
                 <option value="dsp_fft">1. Signal Processing & FFT Spectrum</option>
-                <option value="rc_bode">2. Transfer Function & Bode Response</option>
-                <option value="qpsk_comm">3. QPSK Modulation & Constellation</option>
-                <option value="ode_rlc">4. State-Space ODE45 Dynamic RLC</option>
-                <option value="matrix_eig">5. Linear Algebra & Eigenvalues</option>
+                <option value="rc_bode">2. Transfer Function, Bode & Margins</option>
+                <option value="control_pendulum">3. Inverted Pendulum PID & State Feedback</option>
+                <option value="qpsk_comm">4. QPSK / 16-QAM Constellation & AWGN</option>
+                <option value="ode_rlc">5. State-Space ODE45 Dynamic RLC Circuit</option>
+                <option value="lorenz_chaos">6. Lorenz Strange Attractor & Chaos ODE</option>
+                <option value="matrix_eig">7. Linear Algebra, SVD, Cholesky & Inverses</option>
+                <option value="butter_filter">8. Butterworth IIR Filter Design (Zero-Phase)</option>
+                <option value="curve_fit">9. Polynomial Curve Fitting & Roots</option>
+                <option value="sim_blocks">10. Simulink Co-Simulation Bridge (sim)</option>
+                <option value="am_modulation">11. Amplitude Modulation (AM) & Waveforms</option>
+                <option value="delta_modulation">12. Delta Modulation (DM) & Staircase Approximator</option>
             </select>
             <span style="flex:1;"></span>
-            <span id="codeScriptName" style="color:#94a3b8; font-family:monospace;">untitled_script.swcode</span>
+            <span id="codeScriptName" style="color:#94a3b8; font-family:monospace;">untitled_script.m</span>
             <button id="codeBtnSave" style="background:#1f2937; color:#00ffcc; border:1px solid #374151; padding:4px 8px; border-radius:4px; cursor:pointer;">💾 Save</button>
         `;
         leftPane.appendChild(editorToolbar);
@@ -155,7 +168,7 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         editorArea.appendChild(textarea);
         leftPane.appendChild(editorArea);
 
-        // REPL Output Console
+        // REPL Output Console (Command Window)
         const consolePane = document.createElement('div');
         consolePane.style.flex = '2';
         consolePane.style.display = 'flex';
@@ -169,7 +182,7 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         consoleHeader.style.color = '#94a3b8';
         consoleHeader.style.backgroundColor = '#111827';
         consoleHeader.style.fontWeight = '600';
-        consoleHeader.textContent = '📟 REPL Interactive Output Console';
+        consoleHeader.textContent = '📟 MATLAB Command Window (REPL)';
         consolePane.appendChild(consoleHeader);
 
         const consoleLog = document.createElement('div');
@@ -201,7 +214,7 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         const replInput = document.createElement('input');
         replInput.id = 'codeReplInput';
         replInput.type = 'text';
-        replInput.placeholder = 'Type expression or command e.g. eig([[1,2],[3,4]])';
+        replInput.placeholder = 'Type MATLAB command or expression e.g. A = [1 2; 3 4]; inv(A)';
         replInput.style.flex = '1';
         replInput.style.backgroundColor = 'transparent';
         replInput.style.border = 'none';
@@ -245,7 +258,7 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         varHeader.style.color = '#94a3b8';
         varHeader.style.backgroundColor = '#111827';
         varHeader.style.fontWeight = '600';
-        varHeader.textContent = '📋 Workspace Variables';
+        varHeader.textContent = '📋 Workspace Variables Explorer';
         varPane.appendChild(varHeader);
 
         const varTableContainer = document.createElement('div');
@@ -259,10 +272,9 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         rightPane.appendChild(varPane);
         this.container.appendChild(rightPane);
 
-        // Instantiate SwitchaPlotter
         this.plotter = new SwitchaPlotter(plotContainer);
+        this.engine.plotter = this.plotter;
 
-        // Bind Events
         this.bindEvents(textarea, lineNumbers, consoleLog, replInput);
         this.updateLineNumbers(textarea, lineNumbers);
     }
@@ -277,7 +289,6 @@ disp("✅ Simulation finished! Total samples: " + t.length);
             lineNumbers.scrollTop = textarea.scrollTop;
         });
 
-        // Tab key and Ctrl+Enter support
         textarea.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
                 e.preventDefault();
@@ -292,13 +303,11 @@ disp("✅ Simulation finished! Total samples: " + t.length);
             }
         });
 
-        // Run Button
         const runBtn = this.container.querySelector('#codeBtnRun');
         if (runBtn) {
             runBtn.addEventListener('click', () => this.runScript());
         }
 
-        // Clear Console
         const clearBtn = this.container.querySelector('#codeBtnClearCons');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
@@ -306,7 +315,6 @@ disp("✅ Simulation finished! Total samples: " + t.length);
             });
         }
 
-        // Template Selector
         const tmplSelect = this.container.querySelector('#codeTemplateSelect');
         if (tmplSelect) {
             tmplSelect.addEventListener('change', (e) => {
@@ -317,13 +325,11 @@ disp("✅ Simulation finished! Total samples: " + t.length);
             });
         }
 
-        // Save Script
         const saveBtn = this.container.querySelector('#codeBtnSave');
         if (saveBtn) {
             saveBtn.addEventListener('click', () => this.saveScript());
         }
 
-        // REPL Input
         replInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 const cmd = replInput.value.trim();
@@ -389,17 +395,11 @@ disp("✅ Simulation finished! Total samples: " + t.length);
     executeREPL(cmd) {
         this.appendConsole(cmd, 'cmd');
         try {
-            const res = this.engine.run(cmd, {
+            this.engine.run(cmd, {
                 plotter: this.plotter,
                 onPrint: (msg) => this.appendConsole(msg, 'log'),
                 onError: (err) => this.appendConsole(err, 'error')
             });
-
-            if (res.error) {
-                this.appendConsole(res.error, 'error');
-            } else if (res.result !== undefined) {
-                this.appendConsole(this.formatResult(res.result), 'res');
-            }
             this.updateWorkspaceVariables();
         } catch (err) {
             this.appendConsole(err.message, 'error');
@@ -418,9 +418,7 @@ disp("✅ Simulation finished! Total samples: " + t.length);
                 onError: (err) => this.appendConsole(err, 'error')
             });
 
-            if (res.error) {
-                this.appendConsole(res.error, 'error');
-            } else {
+            if (!res.error) {
                 this.appendConsole('✔ Script executed successfully.', 'log');
             }
             this.updateWorkspaceVariables();
@@ -429,30 +427,12 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         }
     }
 
-    formatResult(res) {
-        if (res === null) return 'null';
-        if (res === undefined) return '';
-        if (typeof res === 'number') return String(res);
-        if (typeof res === 'string') return `"${res}"`;
-        if (Array.isArray(res) || res instanceof Float64Array) {
-            if (res.length > 0 && Array.isArray(res[0])) {
-                // 2D Matrix display
-                return res.map(row => '[' + Array.from(row).map(v => typeof v === 'number' ? v.toFixed(3) : String(v)).join(', ') + ']').join('\n');
-            }
-            return '[' + Array.from(res).slice(0, 20).map(v => typeof v === 'number' ? v.toFixed(3) : String(v)).join(', ') + (res.length > 20 ? ' ...]' : ']');
-        }
-        if (typeof res === 'object') {
-            return JSON.stringify(res, null, 2);
-        }
-        return String(res);
-    }
-
     updateWorkspaceVariables() {
         const varTable = this.container.querySelector('#codeVarTable');
         if (!varTable) return;
 
-        const vars = this.engine.getWorkspaceVariables();
-        if (Object.keys(vars).length === 0) {
+        const vars = this.engine.getVariablesList();
+        if (vars.length === 0) {
             varTable.innerHTML = '<div style="padding:10px; color:#4b5563; text-align:center;">No variables in workspace</div>';
             return;
         }
@@ -461,40 +441,19 @@ disp("✅ Simulation finished! Total samples: " + t.length);
             <thead>
                 <tr style="border-bottom:1px solid #1f2937; color:#94a3b8;">
                     <th style="padding:4px 8px;">Name</th>
-                    <th style="padding:4px 8px;">Type</th>
                     <th style="padding:4px 8px;">Size</th>
-                    <th style="padding:4px 8px;">Value</th>
+                    <th style="padding:4px 8px;">Class</th>
+                    <th style="padding:4px 8px;">Value Preview</th>
                 </tr>
             </thead>
             <tbody>`;
 
-        for (const [name, val] of Object.entries(vars)) {
-            let type = typeof val;
-            let size = '1x1';
-            let preview = '';
-
-            if (Array.isArray(val) || val instanceof Float64Array) {
-                type = 'array';
-                if (Array.isArray(val[0])) {
-                    size = `${val.length}x${val[0].length}`;
-                    preview = `[Matrix ${size}]`;
-                } else {
-                    size = `1x${val.length}`;
-                    preview = `[${val.slice(0, 3).map(v => typeof v === 'number' ? v.toFixed(2) : String(v)).join(', ')}${val.length > 3 ? '...' : ''}]`;
-                }
-            } else if (typeof val === 'number') {
-                preview = Number.isInteger(val) ? String(val) : val.toFixed(4);
-            } else if (typeof val === 'string') {
-                preview = `"${val.slice(0, 15)}"`;
-            } else {
-                preview = Object.prototype.toString.call(val);
-            }
-
+        for (const v of vars) {
             html += `<tr style="border-bottom:1px solid #111827; color:#cbd5e1;">
-                <td style="padding:4px 8px; color:#00ffcc;">${name}</td>
-                <td style="padding:4px 8px; color:#94a3b8;">${type}</td>
-                <td style="padding:4px 8px; color:#94a3b8;">${size}</td>
-                <td style="padding:4px 8px; color:#e2e8f0;">${preview}</td>
+                <td style="padding:4px 8px; color:#00ffcc; font-weight:600;">${v.name}</td>
+                <td style="padding:4px 8px; color:#94a3b8;">${v.size}</td>
+                <td style="padding:4px 8px; color:#a5b4fc;">${v.type}</td>
+                <td style="padding:4px 8px; color:#e2e8f0;">${v.preview}</td>
             </tr>`;
         }
 
@@ -509,7 +468,7 @@ disp("✅ Simulation finished! Total samples: " + t.length);
 
         const scriptDoc = {
             id: this.activeScript.id === 'scratch' ? `script_${Date.now()}` : this.activeScript.id,
-            name: name.endsWith('.swcode') ? name : name + '.swcode',
+            name: name.endsWith('.m') || name.endsWith('.swcode') ? name : name + '.m',
             content,
             updatedAt: Date.now()
         };
@@ -532,143 +491,342 @@ disp("✅ Simulation finished! Total samples: " + t.length);
         if (tmplId === 'dsp_fft') {
             code = this.getDefaultScript();
         } else if (tmplId === 'rc_bode') {
-            code = `// ==========================================================
-// 📈 2ND-ORDER LOW-PASS FILTER BODE FREQUENCY RESPONSE
-// ==========================================================
-const R = 1000;    // 1 kOhm
-const C = 1e-6;    // 1 uF
-const fc = 1 / (2 * Math.PI * R * C); // ~159.15 Hz
+            code = `% ==========================================================
+% 📈 2ND-ORDER LOW-PASS FILTER BODE & STABILITY MARGINS
+% ==========================================================
+% Transfer function G(s) = 25 / (s^2 + 2s + 25)
+num = [25];
+den = [1 2 25];
+G = tf(num, den);
 
-disp("Cutoff Frequency fc = " + fc.toFixed(2) + " Hz");
+disp('Plant Transfer Function:');
+disp(G);
 
-// Frequency range from 1 Hz to 10 kHz (log-spaced)
-const freq = logspace(0, 4, 300);
-const magDb = [];
-const phaseDeg = [];
+% Calculate frequency response
+w = logspace(-1, 2, 250);
+bode(G, w);
 
-for (let i = 0; i < freq.length; i++) {
-    const f = freq[i];
-    const w = 2 * Math.PI * f;
-    // H(s) = 1 / (1 + j * w * R * C)
-    const denomRe = 1;
-    const denomIm = w * R * C;
-    const mag = 1 / Math.sqrt(denomRe * denomRe + denomIm * denomIm);
-    const phase = -Math.atan2(denomIm, denomRe) * (180 / Math.PI);
-    
-    magDb.push(20 * Math.log10(mag));
-    phaseDeg.push(phase);
-}
+% Calculate stability margins
+margins = margin(G);
+disp('Stability Margins:');
+disp(margins);
+`;
+        } else if (tmplId === 'control_pendulum') {
+            code = `% ==========================================================
+% ⚖️ INVERTED PENDULUM ON A CART: CLOSED-LOOP PID BALANCE
+% ==========================================================
+% Plant Transfer Function (Angle Theta / Force u):
+% G(s) = 1 / (s^2 - 9.8) [Unstable Open-Loop Pole at +3.13 rad/s]
+G_plant = tf([1], [1 0 -9.8]);
 
-// Render Dual-Pane Bode Plot
-bode(freq, magDb, phaseDeg);
-disp("✅ Bode diagram plotted!");
+disp('Unstable Open-Loop Plant Poles:');
+disp(pzmap(G_plant));
+
+% Tuned PID Balance Controller: C(s) = (50s^2 + 150s + 400) / (0.01s + 1)
+C_pid = tf([50 150 400], [0.01 1]);
+
+% Form Negative Feedback Loop: T(s) = G*C / (1 + G*C)
+T_closed = feedback(series(C_pid, G_plant), 1);
+
+disp('Closed-Loop Stable Transfer Function:');
+disp(T_closed);
+
+% Plot Step Response
+clf();
+step(T_closed);
+title('Inverted Pendulum Cart: Closed-Loop Step Disturbance Rejection');
 `;
         } else if (tmplId === 'qpsk_comm') {
-            code = `// ==========================================================
-// 📡 QPSK DIGITAL MODULATION & AWGN CONSTELLATION
-// ==========================================================
-const numSymbols = 1200;
-const symbols = [];
-const constellationRef = [
-    { re: 1, im: 1 },
-    { re: -1, im: 1 },
-    { re: -1, im: -1 },
-    { re: 1, im: -1 }
-];
+            code = `% ==========================================================
+% 📡 16-QAM MODULATION, AWGN CHANNEL & CONSTELLATION
+% ==========================================================
+numSymbols = 1000;
+snrDb = 18;
 
-// Generate random QPSK symbols + AWGN Channel Noise
-const snrDb = 15;
-const noiseStd = Math.sqrt(1 / (2 * Math.pow(10, snrDb / 10)));
+% Generate 16-QAM Grid
+qamRef = [-3, -1, 1, 3];
+symbols = [];
 
-for (let i = 0; i < numSymbols; i++) {
-    const symIdx = Math.floor(Math.random() * 4);
-    const ref = constellationRef[symIdx];
-    
-    // Add complex Gaussian noise
-    const noiseI = noiseStd * (Math.random() - 0.5) * 2;
-    const noiseQ = noiseStd * (Math.random() - 0.5) * 2;
-    
-    symbols.push({
-        re: ref.re / Math.SQRT2 + noiseI,
-        im: ref.im / Math.SQRT2 + noiseQ
-    });
-}
+for k = 1:numSymbols
+    reIdx = randi([1 4], 1);
+    imIdx = randi([1 4], 1);
+    symbols = [symbols; qamRef(reIdx) + j * qamRef(imIdx)];
+end
+
+% Add AWGN Channel Noise
+rxSymbols = awgn(symbols, snrDb);
 
 clf();
-constellation(symbols, { title: 'QPSK Received Constellation (SNR = 15 dB)' });
-disp("✅ Constellation rendered with " + numSymbols + " symbols.");
+scatter(rxSymbols.real, rxSymbols.imag, { color: '#00ffcc', size: 5 });
+hold on;
+scatter(symbols.real, symbols.imag, { color: '#ef4444', size: 8 });
+title(['16-QAM Constellation Diagram (SNR = ' + num2str(snrDb) + ' dB)']);
+xlabel('In-Phase (I)');
+ylabel('Quadrature (Q)');
+grid on;
 `;
         } else if (tmplId === 'ode_rlc') {
-            code = `// ==========================================================
-// ⚡ STATE-SPACE RLC CIRCUIT TRANSIENT DYNAMICS (ODE45)
-// ==========================================================
-// State vector: x[0] = Vc (Capacitor Voltage), x[1] = iL (Inductor Current)
-// dVc/dt = iL / C
-// diL/dt = (Vin - Vc - iL * R) / L
+            code = `% ==========================================================
+% ⚡ STATE-SPACE RLC CIRCUIT TRANSIENT DYNAMICS (ODE45)
+% ==========================================================
+% State vector: x[0] = Vc (Capacitor Voltage), x[1] = iL (Inductor Current)
+R = 10;          % 10 Ohms
+L = 10e-3;       % 10 mH
+C = 100e-6;      % 100 uF
+Vin = 12.0;      % 12V Step Input
 
-const R = 10;     // 10 Ohms
-const L = 10e-3;  // 10 mH
-const C = 100e-6; // 100 uF
-const Vin = 12.0; // 12V Step Input
+rlcOde = (t, x) => [
+    x[1] / C,
+    (Vin - x[0] - x[1] * R) / L
+];
 
-const rlcOde = (t, x) => {
-    const Vc = x[0];
-    const iL = x[1];
-    return [
-        iL / C,
-        (Vin - Vc - iL * R) / L
-    ];
-};
-
-// Solve ODE over t = [0, 0.02] with initial conditions x0 = [0, 0]
-const sol = ode45(rlcOde, [0, 0.02], [0, 0], 500);
+% Solve ODE with ODE45 over t = [0, 0.02s]
+sol = ode45(rlcOde, [0 0.02], [0 0], 500);
 
 clf();
 subplot(2, 1, 1);
-plot(mul(sol.t, 1000), sol.y[0], { color: '#00ffcc', lineWidth: 2, label: 'Vc(t)' });
+plot(sol.t * 1000, sol.y[0], { color: '#00ffcc', lineWidth: 2, label: 'Vc(t)' });
 title('RLC Series Step Response: Capacitor Voltage');
 xlabel('Time (ms)');
 ylabel('Voltage (V)');
+grid on;
 
 subplot(2, 1, 2);
-plot(mul(sol.t, 1000), sol.y[1], { color: '#ffaa00', lineWidth: 2, label: 'iL(t)' });
+plot(sol.t * 1000, sol.y[1], { color: '#ffaa00', lineWidth: 2, label: 'iL(t)' });
 title('Inductor Current Transient');
 xlabel('Time (ms)');
 ylabel('Current (A)');
-
-disp("✅ RLC ODE integration completed.");
+grid on;
 `;
-        } else if (tmplId === 'matrix_eig') {
-            code = `// ==========================================================
-// 🔢 LINEAR ALGEBRA & EIGENVALUE DECOMPOSITION
-// ==========================================================
+        } else if (tmplId === 'lorenz_chaos') {
+            code = `% ==========================================================
+% 🌪️ LORENZ STRANGE ATTRACTOR & CHAOTIC DYNAMICS (ODE45)
+% ==========================================================
+% dx/dt = sigma * (y - x)
+% dy/dt = x * (rho - z) - y
+% dz/dt = x * y - beta * z
+sigma = 10;
+rho = 28;
+beta = 8 / 3;
 
-// Define a symmetric system matrix A
-const A = [
-    [4, 1, -2],
-    [1, 2, 0],
-    [-2, 0, 3]
+lorenz = (t, state) => [
+    sigma * (state[1] - state[0]),
+    state[0] * (rho - state[2]) - state[1],
+    state[0] * state[1] - beta * state[2]
 ];
 
-disp("Matrix A:");
+% Integrate over 30 seconds with initial perturbation
+sol = ode45(lorenz, [0 30], [1 1 1], 2500);
+
+clf();
+subplot(2, 1, 1);
+plot(sol.y[0], sol.y[2], { color: '#00ffcc', lineWidth: 1 });
+title('Lorenz Attractor: X vs Z Phase Plane Butterfly Wing');
+xlabel('State X');
+ylabel('State Z');
+grid on;
+
+subplot(2, 1, 2);
+plot(sol.y[0], sol.y[1], { color: '#ff007f', lineWidth: 1 });
+title('Lorenz Attractor: X vs Y Trajectory');
+xlabel('State X');
+ylabel('State Y');
+grid on;
+`;
+        } else if (tmplId === 'matrix_eig') {
+            code = `% ==========================================================
+% 🔢 LINEAR ALGEBRA: SVD, CHOLESKY, EIGENVALUES & INVERSE
+% ==========================================================
+A = [4 1 -2; 1 2 0; -2 0 3];
+
+disp('Matrix A:');
 disp(A);
 
-const d = det(A);
-disp("Determinant det(A) = " + d.toFixed(4));
+detA = det(A)
+invA = inv(A)
+eigA = eig(A)
 
-const invA = inv(A);
-disp("Inverse Matrix A^-1:");
-disp(invA);
+% Cholesky Factorization A = L * L^T
+L = chol(A);
+disp('Cholesky Factor L:');
+disp(L);
 
-const eigenvalues = eig(A);
-disp("Eigenvalues of A:");
-disp(eigenvalues);
+% Solve Linear System A * x = b
+b = [5; 3; 1];
+x = A \\ b
+`;
+        } else if (tmplId === 'butter_filter') {
+            code = `% ==========================================================
+% 🎛️ BUTTERWORTH IIR DIGITAL FILTER DESIGN & FREQZ
+% ==========================================================
+Fs = 1000;              % 1 kHz Sampling Rate
+Wn = 0.2;               % Normalized Cutoff Frequency (100 Hz)
 
-// Solve linear system A * x = b
-const b = [5, 3, 1];
-const x = linsolve(A, b);
-disp("Solution x to A*x = b:");
-disp(x);
+% 2nd Order Lowpass Butterworth Filter
+filt = butter(2, Wn, 'low');
+disp('Filter Numerator b:');
+disp(filt.b);
+disp('Filter Denominator a:');
+disp(filt.a);
+
+% Frequency Response via freqz
+resp = freqz(filt.b, filt.a, 256, Fs);
+
+clf();
+subplot(2, 1, 1);
+plot(resp.f, resp.magDb, { color: '#00ffcc', lineWidth: 2 });
+title('Butterworth Lowpass Filter: Magnitude Response');
+xlabel('Frequency (Hz)');
+ylabel('Magnitude (dB)');
+grid on;
+
+subplot(2, 1, 2);
+plot(resp.f, resp.phaseDeg, { color: '#ffaa00', lineWidth: 2 });
+title('Phase Response');
+xlabel('Frequency (Hz)');
+ylabel('Phase (degrees)');
+grid on;
+`;
+        } else if (tmplId === 'curve_fit') {
+            code = `% ==========================================================
+% 📐 POLYNOMIAL LEAST-SQUARES CURVE FITTING & ROOTS
+% ==========================================================
+% Generate noisy cubic data
+x = linspace(-2, 2, 50);
+yTrue = x .^ 3 - 2 * (x .^ 2) - x + 2;
+yNoisy = yTrue + randn(1, 50) * 0.3;
+
+% Fit 3rd-order polynomial: p(x) = p1*x^3 + p2*x^2 + p3*x + p4
+p = polyfit(x, yNoisy, 3);
+disp('Fitted Polynomial Coefficients:');
+disp(p);
+
+% Calculate Roots
+r = roots(p);
+disp('Roots of Fitted Polynomial:');
+disp(r);
+
+% Evaluate Fit
+xPlot = linspace(-2, 2, 150);
+yFit = polyval(p, xPlot);
+
+clf();
+scatter(x, yNoisy, { color: '#00ffcc', size: 6, label: 'Data Points' });
+hold on;
+plot(xPlot, yFit, { color: '#ff007f', lineWidth: 2.5, label: 'Fitted Curve' });
+title('Least-Squares 3rd-Order Polynomial Regression');
+xlabel('x');
+ylabel('y');
+legend('Noisy Data', 'Fitted Polynomial');
+grid on;
+`;
+        } else if (tmplId === 'sim_blocks') {
+            code = `% ==========================================================
+% 🔌 SIMULINK CO-SIMULATION BRIDGE: sim() CALL
+% ==========================================================
+% Run DC Motor Closed-Loop Block Diagram simulation from script!
+disp('Starting Simulink Model Simulation...');
+
+result = sim('dc_motor_pid', { stopTime: 4.0, timeStep: 0.001 });
+disp('Simulink Simulation Results Object:');
+disp(result);
+`;
+        } else if (tmplId === 'am_modulation') {
+            code = `% ==========================================================
+% 📻 AMPLITUDE MODULATION (AM) & WAVEFORMS
+% ==========================================================
+clc;
+clear;
+close all;
+
+% Parameters
+Am = 1;          % Message signal amplitude
+Ac = 2;          % Carrier signal amplitude
+fm = 100;        % Message frequency (Hz)
+fc = 1000;       % Carrier frequency (Hz)
+mu = 0.5;        % Modulation index
+
+% Time vector
+t = 0:0.00001:0.05;
+
+% Message signal
+m = Am * cos(2*pi*fm*t);
+
+% Carrier signal
+c = Ac * cos(2*pi*fc*t);
+
+% AM signal
+s = Ac * (1 + mu*cos(2*pi*fm*t)) .* cos(2*pi*fc*t);
+
+% Plot message signal
+subplot(3,1,1);
+plot(t,m);
+grid on;
+title('Message Signal');
+xlabel('Time (s)');
+ylabel('Amplitude');
+
+% Plot carrier signal
+subplot(3,1,2);
+plot(t,c);
+grid on;
+title('Carrier Signal');
+xlabel('Time (s)');
+ylabel('Amplitude');
+
+% Plot AM signal
+subplot(3,1,3);
+plot(t,s);
+grid on;
+title('Amplitude Modulated (AM) Signal');
+xlabel('Time (s)');
+ylabel('Amplitude');
+`;
+        } else if (tmplId === 'delta_modulation') {
+            code = `% ==========================================================
+% 📈 DELTA MODULATION (DM) & STAIRCASE APPROXIMATION
+% ==========================================================
+clc;
+clear;
+close all;
+
+fs = 1000;
+fm = 5;
+t = 0:1/fs:1;
+
+m = sin(2*pi*fm*t);
+
+delta = 0.1;
+
+y = zeros(size(t));
+dm = zeros(size(t));
+
+for i = 2:length(t)
+    if m(i) > y(i-1)
+        dm(i) = 1;
+        y(i) = y(i-1) + delta;
+    else
+        dm(i) = 0;
+        y(i) = y(i-1) - delta;
+    end
+end
+
+figure;
+
+subplot(3,1,1);
+plot(t,m);
+grid on;
+title('Message Signal');
+
+subplot(3,1,2);
+plot(t,y);
+grid on;
+title('Delta Modulated Staircase');
+
+subplot(3,1,3);
+stairs(t,dm);
+grid on;
+title('Delta Modulated Signal');
 `;
         }
 
@@ -685,4 +843,3 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { SwitchaCodeEditor };
 }
 export { SwitchaCodeEditor };
-

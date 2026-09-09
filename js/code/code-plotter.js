@@ -145,6 +145,10 @@ class SwitchaPlotter {
         this.getOrCreateSubplot();
     }
 
+    figure(n = 1) {
+        this.clf();
+    }
+
     clf() {
         this.subplots.clear();
         this.panZoom.clear();
@@ -406,6 +410,127 @@ class SwitchaPlotter {
             }
         }
         this.render();
+    }
+
+    stairs(x, y, opts = {}) {
+        let px, py;
+        if (y === undefined || (typeof y === 'object' && !Array.isArray(y) && !(y instanceof Float64Array))) {
+            py = Array.from(x);
+            px = py.map((_, i) => i);
+            opts = y || {};
+        } else {
+            px = Array.from(x);
+            py = Array.from(y);
+        }
+        const sx = [], sy = [];
+        for (let i = 0; i < px.length; i++) {
+            if (i > 0) {
+                sx.push(px[i]);
+                sy.push(py[i - 1]);
+            }
+            sx.push(px[i]);
+            sy.push(py[i]);
+        }
+        this.plot(sx, sy, { ...opts, label: opts.label || 'Stairs' });
+    }
+
+    semilogx(x, y, opts = {}) {
+        const sp = this.getOrCreateSubplot();
+        if (!sp.hold) sp.traces = [];
+        const color = opts.color || this.colorPalette[sp.traces.length % this.colorPalette.length];
+        sp.traces.push({
+            type: 'line',
+            x: Array.from(x),
+            y: Array.from(y),
+            color,
+            lineWidth: opts.lineWidth || 2,
+            isLogX: true,
+            label: opts.label || `Trace ${sp.traces.length + 1}`
+        });
+        this.render();
+    }
+
+    semilogy(x, y, opts = {}) {
+        this.plot(x, y, { ...opts, isLogY: true });
+    }
+
+    loglog(x, y, opts = {}) {
+        this.semilogx(x, y, { ...opts, isLogY: true });
+    }
+
+    polarplot(theta, r, opts = {}) {
+        const px = [], py = [];
+        const thArr = Array.from(theta);
+        const rArr = Array.from(r);
+        for (let i = 0; i < thArr.length; i++) {
+            px.push(rArr[i] * Math.cos(thArr[i]));
+            py.push(rArr[i] * Math.sin(thArr[i]));
+        }
+        this.plot(px, py, { ...opts, label: opts.label || 'Polar' });
+    }
+
+    hist(data, numBins = 10, opts = {}) {
+        const arr = Array.from(data);
+        const min = Math.min(...arr);
+        const max = Math.max(...arr);
+        const binWidth = (max - min) / numBins;
+        const counts = new Float64Array(numBins);
+        const centers = new Float64Array(numBins);
+        for (let i = 0; i < numBins; i++) centers[i] = min + (i + 0.5) * binWidth;
+        for (let i = 0; i < arr.length; i++) {
+            let bin = Math.floor((arr[i] - min) / binWidth);
+            if (bin >= numBins) bin = numBins - 1;
+            if (bin >= 0) counts[bin]++;
+        }
+        this.bar(centers, counts, { ...opts, label: opts.label || 'Histogram' });
+    }
+
+    pzmap(poles, zeros = [], opts = {}) {
+        const sp = this.getOrCreateSubplot();
+        if (!sp.hold) sp.traces = [];
+        sp.title = opts.title || 'Pole-Zero Map (s-plane)';
+        sp.xlabel = 'Real Axis (σ)';
+        sp.ylabel = 'Imaginary Axis (jω)';
+
+        // Draw axes and unit circle or stability boundary
+        const pArr = Array.isArray(poles) ? poles : [poles];
+        const pRe = pArr.map(p => (typeof p === 'number' ? p : p.r));
+        const pIm = pArr.map(p => (typeof p === 'number' ? 0 : p.i));
+        sp.traces.push({
+            type: 'scatter',
+            x: pRe,
+            y: pIm,
+            color: '#ef4444',
+            size: 8,
+            label: 'Poles (x)'
+        });
+
+        if (zeros && zeros.length > 0) {
+            const zArr = Array.isArray(zeros) ? zeros : [zeros];
+            const zRe = zArr.map(z => (typeof z === 'number' ? z : z.r));
+            const zIm = zArr.map(z => (typeof z === 'number' ? 0 : z.i));
+            sp.traces.push({
+                type: 'scatter',
+                x: zRe,
+                y: zIm,
+                color: '#3b82f6',
+                size: 8,
+                label: 'Zeros (o)'
+            });
+        }
+        this.render();
+    }
+
+    nyquist(real, imag, opts = {}) {
+        this.plot(real, imag, { color: '#00ffcc', lineWidth: 2, label: 'Nyquist Contour' });
+        this.hold(true);
+        // Critical point (-1, j0)
+        this.scatter([-1], [0], { color: '#ef4444', size: 8, label: '(-1, j0) Critical' });
+        this.title('Nyquist Diagram');
+        this.xlabel('Real Axis');
+        this.ylabel('Imag Axis');
+        this.grid(true);
+        this.hold(false);
     }
 
     // --- Rendering Engine ---
