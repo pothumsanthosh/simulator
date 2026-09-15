@@ -870,7 +870,7 @@ export const CircuitLibrary = {
       canvas.wires = [];
 
       canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 40, { text: 'OP-AMP (LM741) RC PHASE SHIFT SINE WAVE OSCILLATOR', fontSize: 15, bold: true, color: '#334155' }, 0);
-      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'C1=C2=C3=100nF, R3=R4=R5=3.3kΩ, Rin=33kΩ, Rf=1MΩ (Continuous ~200Hz Sinusoid)', fontSize: 11, bold: false, color: '#64748b' }, 0);
+      canvas.addComponent(ComponentTypes.TEXT_LABEL, 450, 65, { text: 'C1=C2=C3=100nF, R3=R4=R5=3.3kΩ, Rin=33kΩ, Rf=1.5MΩ (Continuous ~200Hz Sinusoid)', fontSize: 11, bold: false, color: '#64748b' }, 0);
 
       // Ground symbols
       const gnd = canvas.addComponent(ComponentTypes.GROUND, 340, 490, {}, 0);
@@ -882,14 +882,14 @@ export const CircuitLibrary = {
       // Non-inverting input bias resistor R6 (33k) to GND2
       const r6 = canvas.addComponent(ComponentTypes.RESISTOR, 440, 260, { resistance: 33000 }, 0);
 
-      // Top feedback & inverting input resistors (Rin = 33kΩ, Rf = 1MΩ for clean ~200Hz sinusoid)
+      // Top feedback & inverting input resistors (Rin = 33kΩ, Rf = 1.5MΩ for clean ~200Hz sinusoid)
       const rIn = canvas.addComponent(ComponentTypes.RESISTOR, 440, 120, { resistance: 33000 }, 0);
-      const rf = canvas.addComponent(ComponentTypes.RESISTOR, 660, 120, { resistance: 1020000 }, 0);
+      const rf = canvas.addComponent(ComponentTypes.RESISTOR, 660, 120, { resistance: 1500000 }, 0);
 
       // Bottom 3-stage high-pass RC ladder: C2, C3, C1 (100nF each)
       const c2 = canvas.addComponent(ComponentTypes.CAPACITOR, 260, 360, { capacitance: 1e-7 }, 0);
       const c3 = canvas.addComponent(ComponentTypes.CAPACITOR, 420, 360, { capacitance: 1e-7 }, 0);
-      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 580, 360, { capacitance: 1e-7, initialVoltage: 1.0 }, 0);
+      const c1 = canvas.addComponent(ComponentTypes.CAPACITOR, 580, 360, { capacitance: 1e-7 }, 0);
 
       // Shunt resistors to ground: R3, R4, R5 (3.3kΩ each, vertical)
       const r3 = canvas.addComponent(ComponentTypes.RESISTOR, 180, 420, { resistance: 3300 }, 90);
