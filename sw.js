@@ -3,7 +3,7 @@
  * Enables offline simulation, PWA installation, and ultra-fast asset caching on Laptop, Phone, and Tablet.
  */
 
-const CACHE_NAME = 'switcha-pwa-v17';
+const CACHE_NAME = 'switcha-pwa-v18';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

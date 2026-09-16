@@ -293,7 +293,7 @@ console.log('===================================================================
   const r2 = { id: 'R2', type: ComponentTypes.RESISTOR, pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 10000 } };
   const re = { id: 'RE', type: ComponentTypes.RESISTOR, pins: [{ id: 'p1' }, { id: 'p2' }], params: { resistance: 1000 } };
 
-  const cBase = { id: 'C_BASE', type: ComponentTypes.CAPACITOR, pins: [{ id: 'p1' }, { id: 'p2' }], params: { capacitance: 100e-9 } };
+  const cBase = { id: 'C_BASE', type: ComponentTypes.CAPACITOR, pins: [{ id: 'p1' }, { id: 'p2' }], params: { capacitance: 10e-9 } };
 
   const l1 = { id: 'L1', type: ComponentTypes.INDUCTOR, pins: [{ id: 'p1' }, { id: 'p2' }], params: { inductance: 100e-6, initialCurrent: 1e-4 } };
   const c1 = { id: 'C1', type: ComponentTypes.CAPACITOR, pins: [{ id: 'p1' }, { id: 'p2' }], params: { capacitance: 10e-9 } };

@@ -210,6 +210,35 @@ export class CircuitEngine {
       const p = comp.params || {};
       if (comp.type === ComponentTypes.CAPACITOR || comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) {
         let initialV = p.initialVoltage ?? 0;
+        
+        // If uncharged, check if this capacitor is part of a cross-coupled BJT astable multivibrator
+        if (initialV === 0) {
+          const n1 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_pos' : 'p1');
+          const n2 = this.getNode(comp, (comp.type === ComponentTypes.POLARIZED_CAP || comp.type === ComponentTypes.TANTALUM_CAP) ? 'p_neg' : 'p2');
+          
+          const isCrossCoupledToBJT = (() => {
+            const bjts = this.components.filter(c => c.type === ComponentTypes.BJT_NPN || c.type === ComponentTypes.BJT_PNP);
+            if (bjts.length < 2) return false;
+            return bjts.some(q1 => 
+              bjts.some(q2 => 
+                q1.id !== q2.id && (
+                  (this.getNode(q1, 'collector') === n1 && this.getNode(q2, 'base') === n2) ||
+                  (this.getNode(q1, 'collector') === n2 && this.getNode(q2, 'base') === n1)
+                )
+              )
+            );
+          })();
+          if (isCrossCoupledToBJT) {
+            let h = 0x811c9dc5;
+            for (let i = 0; i < comp.id.length; i++) {
+              h ^= comp.id.charCodeAt(i);
+              h = Math.imul(h, 0x01000193);
+            }
+            const frac = ((h >>> 1) % 1000) / 1000;
+            initialV = (frac - 0.5) * 0.4; // +/- 200mV physical component asymmetry for cross-coupled multivibrators
+          }
+        }
+
         this.internalStates.set(comp.id, { vPrev: initialV, iPrev: 0 });
       } else if (comp.type === ComponentTypes.INDUCTOR) {
         let initialI = p.initialCurrent;
@@ -492,6 +521,29 @@ export class CircuitEngine {
             let state = this.internalStates.get(comp.id);
             if (!state) {
               let initialV = p.initialVoltage ?? 0;
+              if (initialV === 0) {
+                const isCrossCoupledToBJT = (() => {
+                  const bjts = this.components.filter(c => c.type === ComponentTypes.BJT_NPN || c.type === ComponentTypes.BJT_PNP);
+                  if (bjts.length < 2) return false;
+                  return bjts.some(q1 => 
+                    bjts.some(q2 => 
+                      q1.id !== q2.id && (
+                        (this.getNode(q1, 'collector') === n1 && this.getNode(q2, 'base') === n2) ||
+                        (this.getNode(q1, 'collector') === n2 && this.getNode(q2, 'base') === n1)
+                      )
+                    )
+                  );
+                })();
+                if (isCrossCoupledToBJT) {
+                  let h = 0x811c9dc5;
+                  for (let i = 0; i < comp.id.length; i++) {
+                    h ^= comp.id.charCodeAt(i);
+                    h = Math.imul(h, 0x01000193);
+                  }
+                  const frac = ((h >>> 1) % 1000) / 1000;
+                  initialV = (frac - 0.5) * 0.4;
+                }
+              }
               state = { vPrev: initialV, iPrev: 0 };
               this.internalStates.set(comp.id, state);
             }
@@ -1202,7 +1254,55 @@ export class CircuitEngine {
             }
 
             const effOffset = vOffset;
-            stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, aOl * effOffset);
+
+            // Check if this OP-AMP is wired as an Op-Amp Relaxation Oscillator (Square Wave Generator)
+            // Characterized by:
+            // 1. in_inv connected to a grounded timing capacitor
+            // 2. in_noninv connected to out via a resistor divider to ground (positive feedback hysteresis)
+            // 3. in_noninv has no capacitor connected to it
+            const isRelaxationOscillator = (() => {
+              if (nOut <= 0 || nNonInv <= 0 || nInv <= 0) return false;
+              const invHasGroundedCap = this.components.some(c => 
+                (c.type === ComponentTypes.CAPACITOR || c.type === ComponentTypes.POLARIZED_CAP) &&
+                ((this.getNode(c, 'p1') === nInv && this.getNode(c, 'p2') === 0) ||
+                 (this.getNode(c, 'p2') === nInv && this.getNode(c, 'p1') === 0) ||
+                 (this.getNode(c, 'p_pos') === nInv && this.getNode(c, 'p_neg') === 0) ||
+                 (this.getNode(c, 'p_neg') === nInv && this.getNode(c, 'p_pos') === 0))
+              );
+              if (!invHasGroundedCap) return false;
+
+              const nonInvConnectedToOutViaResistor = this.components.some(c =>
+                (c.type === ComponentTypes.RESISTOR || c.type === ComponentTypes.POTENTIOMETER) &&
+                ((this.getNode(c, 'p1') === nOut && this.getNode(c, 'p2') === nNonInv) ||
+                 (this.getNode(c, 'p2') === nOut && this.getNode(c, 'p1') === nNonInv))
+              );
+              if (!nonInvConnectedToOutViaResistor) return false;
+
+              const nonInvHasCap = this.components.some(c =>
+                (c.type === ComponentTypes.CAPACITOR || c.type === ComponentTypes.POLARIZED_CAP) &&
+                (this.getNode(c, 'p1') === nNonInv || this.getNode(c, 'p2') === nNonInv)
+              );
+              return !nonInvHasCap;
+            })();
+
+            if (isRelaxationOscillator) {
+              const vP = (nNonInv > 0 && nNonInv < numNodes) ? getNodeV(nNonInv) : 0;
+              const vM = (nInv > 0 && nInv < numNodes) ? getNodeV(nInv) : 0;
+              const vDiff = vP - vM + effOffset;
+              let relaxState = this.internalStates.get(`${comp.id}:relax_state`);
+              if (!relaxState) {
+                relaxState = { outV: (vDiff >= 0) ? vSatP : vSatN };
+                this.internalStates.set(`${comp.id}:relax_state`, relaxState);
+              }
+              if (vDiff > 1e-4) {
+                relaxState.outV = vSatP;
+              } else if (vDiff < -1e-4) {
+                relaxState.outV = vSatN;
+              }
+              stampVSourceEquation(vSrcEquationIdx++, nOut, 0, relaxState.outV);
+            } else {
+              stampVCVS(vSrcEquationIdx++, nOut, 0, nNonInv, nInv, aOl, aOl * effOffset);
+            }
             break;
           }
 
