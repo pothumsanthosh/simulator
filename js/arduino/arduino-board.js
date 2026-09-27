@@ -13,7 +13,8 @@
 export const PinMode = {
   INPUT: 0,
   OUTPUT: 1,
-  INPUT_PULLUP: 2
+  INPUT_PULLUP: 2,
+  INPUT_PULLDOWN: 3
 };
 
 export const PinValue = {
@@ -222,12 +223,16 @@ export class ArduinoBoard {
     if (!p || p.isPower) return;
     p.mode = mode;
     p.pullup = (mode === PinMode.INPUT_PULLUP);
+    p.pulldown = (mode === PinMode.INPUT_PULLDOWN);
     if (p.pullup && p.digitalValue === PinValue.LOW) {
       p.digitalValue = PinValue.HIGH;
       p.voltage = this.vccVoltage;
+    } else if (p.pulldown) {
+      p.digitalValue = PinValue.LOW;
+      p.voltage = 0.0;
     }
     p.lastUpdated = Date.now();
-    const modeName = mode === PinMode.OUTPUT ? 'OUTPUT' : (mode === PinMode.INPUT_PULLUP ? 'INPUT_PULLUP' : 'INPUT');
+    const modeName = mode === PinMode.OUTPUT ? 'OUTPUT' : (mode === PinMode.INPUT_PULLUP ? 'INPUT_PULLUP' : (mode === PinMode.INPUT_PULLDOWN ? 'INPUT_PULLDOWN' : 'INPUT'));
     this.emitDebug(`pinMode(${p.name}, ${modeName})`);
     this.notify('pinMode', { pin: p.id, mode });
   }
@@ -264,11 +269,14 @@ export class ArduinoBoard {
     const p = this.getPin(pin);
     if (!p) return PinValue.LOW;
     if (p.isPower) return p.voltage > 2.5 ? PinValue.HIGH : PinValue.LOW;
-    if (p.mode === PinMode.INPUT_PULLUP && p.digitalValue === undefined) {
+    if (p.mode === PinMode.INPUT_PULLUP && (p.digitalValue === undefined || p.digitalValue === null)) {
       return PinValue.HIGH;
     }
+    if (p.mode === PinMode.INPUT_PULLDOWN && (p.digitalValue === undefined || p.digitalValue === null)) {
+      return PinValue.LOW;
+    }
     this.emitDebug(`digitalRead(${p.name}) -> ${p.digitalValue === 1 ? 'HIGH' : 'LOW'}`);
-    return p.digitalValue;
+    return p.digitalValue !== undefined ? p.digitalValue : PinValue.LOW;
   }
 
   analogWrite(pin, duty) {

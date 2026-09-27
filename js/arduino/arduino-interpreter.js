@@ -29,7 +29,7 @@ const KEYWORDS = new Set([
   'void', 'int', 'long', 'short', 'float', 'double', 'char', 'bool', 'boolean', 'byte',
   'unsigned', 'signed', 'const', 'static', 'auto', 'String',
   'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'default', 'break', 'continue', 'return',
-  'true', 'false', 'HIGH', 'LOW', 'INPUT', 'OUTPUT', 'INPUT_PULLUP',
+  'true', 'false', 'HIGH', 'LOW', 'INPUT', 'OUTPUT', 'INPUT_PULLUP', 'INPUT_PULLDOWN',
   'class', 'struct', 'new', 'sizeof'
 ]);
 
@@ -372,7 +372,7 @@ export class ArduinoParser {
     // Check if function declaration vs variable constructor
     let isFunction = false;
     if (this.peek().value === '(') {
-      if (['Servo', 'LiquidCrystal', 'Adafruit_SSD1306', 'DHT'].includes(typeTokens.typeName)) {
+      if (['Servo', 'LiquidCrystal', 'LiquidCrystal_I2C', 'Adafruit_SSD1306', 'DHT'].includes(typeTokens.typeName)) {
         isFunction = false;
       } else {
         let depth = 0;
@@ -404,7 +404,8 @@ export class ArduinoParser {
   parseType() {
     const validTypes = new Set([
       'void', 'int', 'long', 'short', 'float', 'double', 'char', 'bool', 'boolean', 'byte',
-      'unsigned', 'signed', 'const', 'String', 'Servo', 'LiquidCrystal', 'Adafruit_SSD1306', 'DHT'
+      'unsigned', 'signed', 'const', 'String', 'Servo', 'LiquidCrystal', 'LiquidCrystal_I2C', 'Adafruit_SSD1306', 'DHT',
+      'uint8_t', 'uint16_t', 'uint32_t', 'int8_t', 'int16_t', 'int32_t', 'size_t', 'word'
     ]);
 
     let typeStr = '';
@@ -561,7 +562,7 @@ export class ArduinoParser {
     const typeInfo = this.parseType();
     if (typeInfo && this.peek().type === TokenType.IDENTIFIER) {
       const name = this.expectIdentifier();
-      if (this.peek().value !== '(' || ['Servo', 'LiquidCrystal', 'Adafruit_SSD1306', 'DHT'].includes(typeInfo.typeName)) {
+      if (this.peek().value !== '(' || ['Servo', 'LiquidCrystal', 'LiquidCrystal_I2C', 'Adafruit_SSD1306', 'DHT'].includes(typeInfo.typeName)) {
         return this.parseVariableDeclaration(typeInfo, name);
       }
     }
@@ -902,6 +903,11 @@ export class ArduinoParser {
       return { type: 'Literal', value: 2, line: cur.line };
     }
 
+    if (cur.value === 'INPUT_PULLDOWN') {
+      this.pos++;
+      return { type: 'Literal', value: 3, line: cur.line };
+    }
+
     if (cur.value === 'LED_BUILTIN') {
       this.pos++;
       return { type: 'Literal', value: 13, line: cur.line };
@@ -993,13 +999,27 @@ export class SerialPeripheral {
     this.isOpen = true;
   }
 
-  print(val) {
-    const text = (val === undefined || val === null) ? '' : String(val);
+  _formatValue(val, format) {
+    if (val === undefined || val === null) return '';
+    if (typeof val === 'number') {
+      if (format === 16 || format === 'HEX') return Math.trunc(val).toString(16).toUpperCase();
+      if (format === 2 || format === 'BIN') return (val >>> 0).toString(2);
+      if (format === 8 || format === 'OCT') return Math.trunc(val).toString(8);
+      if (format === 10 || format === 'DEC') return Math.trunc(val).toString(10);
+      if (typeof format === 'number' && Number.isInteger(format) && format >= 0) {
+        return val.toFixed(format);
+      }
+    }
+    return String(val);
+  }
+
+  print(val, format) {
+    const text = this._formatValue(val, format);
     if (this.onOutput) this.onOutput(text, false);
   }
 
-  println(val) {
-    const text = (val === undefined || val === null) ? '' : String(val);
+  println(val, format) {
+    const text = this._formatValue(val, format);
     if (this.onOutput) this.onOutput(text, true);
   }
 
@@ -1012,14 +1032,46 @@ export class SerialPeripheral {
     return this.rxBuffer.length;
   }
 
+  availableForWrite() {
+    return 64;
+  }
+
+  peek() {
+    return this.rxBuffer.length > 0 ? this.rxBuffer[0] : -1;
+  }
+
   read() {
     return this.rxBuffer.length > 0 ? this.rxBuffer.shift() : -1;
+  }
+
+  readBytes(buffer, length) {
+    let count = 0;
+    while (this.rxBuffer.length > 0 && count < length) {
+      if (Array.isArray(buffer)) {
+        buffer[count] = this.rxBuffer.shift();
+      } else {
+        this.rxBuffer.shift();
+      }
+      count++;
+    }
+    return count;
   }
 
   readString() {
     let str = '';
     while (this.rxBuffer.length > 0) {
       str += String.fromCharCode(this.rxBuffer.shift());
+    }
+    return str;
+  }
+
+  readStringUntil(terminator) {
+    const termCode = typeof terminator === 'string' ? terminator.charCodeAt(0) : terminator;
+    let str = '';
+    while (this.rxBuffer.length > 0) {
+      const c = this.rxBuffer.shift();
+      if (c === termCode) break;
+      str += String.fromCharCode(c);
     }
     return str;
   }
@@ -1035,6 +1087,21 @@ export class SerialPeripheral {
       }
     }
     return str ? parseInt(str, 10) : 0;
+  }
+
+  parseFloat() {
+    let str = '';
+    let hasDot = false;
+    while (this.rxBuffer.length > 0) {
+      const c = String.fromCharCode(this.rxBuffer[0]);
+      if (/[0-9\-]/.test(c) || (c === '.' && !hasDot)) {
+        if (c === '.') hasDot = true;
+        str += String.fromCharCode(this.rxBuffer.shift());
+      } else {
+        break;
+      }
+    }
+    return str ? parseFloat(str) : 0.0;
   }
 
   flush() {
@@ -1103,6 +1170,24 @@ export class LiquidCrystalPeripheral {
     this.rows = rows || 2;
     this.clear();
   }
+
+  init() {
+    this.clear();
+  }
+
+  backlight() {}
+  noBacklight() {}
+  createChar(location, charmap) {}
+  autoscroll() {}
+  noAutoscroll() {}
+  blink() {}
+  noBlink() {}
+  cursor() {}
+  noCursor() {}
+  display() {}
+  noDisplay() {}
+  scrollDisplayLeft() {}
+  scrollDisplayRight() {}
 
   clear() {
     this.buffer = [];
@@ -1203,6 +1288,20 @@ export class OledPeripheral {
     this.notify();
   }
 
+  drawPixel(x, y, color) {}
+  drawLine(x0, y0, x1, y1, color) {}
+  drawRect(x, y, w, h, color) {}
+  fillRect(x, y, w, h, color) {}
+  drawCircle(x, y, r, color) {}
+  fillCircle(x, y, r, color) {}
+  invertDisplay(i) {}
+  dim(dim) {}
+  cp437(b) {}
+  write(ch) {
+    const text = typeof ch === 'number' ? String.fromCharCode(ch) : String(ch);
+    this.print(text);
+  }
+
   notify() {
     if (this.board) {
       this.board.notify('oledUpdate', {
@@ -1223,12 +1322,125 @@ export class DhtPeripheral {
 
   begin() {}
 
-  readTemperature() {
-    return this.temperature;
+  readTemperature(isFahrenheit = false) {
+    return isFahrenheit ? (this.temperature * 1.8 + 32) : this.temperature;
   }
 
   readHumidity() {
     return this.humidity;
+  }
+
+  computeHeatIndex(temp, percentHumidity, isFahrenheit = false) {
+    const t = isFahrenheit ? temp : (temp * 1.8 + 32);
+    const rh = percentHumidity !== undefined ? percentHumidity : this.humidity;
+    const hi = 0.5 * (t + 61.0 + ((t - 68.0) * 1.2) + (rh * 0.094));
+    return isFahrenheit ? hi : ((hi - 32) * 5 / 9);
+  }
+}
+
+export class EepromPeripheral {
+  constructor(size = 1024) {
+    this.size = size;
+    this.data = new Uint8Array(size).fill(0xff);
+  }
+
+  read(address) {
+    const addr = Math.max(0, Math.min(this.size - 1, Number(address) || 0));
+    return this.data[addr];
+  }
+
+  write(address, value) {
+    const addr = Math.max(0, Math.min(this.size - 1, Number(address) || 0));
+    this.data[addr] = (Number(value) || 0) & 0xff;
+  }
+
+  update(address, value) {
+    const addr = Math.max(0, Math.min(this.size - 1, Number(address) || 0));
+    const byteVal = (Number(value) || 0) & 0xff;
+    if (this.data[addr] !== byteVal) {
+      this.data[addr] = byteVal;
+    }
+  }
+
+  length() {
+    return this.size;
+  }
+
+  get(address, val) {
+    return this.read(address);
+  }
+
+  put(address, val) {
+    this.write(address, val);
+    return val;
+  }
+}
+
+export class WirePeripheral {
+  constructor(board) {
+    this.board = board;
+    this.txBuffer = [];
+    this.rxBuffer = [];
+    this.txAddress = 0;
+  }
+
+  begin(address) {
+    this.address = address;
+  }
+
+  beginTransmission(address) {
+    this.txAddress = address;
+    this.txBuffer = [];
+  }
+
+  write(data) {
+    if (typeof data === 'string') {
+      for (let i = 0; i < data.length; i++) {
+        this.txBuffer.push(data.charCodeAt(i));
+      }
+      return data.length;
+    }
+    this.txBuffer.push((Number(data) || 0) & 0xff);
+    return 1;
+  }
+
+  endTransmission(stop = true) {
+    if (this.board) {
+      this.board.notify('i2cTransmission', { address: this.txAddress, data: [...this.txBuffer], stop });
+    }
+    this.txBuffer = [];
+    return 0; // 0 = success in Wire library
+  }
+
+  requestFrom(address, quantity, stop = true) {
+    this.rxBuffer = new Array(quantity).fill(0);
+    return quantity;
+  }
+
+  available() {
+    return this.rxBuffer.length;
+  }
+
+  read() {
+    return this.rxBuffer.length > 0 ? this.rxBuffer.shift() : -1;
+  }
+
+  onReceive(fn) {}
+  onRequest(fn) {}
+}
+
+export class SpiPeripheral {
+  constructor(board) {
+    this.board = board;
+  }
+
+  begin() {}
+  end() {}
+  setBitOrder(order) {}
+  setClockDivider(divider) {}
+  setDataMode(mode) {}
+  transfer(val) {
+    return (Number(val) || 0) & 0xff;
   }
 }
 
@@ -1255,6 +1467,9 @@ export class ArduinoInterpreter {
     this.serial = new SerialPeripheral((text, newline) => {
       if (this.onSerialOutput) this.onSerialOutput(text, newline);
     });
+    this.eeprom = new EepromPeripheral(1024);
+    this.wire = new WirePeripheral(board);
+    this.spi = new SpiPeripheral(board);
 
     this.initBuiltins();
   }
@@ -1272,12 +1487,31 @@ export class ArduinoInterpreter {
     this.globalScope.declare('INPUT', 0);
     this.globalScope.declare('OUTPUT', 1);
     this.globalScope.declare('INPUT_PULLUP', 2);
+    this.globalScope.declare('INPUT_PULLDOWN', 3);
     this.globalScope.declare('LED_BUILTIN', 13);
     this.globalScope.declare('PI', Math.PI);
     this.globalScope.declare('HALF_PI', Math.PI / 2);
     this.globalScope.declare('TWO_PI', Math.PI * 2);
     this.globalScope.declare('DEG_TO_RAD', Math.PI / 180.0);
     this.globalScope.declare('RAD_TO_DEG', 180.0 / Math.PI);
+
+    // Number formats and interrupt modes
+    this.globalScope.declare('DEC', 10);
+    this.globalScope.declare('HEX', 16);
+    this.globalScope.declare('OCT', 8);
+    this.globalScope.declare('BIN', 2);
+    this.globalScope.declare('CHANGE', 1);
+    this.globalScope.declare('FALLING', 2);
+    this.globalScope.declare('RISING', 3);
+    this.globalScope.declare('DEFAULT', 1);
+    this.globalScope.declare('INTERNAL', 3);
+    this.globalScope.declare('INTERNAL1V1', 2);
+    this.globalScope.declare('INTERNAL2V56', 3);
+    this.globalScope.declare('EXTERNAL', 0);
+    this.globalScope.declare('SSD1306_SWITCHCAPVCC', 2);
+    this.globalScope.declare('WHITE', 1);
+    this.globalScope.declare('BLACK', 0);
+    this.globalScope.declare('INVERSE', 2);
 
     // Analog pins A0-A15
     for (let i = 0; i <= 15; i++) {
@@ -1286,9 +1520,11 @@ export class ArduinoInterpreter {
 
     this.globalScope.declare('DHT11', 11);
     this.globalScope.declare('DHT22', 22);
-    this.globalScope.declare('Wire', 1);
 
     this.globalScope.declare('Serial', this.serial);
+    this.globalScope.declare('Wire', this.wire);
+    this.globalScope.declare('SPI', this.spi);
+    this.globalScope.declare('EEPROM', this.eeprom);
 
     this.builtins = {
       pinMode: (pin, mode) => this.board.setPinMode(pin, mode),
@@ -1313,6 +1549,8 @@ export class ArduinoInterpreter {
       cos: (rad) => Math.cos(rad),
       tan: (rad) => Math.tan(rad),
       round: (x) => Math.round(x),
+      radians: (deg) => (deg * Math.PI) / 180.0,
+      degrees: (rad) => (rad * 180.0) / Math.PI,
       random: (min, max) => {
         if (max === undefined) {
           max = min;
@@ -1340,7 +1578,39 @@ export class ArduinoInterpreter {
       bitWrite: (value, bit, bitvalue) => bitvalue ? (value | (1 << bit)) : (value & ~(1 << bit)),
       bit: (b) => 1 << b,
       lowByte: (w) => w & 0xff,
-      highByte: (w) => (w >> 8) & 0xff
+      highByte: (w) => (w >> 8) & 0xff,
+      word: (h, l) => l !== undefined ? (((Number(h) || 0) & 0xff) << 8) | ((Number(l) || 0) & 0xff) : ((Number(h) || 0) & 0xffff),
+      isAlphaNumeric: (c) => typeof c === 'string' ? /^[a-zA-Z0-9]$/.test(c) : /^[a-zA-Z0-9]$/.test(String.fromCharCode(c)),
+      isAlpha: (c) => typeof c === 'string' ? /^[a-zA-Z]$/.test(c) : /^[a-zA-Z]$/.test(String.fromCharCode(c)),
+      isAscii: (c) => typeof c === 'string' ? c.charCodeAt(0) <= 127 : c <= 127,
+      isWhitespace: (c) => typeof c === 'string' ? /^\s$/.test(c) : /^\s$/.test(String.fromCharCode(c)),
+      isControl: (c) => typeof c === 'string' ? c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 : c < 32 || c === 127,
+      isDigit: (c) => typeof c === 'string' ? /^[0-9]$/.test(c) : /^[0-9]$/.test(String.fromCharCode(c)),
+      isGraph: (c) => typeof c === 'string' ? c.charCodeAt(0) > 32 && c.charCodeAt(0) < 127 : c > 32 && c < 127,
+      isLowerCase: (c) => typeof c === 'string' ? /^[a-z]$/.test(c) : /^[a-z]$/.test(String.fromCharCode(c)),
+      isPrintable: (c) => typeof c === 'string' ? c.charCodeAt(0) >= 32 && c.charCodeAt(0) < 127 : c >= 32 && c < 127,
+      isPunct: (c) => typeof c === 'string' ? /^[!-/:-@[-`{-~]$/.test(c) : /^[!-/:-@[-`{-~]$/.test(String.fromCharCode(c)),
+      isSpace: (c) => typeof c === 'string' ? /^[ \t\r\n\v\f]$/.test(c) : /^[ \t\r\n\v\f]$/.test(String.fromCharCode(c)),
+      isUpperCase: (c) => typeof c === 'string' ? /^[A-Z]$/.test(c) : /^[A-Z]$/.test(String.fromCharCode(c)),
+      isHexadecimalDigit: (c) => typeof c === 'string' ? /^[0-9a-fA-F]$/.test(c) : /^[0-9a-fA-F]$/.test(String.fromCharCode(c)),
+      int: (val) => Math.trunc(Number(val) || 0),
+      float: (val) => Number(val) || 0,
+      double: (val) => Number(val) || 0,
+      char: (val) => typeof val === 'string' ? val.charAt(0) : String.fromCharCode(Number(val) || 0),
+      byte: (val) => (Number(val) || 0) & 0xff,
+      boolean: (val) => Boolean(val) ? 1 : 0,
+      bool: (val) => Boolean(val) ? 1 : 0,
+      String: (val, base) => {
+        if (val === undefined || val === null) return '';
+        if (typeof val === 'number' && base) {
+          if (base === 16 || base === 'HEX') return Math.trunc(val).toString(16).toUpperCase();
+          if (base === 2 || base === 'BIN') return (val >>> 0).toString(2);
+          if (base === 8 || base === 'OCT') return Math.trunc(val).toString(8);
+          if (base === 10 || base === 'DEC') return Math.trunc(val).toString(10);
+          return val.toFixed(base);
+        }
+        return String(val);
+      }
     };
   }
 
@@ -1404,7 +1674,7 @@ export class ArduinoInterpreter {
       let val = 0;
       if (decl.varType === 'Servo') {
         val = new ServoPeripheral(this.board);
-      } else if (decl.varType === 'LiquidCrystal') {
+      } else if (decl.varType === 'LiquidCrystal' || decl.varType === 'LiquidCrystal_I2C') {
         const args = (decl.constructorArgs || []).map(a => this.evaluateExpressionSync(a, scope));
         val = new LiquidCrystalPeripheral(this.board, ...args);
       } else if (decl.varType === 'Adafruit_SSD1306') {
@@ -1413,6 +1683,9 @@ export class ArduinoInterpreter {
         val = new DhtPeripheral(this.board);
       } else if (decl.init) {
         val = this.evaluateExpressionSync(decl.init, scope);
+      } else if (decl.varType === 'String' || decl.varType === 'string') {
+        val = decl.constructorArgs && decl.constructorArgs.length > 0 ?
+          String(this.evaluateExpressionSync(decl.constructorArgs[0], scope)) : '';
       } else if (decl.isArray) {
         const sz = decl.arraySize ? this.evaluateExpressionSync(decl.arraySize, scope) : 10;
         val = new Array(sz).fill(0);
@@ -1536,7 +1809,7 @@ export class ArduinoInterpreter {
           let val = 0;
           if (decl.varType === 'Servo') {
             val = new ServoPeripheral(this.board);
-          } else if (decl.varType === 'LiquidCrystal') {
+          } else if (decl.varType === 'LiquidCrystal' || decl.varType === 'LiquidCrystal_I2C') {
             const args = [];
             for (const a of (decl.constructorArgs || [])) {
               args.push(yield* this.evaluateExpression(a, scope));
@@ -1548,6 +1821,9 @@ export class ArduinoInterpreter {
             val = new DhtPeripheral(this.board);
           } else if (decl.init) {
             val = yield* this.evaluateExpression(decl.init, scope);
+          } else if (decl.varType === 'String' || decl.varType === 'string') {
+            val = decl.constructorArgs && decl.constructorArgs.length > 0 ?
+              String(yield* this.evaluateExpression(decl.constructorArgs[0], scope)) : '';
           } else if (decl.isArray) {
             const sz = decl.arraySize ? (yield* this.evaluateExpression(decl.arraySize, scope)) : 10;
             val = new Array(sz).fill(0);
@@ -1782,6 +2058,9 @@ export class ArduinoInterpreter {
 
       case 'MemberExpression': {
         const target = yield* this.evaluateExpression(node.object, scope);
+        if (typeof target === 'string') {
+          if (node.property === 'length') return target.length;
+        }
         if (target && target[node.property] !== undefined) {
           return target[node.property];
         }
@@ -1804,6 +2083,53 @@ export class ArduinoInterpreter {
         if (node.callee.type === 'MemberExpression') {
           const targetObj = yield* this.evaluateExpression(node.callee.object, scope);
           const methodName = node.callee.property;
+
+          // SPECIAL HANDLING: String member methods in Arduino C++
+          if (typeof targetObj === 'string') {
+            const args = [];
+            for (const argNode of node.arguments) {
+              args.push(yield* this.evaluateExpression(argNode, scope));
+            }
+
+            switch (methodName) {
+              case 'length':
+                return targetObj.length;
+              case 'charAt':
+                return targetObj.charAt(args[0] || 0);
+              case 'substring':
+                return args.length > 1 ? targetObj.substring(args[0], args[1]) : targetObj.substring(args[0]);
+              case 'indexOf':
+                return targetObj.indexOf(args[0], args[1]);
+              case 'lastIndexOf':
+                return targetObj.lastIndexOf(args[0], args[1]);
+              case 'startsWith':
+                return targetObj.startsWith(args[0]) ? 1 : 0;
+              case 'endsWith':
+                return targetObj.endsWith(args[0]) ? 1 : 0;
+              case 'equals':
+                return targetObj === String(args[0]) ? 1 : 0;
+              case 'equalsIgnoreCase':
+                return targetObj.toLowerCase() === String(args[0]).toLowerCase() ? 1 : 0;
+              case 'toInt':
+                return parseInt(targetObj, 10) || 0;
+              case 'toFloat':
+                return parseFloat(targetObj) || 0.0;
+              case 'trim':
+                return targetObj.trim();
+              case 'toUpperCase':
+                return targetObj.toUpperCase();
+              case 'toLowerCase':
+                return targetObj.toLowerCase();
+              case 'c_str':
+                return targetObj;
+              default:
+                if (typeof targetObj[methodName] === 'function') {
+                  return targetObj[methodName](...args);
+                }
+                throw new Error(`Arduino String method '${methodName}()' not supported`);
+            }
+          }
+
           const method = targetObj ? targetObj[methodName] : null;
 
           if (typeof method !== 'function') {
