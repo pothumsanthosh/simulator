@@ -13,7 +13,7 @@
 export class StorageService {
   constructor() {
     this.dbName = 'switcha_studio_db';
-    this.dbVersion = 1;
+    this.dbVersion = 2;
     this.db = null;
     this.isReady = false;
     this.initPromise = this.initDB();
@@ -43,6 +43,11 @@ export class StorageService {
           }
           if (!db.objectStoreNames.contains('scripts')) {
             const store = db.createObjectStore('scripts', { keyPath: 'id' });
+            store.createIndex('updatedAt', 'updatedAt', { unique: false });
+            store.createIndex('name', 'name', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('arduino')) {
+            const store = db.createObjectStore('arduino', { keyPath: 'id' });
             store.createIndex('updatedAt', 'updatedAt', { unique: false });
             store.createIndex('name', 'name', { unique: false });
           }
@@ -219,6 +224,12 @@ export class StorageService {
   async getScript(id) { return this.getById('scripts', id); }
   async saveScript(script) { return this.save('scripts', script); }
   async deleteScript(id) { return this.delete('scripts', id); }
+
+  // 4. Arduino IDE & Lab Projects (.swino)
+  async getArduinoProjects() { return this.getAll('arduino'); }
+  async getArduinoProject(id) { return this.getById('arduino', id); }
+  async saveArduinoProject(project) { return this.save('arduino', project); }
+  async deleteArduinoProject(id) { return this.delete('arduino', id); }
 }
 
 export const storageService = new StorageService();

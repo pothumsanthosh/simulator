@@ -1,7 +1,7 @@
 {
   "name": "electrosim",
   "version": "1.0.0",
-  "description": "ElectroSim / Switcha - Advanced Circuit Simulator",
+  "description": "e-Samastha — Integrated ECE Engineering Simulation & Learning Platform",
   "scripts": {
     "test": "node test/suite.js",
     "deploy": "firebase deploy --only hosting"

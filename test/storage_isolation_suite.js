@@ -99,13 +99,40 @@ async function runAsyncTests() {
         assert(!models.some(m => m.id === 'test_script_303'), 'Script must NOT be in models store');
     });
 
-    await test('Deletion is isolated to target store only', async () => {
-        await storage.deleteCircuit('test_circ_101');
+    await test('Saving Arduino project (.swino) only writes to Arduino store and does not pollute Circuits, Models, or Scripts', async () => {
+        const testArduino = {
+            id: 'test_arduino_404',
+            name: 'Ultrasonic Radar Project',
+            board: 'UNO',
+            code: 'void setup() {} void loop() {}',
+            components: [{ id: 'u1', type: 'ULTRASONIC' }],
+            wires: [],
+            updatedAt: Date.now()
+        };
+
+        await storage.saveArduinoProject(testArduino);
+
         const circuits = await storage.getCircuits();
         const models = await storage.getModels();
         const scripts = await storage.getScripts();
+        const arduinos = await storage.getArduinoProjects();
+
+        assert(arduinos.some(a => a.id === 'test_arduino_404'), 'Arduino project must be saved in arduino store');
+        assert(!circuits.some(c => c.id === 'test_arduino_404'), 'Arduino project must NOT be in circuits store');
+        assert(!models.some(m => m.id === 'test_arduino_404'), 'Arduino project must NOT be in models store');
+        assert(!scripts.some(s => s.id === 'test_arduino_404'), 'Arduino project must NOT be in scripts store');
+    });
+
+    await test('Deletion is isolated to target store only', async () => {
+        await storage.deleteCircuit('test_circ_101');
+        await storage.deleteArduinoProject('test_arduino_404');
+        const circuits = await storage.getCircuits();
+        const models = await storage.getModels();
+        const scripts = await storage.getScripts();
+        const arduinos = await storage.getArduinoProjects();
 
         assert(!circuits.some(c => c.id === 'test_circ_101'), 'Circuit must be deleted');
+        assert(!arduinos.some(a => a.id === 'test_arduino_404'), 'Arduino project must be deleted');
         assert(models.some(m => m.id === 'test_model_202'), 'Model must remain untouched');
         assert(scripts.some(s => s.id === 'test_script_303'), 'Script must remain untouched');
     });

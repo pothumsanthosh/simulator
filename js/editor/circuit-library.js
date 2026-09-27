@@ -627,7 +627,7 @@ export const CircuitLibrary = {
     id: 'universal-nor-gates',
     name: 'Universal Logic: NOR Gate Equivalents (NOT, OR, AND, XOR)',
     description: 'Complete universal realization of NOT, OR, AND, and XOR logic gates using exclusively 2-input NOR gates with interactive DG1-DG7 digital switches and glowing LED indicators.',
-    author: 'Switcha Lab',
+    author: 'e-Samastha Lab',
     stats: { stars: 342, copies: 1205, views: 284900 },
     timePerDiv: 0.001, // 1 ms/div
     voltsPerDiv: 1.0,
@@ -752,7 +752,7 @@ export const CircuitLibrary = {
     id: 'switch-spst-lamp',
     name: 'Interactive Switch & Light Bulb / LED Lamp',
     description: 'Dual interactive switch setup: SPST toggle switch powering an incandescent light bulb and glowing LED indicator with 9V DC source.',
-    author: 'Switcha Studio',
+    author: 'e-Samastha Studio',
     stats: { stars: 215, copies: 840, views: 154200 },
     timePerDiv: 0.001, // 1 ms/div
     voltsPerDiv: 2.0,
@@ -789,7 +789,7 @@ export const CircuitLibrary = {
     id: 'bjt-astable-multivibrator',
     name: 'Transistor (BJT) Astable Multivibrator Flasher',
     description: 'Classic dual-transistor cross-coupled multivibrator generating complementary anti-phase square waves to flash alternating Red and Green LEDs.',
-    author: 'Switcha Studio',
+    author: 'e-Samastha Studio',
     stats: { stars: 188, copies: 730, views: 142000 },
     timePerDiv: 0.002, // 2 ms/div (20ms display window shows multiple alternating square waves)
     voltsPerDiv: 2.0,

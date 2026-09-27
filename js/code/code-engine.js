@@ -2327,6 +2327,677 @@ export function transpileMatlab(code) {
 }
 
 // ==========================================
+// SAFE DETERMINISTIC AST & STATEMENT INTERPRETER
+// 100% CSP-Safe: Zero eval and Zero Function constructors
+// ==========================================
+function tokenizeSafe(code) {
+  const tokens = [];
+  let i = 0;
+  const len = code.length;
+
+  while (i < len) {
+    const ch = code[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    if ((ch === '/' && code[i + 1] === '/') || ch === '%') {
+      while (i < len && code[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && code[i + 1] === '*') {
+      i += 2;
+      while (i < len && !(code[i] === '*' && code[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    if (/\d/.test(ch) || (ch === '.' && i + 1 < len && /\d/.test(code[i + 1]))) {
+      let num = '';
+      while (i < len && (/[\d.]/.test(code[i]) || (/[eE]/.test(code[i]) && (code[i + 1] === '+' || code[i + 1] === '-' || /\d/.test(code[i + 1]))))) {
+        num += code[i];
+        if (/[eE]/.test(code[i]) && (code[i + 1] === '+' || code[i + 1] === '-')) {
+          i++;
+          num += code[i];
+        }
+        i++;
+      }
+      tokens.push({ type: 'number', value: Number(num) });
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i++;
+      let str = '';
+      while (i < len && code[i] !== quote) {
+        if (code[i] === '\\' && i + 1 < len) {
+          i++;
+          const esc = code[i];
+          if (esc === 'n') str += '\n';
+          else if (esc === 't') str += '\t';
+          else if (esc === 'r') str += '\r';
+          else str += esc;
+        } else {
+          str += code[i];
+        }
+        i++;
+      }
+      i++;
+      tokens.push({ type: 'string', value: str });
+      continue;
+    }
+    if (i + 2 < len) {
+      const three = code.slice(i, i + 3);
+      if (three === '===' || three === '!==') {
+        tokens.push({ type: 'op', value: three });
+        i += 3;
+        continue;
+      }
+    }
+    if (i + 1 < len) {
+      const two = code.slice(i, i + 2);
+      if (['==', '!=', '<=', '>=', '&&', '||', '+=', '-=', '*=', '/=', '**', '=>'].includes(two)) {
+        tokens.push({ type: 'op', value: two });
+        i += 2;
+        continue;
+      }
+    }
+    if ('+-*/%^=<>!&|?:.,;()[]{}'.includes(ch)) {
+      tokens.push({ type: 'punct', value: ch });
+      i++;
+      continue;
+    }
+    if (/[a-zA-Z_$]/.test(ch)) {
+      let id = '';
+      while (i < len && /[a-zA-Z0-9_$]/.test(code[i])) {
+        id += code[i];
+        i++;
+      }
+      if (id === 'true') tokens.push({ type: 'boolean', value: true });
+      else if (id === 'false') tokens.push({ type: 'boolean', value: false });
+      else if (id === 'null') tokens.push({ type: 'null', value: null });
+      else if (id === 'undefined') tokens.push({ type: 'undefined', value: undefined });
+      else tokens.push({ type: 'id', value: id });
+      continue;
+    }
+    i++;
+  }
+  return tokens;
+}
+
+export class SafeInterpreter {
+  constructor(scope) {
+    this.scope = scope;
+  }
+
+  run(code) {
+    const tokens = tokenizeSafe(code);
+    return this.runTokens(tokens);
+  }
+
+  evalTokens(tokens) {
+    const parser = this._createParser(tokens);
+    return parser.parseExpression();
+  }
+
+  runTokens(tokens) {
+    const parser = this._createParser(tokens);
+    let lastValue = undefined;
+    while (parser.hasMore()) {
+      lastValue = parser.parseStatement();
+    }
+    return lastValue;
+  }
+
+  _createParser(tokens) {
+    let pos = 0;
+    const peek = (offset = 0) => tokens[pos + offset];
+    const match = (val) => {
+      const t = peek();
+      if (t && (t.value === val || t.type === val)) {
+        pos++;
+        return t;
+      }
+      return null;
+    };
+    const expect = (val) => {
+      const t = match(val);
+      if (!t) throw new Error(`Unexpected token at ${pos}, expected: ${val}, got: ${peek()?.value}`);
+      return t;
+    };
+
+    const resolveValue = (val) => {
+      if (val && typeof val === 'object' && val.__isRef) {
+        return this.scope[val.name];
+      }
+      if (val && typeof val === 'object' && val.__isMember) {
+        return val.target[val.key];
+      }
+      if (val && val.__isLiteralArray) {
+        return val.map(resolveValue);
+      }
+      return val;
+    };
+
+    const parsePrimary = () => {
+      const t = peek();
+      if (!t) return undefined;
+
+      if (t.type === 'number' || t.type === 'string' || t.type === 'boolean' || t.type === 'null' || t.type === 'undefined') {
+        pos++;
+        return t.value;
+      }
+
+      // Single-parameter arrow function: x => expr
+      if (t.type === 'id' && peek(1)?.value === '=>') {
+        const paramName = t.value;
+        pos += 2;
+        if (peek()?.value === '{') {
+          pos++;
+          const bodyTokens = [];
+          let depth = 1;
+          while (pos < tokens.length && depth > 0) {
+            if (tokens[pos].value === '{') depth++;
+            else if (tokens[pos].value === '}') depth--;
+            if (depth > 0) bodyTokens.push(tokens[pos]);
+            pos++;
+          }
+          return (...fnArgs) => {
+            const localScope = Object.create(this.scope);
+            localScope[paramName] = fnArgs[0];
+            const sub = new SafeInterpreter(localScope);
+            return sub.runTokens(bodyTokens);
+          };
+        } else {
+          const bodyTokens = [];
+          let pD = 0, bD = 0;
+          while (pos < tokens.length) {
+            const pv = peek().value;
+            if (pv === '(') pD++;
+            else if (pv === ')') { if (pD === 0) break; pD--; }
+            else if (pv === '[') bD++;
+            else if (pv === ']') { if (bD === 0) break; bD--; }
+            else if ((pv === ';' || pv === ',') && pD === 0 && bD === 0) break;
+            bodyTokens.push(tokens[pos]);
+            pos++;
+          }
+          return (...fnArgs) => {
+            const localScope = Object.create(this.scope);
+            localScope[paramName] = fnArgs[0];
+            const sub = new SafeInterpreter(localScope);
+            return sub.evalTokens(bodyTokens);
+          };
+        }
+      }
+
+      if (t.type === 'id') {
+        pos++;
+        return { __isRef: true, name: t.value };
+      }
+
+      if (t.value === '(') {
+        let lookAhead = 1;
+        let isArrow = false;
+        let pDepth = 1;
+        while (pos + lookAhead < tokens.length) {
+          if (tokens[pos + lookAhead].value === '(') pDepth++;
+          else if (tokens[pos + lookAhead].value === ')') {
+            pDepth--;
+            if (pDepth === 0) {
+              if (tokens[pos + lookAhead + 1]?.value === '=>') {
+                isArrow = true;
+              }
+              break;
+            }
+          }
+          lookAhead++;
+        }
+
+        if (isArrow) {
+          pos++;
+          const params = [];
+          while (pos < tokens.length && peek().value !== ')') {
+            if (peek().type === 'id') params.push(peek().value);
+            pos++;
+            if (peek()?.value === ',') pos++;
+          }
+          expect(')');
+          expect('=>');
+
+          if (peek()?.value === '{') {
+            pos++;
+            const bodyTokens = [];
+            let depth = 1;
+            while (pos < tokens.length && depth > 0) {
+              if (tokens[pos].value === '{') depth++;
+              else if (tokens[pos].value === '}') depth--;
+              if (depth > 0) bodyTokens.push(tokens[pos]);
+              pos++;
+            }
+            return (...fnArgs) => {
+              const localScope = Object.create(this.scope);
+              params.forEach((p, idx) => localScope[p] = fnArgs[idx]);
+              const sub = new SafeInterpreter(localScope);
+              return sub.runTokens(bodyTokens);
+            };
+          } else {
+            const bodyTokens = [];
+            let pD = 0, bD = 0;
+            while (pos < tokens.length) {
+              const pv = peek().value;
+              if (pv === '(') pD++;
+              else if (pv === ')') { if (pD === 0) break; pD--; }
+              else if (pv === '[') bD++;
+              else if (pv === ']') { if (bD === 0) break; bD--; }
+              else if ((pv === ';' || pv === ',') && pD === 0 && bD === 0) break;
+              bodyTokens.push(tokens[pos]);
+              pos++;
+            }
+            return (...fnArgs) => {
+              const localScope = Object.create(this.scope);
+              params.forEach((p, idx) => localScope[p] = fnArgs[idx]);
+              const sub = new SafeInterpreter(localScope);
+              return sub.evalTokens(bodyTokens);
+            };
+          }
+        }
+
+        pos++;
+        const expr = parseExpression();
+        expect(')');
+        return expr;
+      }
+
+      // Array literal [a, b, c]
+      if (t.value === '[') {
+        pos++;
+        const elements = [];
+        elements.__isLiteralArray = true;
+        while (pos < tokens.length && peek().value !== ']') {
+          elements.push(parseExpression());
+          if (peek()?.value === ',') pos++;
+        }
+        expect(']');
+        return elements;
+      }
+
+      // Object literal { a: 1, b: 2 }
+      if (t.value === '{') {
+        pos++;
+        const obj = {};
+        while (pos < tokens.length && peek().value !== '}') {
+          const keyTok = expect('id');
+          expect(':');
+          const val = resolveValue(parseExpression());
+          obj[keyTok.value] = val;
+          if (peek()?.value === ',') pos++;
+        }
+        expect('}');
+        return obj;
+      }
+
+      return undefined;
+    };
+
+    const parseCallOrMember = () => {
+      let base = parsePrimary();
+
+      while (pos < tokens.length) {
+        const next = peek();
+        if (!next) break;
+
+        if (next.value === '.') {
+          pos++;
+          const propTok = expect('id');
+          const targetObj = resolveValue(base);
+          base = { __isMember: true, target: targetObj, key: propTok.value };
+        } else if (next.value === '[') {
+          pos++;
+          const idxVal = resolveValue(parseExpression());
+          expect(']');
+          const targetObj = resolveValue(base);
+          base = { __isMember: true, target: targetObj, key: idxVal };
+        } else if (next.value === '(') {
+          pos++;
+          const args = [];
+          while (pos < tokens.length && peek().value !== ')') {
+            args.push(resolveValue(parseExpression()));
+            if (peek()?.value === ',') pos++;
+          }
+          expect(')');
+
+          let fn;
+          let ctx = this.scope;
+          if (base && base.__isMember) {
+            ctx = base.target;
+            fn = base.target[base.key];
+          } else {
+            fn = resolveValue(base);
+          }
+
+          if (typeof fn !== 'function') {
+            throw new Error(`${base?.name || base?.key || 'Expression'} is not a function`);
+          }
+          base = fn.apply(ctx, args);
+        } else {
+          break;
+        }
+      }
+
+      return base;
+    };
+
+    const parseUnary = () => {
+      const t = peek();
+      if (t && (t.value === '-' || t.value === '+' || t.value === '!')) {
+        pos++;
+        const operand = resolveValue(parseUnary());
+        if (t.value === '-') return -operand;
+        if (t.value === '+') return +operand;
+        if (t.value === '!') return !operand;
+      }
+      return parseCallOrMember();
+    };
+
+    const parseExponentiation = () => {
+      let left = parseUnary();
+      while (peek()?.value === '**' || peek()?.value === '^') {
+        pos++;
+        const right = parseUnary();
+        left = Math.pow(resolveValue(left), resolveValue(right));
+      }
+      return left;
+    };
+
+    const parseMultiplicative = () => {
+      let left = parseExponentiation();
+      while (peek() && ['*', '/', '%'].includes(peek().value)) {
+        const op = peek().value;
+        pos++;
+        const right = parseExponentiation();
+        const lVal = resolveValue(left);
+        const rVal = resolveValue(right);
+        if (op === '*') left = lVal * rVal;
+        else if (op === '/') left = lVal / rVal;
+        else if (op === '%') left = lVal % rVal;
+      }
+      return left;
+    };
+
+    const parseAdditive = () => {
+      let left = parseMultiplicative();
+      while (peek() && (peek().value === '+' || peek().value === '-')) {
+        const op = peek().value;
+        pos++;
+        const right = parseMultiplicative();
+        const lVal = resolveValue(left);
+        const rVal = resolveValue(right);
+        if (op === '+') left = lVal + rVal;
+        else if (op === '-') left = lVal - rVal;
+      }
+      return left;
+    };
+
+    const parseRelational = () => {
+      let left = parseAdditive();
+      while (peek() && ['<', '<=', '>', '>='].includes(peek().value)) {
+        const op = peek().value;
+        pos++;
+        const right = parseAdditive();
+        const lVal = resolveValue(left);
+        const rVal = resolveValue(right);
+        if (op === '<') left = lVal < rVal;
+        else if (op === '<=') left = lVal <= rVal;
+        else if (op === '>') left = lVal > rVal;
+        else if (op === '>=') left = lVal >= rVal;
+      }
+      return left;
+    };
+
+    const parseEquality = () => {
+      let left = parseRelational();
+      while (peek() && ['==', '!=', '===', '!=='].includes(peek().value)) {
+        const op = peek().value;
+        pos++;
+        const right = parseRelational();
+        const lVal = resolveValue(left);
+        const rVal = resolveValue(right);
+        if (op === '==' || op === '===') left = (lVal === rVal);
+        else if (op === '!=' || op === '!==') left = (lVal !== rVal);
+      }
+      return left;
+    };
+
+    const parseLogicalAnd = () => {
+      let left = parseEquality();
+      while (peek()?.value === '&&') {
+        pos++;
+        const right = parseEquality();
+        left = resolveValue(left) && resolveValue(right);
+      }
+      return left;
+    };
+
+    const parseLogicalOr = () => {
+      let left = parseLogicalAnd();
+      while (peek()?.value === '||') {
+        pos++;
+        const right = parseLogicalAnd();
+        left = resolveValue(left) || resolveValue(right);
+      }
+      return left;
+    };
+
+    const parseAssignment = () => {
+      const left = parseLogicalOr();
+      const next = peek();
+
+      if (next && ['=', '+=', '-=', '*=', '/='].includes(next.value)) {
+        const op = next.value;
+        pos++;
+        const rhs = resolveValue(parseAssignment());
+
+        if (left && left.__isRef) {
+          if (op === '=') this.scope[left.name] = rhs;
+          else if (op === '+=') this.scope[left.name] = resolveValue(left) + rhs;
+          else if (op === '-=') this.scope[left.name] = resolveValue(left) - rhs;
+          else if (op === '*=') this.scope[left.name] = resolveValue(left) * rhs;
+          else if (op === '/=') this.scope[left.name] = resolveValue(left) / rhs;
+          return this.scope[left.name];
+        }
+
+        if (left && left.__isMember) {
+          if (op === '=') left.target[left.key] = rhs;
+          else if (op === '+=') left.target[left.key] = resolveValue(left) + rhs;
+          else if (op === '-=') left.target[left.key] = resolveValue(left) - rhs;
+          else if (op === '*=') left.target[left.key] = resolveValue(left) * rhs;
+          else if (op === '/=') left.target[left.key] = resolveValue(left) / rhs;
+          return left.target[left.key];
+        }
+
+        if (Array.isArray(left)) {
+          for (let di = 0; di < left.length; di++) {
+            const elem = left[di];
+            if (elem && elem.__isRef) {
+              this.scope[elem.name] = rhs[di];
+            }
+          }
+          return rhs;
+        }
+
+        throw new Error('Invalid left-hand side in assignment');
+      }
+
+      return left;
+    };
+
+    const parseExpression = () => {
+      return parseAssignment();
+    };
+
+    const parseStatement = () => {
+      if (pos >= tokens.length) return null;
+      const t = peek();
+
+      if (t.value === ';') {
+        pos++;
+        return null;
+      }
+
+      if (t.value === '{') {
+        pos++;
+        let blkVal;
+        while (pos < tokens.length && peek().value !== '}') {
+          blkVal = parseStatement();
+        }
+        expect('}');
+        return blkVal;
+      }
+
+      if (t.type === 'id' && (t.value === 'const' || t.value === 'let' || t.value === 'var')) {
+        pos++;
+        const expr = parseExpression();
+        if (peek()?.value === ';') pos++;
+        return resolveValue(expr);
+      }
+
+      if (t.type === 'id' && t.value === 'if') {
+        pos++;
+        expect('(');
+        const cond = resolveValue(parseExpression());
+        expect(')');
+        let res;
+        if (cond) {
+          res = parseStatement();
+          if (peek()?.type === 'id' && peek().value === 'else') {
+            pos++;
+            skipStatement();
+          }
+        } else {
+          skipStatement();
+          if (peek()?.type === 'id' && peek().value === 'else') {
+            pos++;
+            res = parseStatement();
+          }
+        }
+        return res;
+      }
+
+      if (t.type === 'id' && t.value === 'while') {
+        pos++;
+        const condStart = pos;
+        expect('(');
+        let cond = resolveValue(parseExpression());
+        expect(')');
+        const bodyStart = pos;
+
+        let iterations = 0;
+        while (cond && iterations < 100000) {
+          iterations++;
+          parseStatement();
+          pos = condStart;
+          expect('(');
+          cond = resolveValue(parseExpression());
+          expect(')');
+        }
+        pos = bodyStart;
+        skipStatement();
+        return null;
+      }
+
+      if (t.type === 'id' && t.value === 'for') {
+        pos++;
+        expect('(');
+        if (peek()?.value === 'let' || peek()?.value === 'const' || peek()?.value === 'var') pos++;
+
+        const loopVarTok = expect('id');
+        if (peek()?.type === 'id' && peek().value === 'of') {
+          pos++;
+          const iterable = resolveValue(parseExpression());
+          expect(')');
+          const bodyStart = pos;
+
+          for (const item of (iterable || [])) {
+            this.scope[loopVarTok.value] = item;
+            pos = bodyStart;
+            parseStatement();
+          }
+          pos = bodyStart;
+          skipStatement();
+          return null;
+        }
+
+        if (peek()?.value === '=') {
+          pos++;
+          this.scope[loopVarTok.value] = resolveValue(parseExpression());
+        }
+        expect(';');
+        const condPos = pos;
+        let cond = resolveValue(parseExpression());
+        expect(';');
+        const stepPos = pos;
+        let depth = 1;
+        while (pos < tokens.length && depth > 0) {
+          if (tokens[pos].value === '(') depth++;
+          else if (tokens[pos].value === ')') depth--;
+          pos++;
+        }
+        const bodyPos = pos;
+
+        let loopLimit = 0;
+        while (cond && loopLimit < 100000) {
+          loopLimit++;
+          pos = bodyPos;
+          parseStatement();
+          pos = stepPos;
+          parseExpression();
+          pos = condPos;
+          cond = resolveValue(parseExpression());
+        }
+        pos = bodyPos;
+        skipStatement();
+        return null;
+      }
+
+      if (t.type === 'id' && t.value === 'return') {
+        pos++;
+        let retVal = undefined;
+        if (peek()?.value !== ';') {
+          retVal = resolveValue(parseExpression());
+        }
+        if (peek()?.value === ';') pos++;
+        return retVal;
+      }
+
+      const expr = parseExpression();
+      if (peek()?.value === ';') pos++;
+      return resolveValue(expr);
+    };
+
+    const skipStatement = () => {
+      if (pos >= tokens.length) return;
+      const t = peek();
+      if (t.value === '{') {
+        pos++;
+        let depth = 1;
+        while (pos < tokens.length && depth > 0) {
+          if (tokens[pos].value === '{') depth++;
+          else if (tokens[pos].value === '}') depth--;
+          pos++;
+        }
+      } else {
+        while (pos < tokens.length && tokens[pos].value !== ';') {
+          pos++;
+        }
+        if (tokens[pos]?.value === ';') pos++;
+      }
+    };
+
+    return {
+      hasMore: () => pos < tokens.length,
+      parseStatement,
+      parseExpression: () => resolveValue(parseExpression())
+    };
+  }
+}
+
+// ==========================================
 // CODE RUNTIME & SANDBOX EXECUTION ENGINE
 // ==========================================
 export class CodeEngine {
@@ -2776,8 +3447,8 @@ export class CodeEngine {
 
       const transformedCode = transpileMatlab(sourceCode);
 
-      const fn = new Function('scope', `with(scope) { return (function() { ${transformedCode} })(); }`);
-      const result = fn(scopeProxy);
+      const interpreter = new SafeInterpreter(scopeProxy);
+      const result = interpreter.run(transformedCode);
 
       if (this.onVariablesUpdated) this.onVariablesUpdated(this.getVariablesList());
       return { result, error: null, success: true };

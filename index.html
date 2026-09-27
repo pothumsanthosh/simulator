@@ -4,8 +4,8 @@
   <meta charset="utf-8"/>
   <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Switcha - Build, Switch & Simulate Circuits</title>
-  <meta name="description" content="Switcha is a modern interactive electronic and digital circuit simulator with live switches, logic gates, SPICE engine, offline mode, and personal My Circuits library." />
+  <title>e-Samastha | ECE Engineering Simulation Platform</title>
+  <meta name="description" content="e-Samastha is an integrated ECE engineering simulation and learning platform for designing, simulating, saving, and managing electronic circuits and engineering projects." />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml"/>
   <link rel="apple-touch-icon" href="icons/icon.svg"/>
   <link rel="manifest" href="manifest.json"/>
@@ -21,12 +21,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css"/>
   <link rel="stylesheet" href="css/simulator.css"/>
+  <link rel="stylesheet" href="css/arduino.css"/>
 </head>
 <body>
 
-  <!-- Top Announcement Notice (Switcha 2.0 Welcome Banner) -->
+  <!-- Top Announcement Notice (e-Samastha Welcome Banner) -->
   <div class="topbar--announcement" id="topAnnouncement">
-    <span>⚡ <strong>Switcha 2.0</strong> — Design. Switch. Simulate. Build interactive electronic & digital circuits with live switches, offline simulation & cloud sync!</span>
+    <span>⚡ <strong>e-Samastha</strong> — Engineering. Simulated. Simplified. Integrated ECE engineering simulation & learning platform!</span>
     <button class="announcement-close" id="btnCloseAnnouncement" title="Dismiss announcement">✕</button>
   </div>
 
@@ -34,24 +35,20 @@
   <header class="topbar">
     <div class="topbar-container">
       <div class="topbar-left">
-        <a href="#/" class="branding-link" title="Switcha Home">
-          <!-- Switcha Modern Vector Logo -->
-          <svg id="switcha_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 38" height="34" width="143">
+        <a href="#/" class="branding-link" title="e-Samastha Home">
+          <!-- e-Samastha Modern Vector Logo -->
+          <svg id="esamastha_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 38" height="34" width="168">
             <defs>
-              <linearGradient id="switchaLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="esamasthaLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#03b585"/>
                 <stop offset="100%" stop-color="#0284c7"/>
               </linearGradient>
             </defs>
-            <rect x="2" y="4" width="30" height="30" rx="8" fill="url(#switchaLogoGrad)"/>
-            <!-- Switch Icon -->
-            <line x1="6" y1="19" x2="12" y2="19" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-            <circle cx="12" cy="19" r="2" fill="#ffffff"/>
-            <line x1="13" y1="18" x2="22" y2="11" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
-            <circle cx="23" cy="19" r="2" fill="#ffffff"/>
-            <line x1="24" y1="19" x2="28" y2="19" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-            <polygon points="18,12 15,20 19,20 16,28 22,18 18,18" fill="#facc15"/>
-            <text x="38" y="25" font-family="'Lato', -apple-system, sans-serif" font-size="21" font-weight="900" fill="#2b2d2f" letter-spacing="-0.5px">Switch<tspan fill="#03b585">a</tspan></text>
+            <rect x="2" y="4" width="30" height="30" rx="8" fill="url(#esamasthaLogoGrad)"/>
+            <!-- Stylized lowercase e + circuit-node electronic trace motif -->
+            <path d="M22 14 C20 10 12 10 10 16 C8 22 14 26 21 24 M9 17 H22" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round"/>
+            <circle cx="21" cy="24" r="2.2" fill="#38bdf8"/>
+            <text x="38" y="25" font-family="'Lato', -apple-system, sans-serif" font-size="20" font-weight="900" fill="#2b2d2f" letter-spacing="-0.4px">e-<tspan fill="#03b585">Samastha</tspan></text>
           </svg>
         </a>
 
@@ -60,6 +57,7 @@
             <li class="nav-item"><a href="#/create" class="nav-link" id="nav-circuits-env" style="font-weight: 700; color: #03b585;">🔌 Circuits</a></li>
             <li class="nav-item"><a href="#/blocks" class="nav-link" id="nav-blocks-env" style="font-weight: 700; color: #3b82f6;">🧩 Blocks</a></li>
             <li class="nav-item"><a href="#/code" class="nav-link" id="nav-code-env" style="font-weight: 700; color: #8b5cf6;">💻 Code</a></li>
+            <li class="nav-item"><a href="#/labs/arduino" class="nav-link" id="nav-arduino-env" style="font-weight: 700; color: #00878a;">⚡ Arduino</a></li>
             <li class="nav-item"><a href="#/my-circuits" class="nav-link" id="nav-my-circuits">📁 My Circuits</a></li>
             <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
             <li class="nav-item nav-item--dropdown">
@@ -83,8 +81,8 @@
           <span id="networkStatusText">Online</span>
         </div>
 
-        <button class="btn btn-outline" id="btnNavInstall" title="Download and install Switcha on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
-        <a href="#/create" class="btn btn-launch-sim">⚡ Launch Switcha</a>
+        <button class="btn btn-outline" id="btnNavInstall" title="Download and install e-Samastha on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
+        <a href="#/create" class="btn btn-launch-sim">⚡ Launch e-Samastha</a>
 
         <!-- Logged Out Guest Controls -->
         <div id="authGuestControls" style="display: inline-flex; align-items: center; gap: 8px;">
@@ -114,9 +112,9 @@
       <!-- Hero Banner -->
       <section class="banner--home">
         <div class="banner-content">
-          <span class="banner-badge">⚡ Build • Connect • Switch • Simulate</span>
-          <h1 class="banner-title">SWITCHA</h1>
-          <p class="banner-subtitle">Design. Switch. Simulate. The modern circuit simulator with interactive switches, digital components & offline auto-sync.</p>
+          <span class="banner-badge">⚡ Integrated ECE Engineering Simulation & Learning Platform</span>
+          <h1 class="banner-title">e-Samastha</h1>
+          <p class="banner-subtitle">Engineering. Simulated. Simplified. Integrated ECE engineering simulation and learning platform for designing, simulating, saving, and managing electronic circuits and engineering projects.</p>
           <div class="banner-actions">
             <a href="#/create" class="btn btn-primary btn-xlarge">⚡ Launch Simulator</a>
             <a href="#/my-circuits" class="btn btn-secondary btn-xlarge">📁 My Circuits</a>
@@ -393,7 +391,7 @@
       <footer class="footer">
         <div class="footer-container">
           <div>
-            <p>&copy; 2026 Switcha. All rights reserved. Design. Switch. Simulate. Modern interactive electronic & digital simulation suite.</p>
+            <p>&copy; 2026 e-Samastha. All rights reserved. Engineering. Simulated. Simplified. Integrated ECE engineering simulation & learning platform.</p>
             <div class="footer-links">
               <a href="#/features">Features</a>
               <a href="#/my-circuits">My Circuits</a>
@@ -403,7 +401,7 @@
             </div>
           </div>
           <div>
-            <span style="font-weight: bold; color: #03b585; font-size: 15px;">⚡ Switcha</span>
+            <span style="font-weight: bold; color: #03b585; font-size: 15px;">⚡ e-Samastha</span>
           </div>
         </div>
       </footer>
@@ -414,6 +412,14 @@
          ==================================================================== -->
     <div class="view-page" id="view-studio">
       <div class="studio-wrapper">
+        <!-- Admin Read-Only Inspection Banner -->
+        <div class="admin-inspection-banner" id="adminInspectionBanner">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>🔍 <strong>ADMIN INSPECTION MODE (READ-ONLY)</strong> — Viewing student circuit (<span id="inspectCircuitInfo"></span>). Modifications and saving are disabled.</span>
+          </div>
+          <a href="#/admin" class="btn btn-outline" style="padding: 3px 10px; font-size: 12px; font-weight: 700; border-color: #f59e0b; color: #92400e; text-decoration: none; background: #fef3c7;">← Return to Admin Portal</a>
+        </div>
+
         <!-- Studio Toolbar -->
         <div class="studio-toolbar">
           <div class="studio-toolbar-left">
@@ -865,6 +871,13 @@
     </div>
 
     <!-- ====================================================================
+         VIEW: ARDUINO IDE & HARDWARE LAB (#/labs/arduino or #/arduino)
+         ==================================================================== -->
+    <div class="view-page" id="view-arduino">
+      <div id="arduinoLabContainer" style="width: 100%; height: 100%;"></div>
+    </div>
+
+    <!-- ====================================================================
          VIEW: MY WORKSPACE (/my-circuits /workspace)
          ==================================================================== -->
     <div class="view-page" id="view-my-circuits">
@@ -881,11 +894,12 @@
           </div>
         </div>
 
-        <!-- Workspace Tabs (Circuits / Models / Scripts) -->
+        <!-- Workspace Tabs (Circuits / Models / Scripts / Arduino) -->
         <div class="filter-tabs" style="margin-bottom: 16px;">
           <button class="filter-tab active" id="tabWorkspaceCircuits" data-workspace-tab="circuits">🔌 Circuits (.swcirc)</button>
           <button class="filter-tab" id="tabWorkspaceModels" data-workspace-tab="models">🧩 Models (.swblock)</button>
           <button class="filter-tab" id="tabWorkspaceScripts" data-workspace-tab="scripts">💻 Scripts (.swcode)</button>
+          <button class="filter-tab" id="tabWorkspaceArduino" data-workspace-tab="arduino">⚡ Arduino (.swino)</button>
         </div>
 
         <div class="my-circuits-toolbar">
@@ -967,6 +981,202 @@
           </div>
         </div>
       </div>
+    <!-- ====================================================================
+         VIEW: ADMIN LOGIN (#/admin/login)
+         ==================================================================== -->
+    <div class="view-page" id="view-admin-login">
+      <div class="admin-login-container">
+        <div class="admin-login-card">
+          <div class="admin-login-header">
+            <div class="admin-shield-icon">🛡️</div>
+            <h2>e-Samastha Admin</h2>
+            <p><strong>Platform Administration</strong> — Elevated access restricted to authorized administrators. Authentication and claims are cryptographically verified.</p>
+          </div>
+          
+          <div id="adminLoginAlert" class="admin-alert error" style="display: none;"></div>
+
+          <form id="adminLoginForm">
+            <div class="form-group">
+              <label class="form-label" for="adminEmail">Admin Email</label>
+              <input type="email" id="adminEmail" class="form-control" placeholder="admin@domain.com" required autocomplete="username"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="adminPassword">Admin Password</label>
+              <input type="password" id="adminPassword" class="form-control" placeholder="••••••••••••" required autocomplete="current-password"/>
+            </div>
+            <button type="submit" id="btnAdminLoginSubmit" class="btn btn-primary btn-large" style="width: 100%; font-weight: 700; margin-top: 8px;">
+              🔐 Authenticate Administrator
+            </button>
+          </form>
+
+          <div class="admin-login-footer">
+            <a href="#/create" class="admin-back-link">← Return to Circuit Studio</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW: ADMIN DASHBOARD (#/admin)
+         ==================================================================== -->
+    <div class="view-page" id="view-admin">
+      <div class="admin-dashboard-wrapper">
+        <!-- Admin Dashboard Header -->
+        <div class="admin-dashboard-header">
+          <div class="admin-header-left">
+            <div class="admin-brand-badge">
+              <span class="shield-dot"></span>
+              <strong>e-SAMASTHA ADMIN CONSOLE</strong>
+            </div>
+            <span class="admin-account-badge" id="adminCurrentEmail">admin@e-samastha</span>
+          </div>
+          <div class="admin-header-right">
+            <button class="btn btn-outline" id="btnAdminRefresh" title="Refresh Live Data">🔄 Refresh</button>
+            <a href="#/create" class="btn btn-outline" title="Launch Simulator">🔌 Circuit Studio</a>
+            <button class="btn btn-primary" id="btnAdminLogout" style="background: #ef4444; border-color: #ef4444;">🚪 Admin Logout</button>
+          </div>
+        </div>
+
+        <!-- Metric Stat Cards (Factual statistics: 0 if empty) -->
+        <div class="admin-metrics-grid">
+          <div class="admin-metric-card">
+            <div class="metric-icon" style="background: rgba(3, 181, 133, 0.1); color: #03b585;">👥</div>
+            <div class="metric-data">
+              <div class="metric-value" id="statTotalUsers">0</div>
+              <div class="metric-label">Total Users</div>
+            </div>
+          </div>
+          <div class="admin-metric-card">
+            <div class="metric-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">⚡</div>
+            <div class="metric-data">
+              <div class="metric-value" id="statActiveUsers">0</div>
+              <div class="metric-label">Active Users</div>
+            </div>
+          </div>
+          <div class="admin-metric-card">
+            <div class="metric-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">💾</div>
+            <div class="metric-data">
+              <div class="metric-value" id="statTotalCircuits">0</div>
+              <div class="metric-label">Saved Circuits</div>
+            </div>
+          </div>
+          <div class="admin-metric-card">
+            <div class="metric-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">🌐</div>
+            <div class="metric-data">
+              <div class="metric-value" id="statPublicCircuits">0</div>
+              <div class="metric-label">Public Circuits</div>
+            </div>
+          </div>
+          <div class="admin-metric-card">
+            <div class="metric-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">📜</div>
+            <div class="metric-data">
+              <div class="metric-value" id="statRecentActivity">0</div>
+              <div class="metric-label">Audit Events</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Tabs / Navigation -->
+        <div class="admin-tabs-nav">
+          <button class="admin-tab-btn active" data-admin-tab="users">👥 User Management</button>
+          <button class="admin-tab-btn" data-admin-tab="circuits">🔌 Circuit Management</button>
+          <button class="admin-tab-btn" data-admin-tab="activity">📜 Activity Audit Trail</button>
+        </div>
+
+        <!-- Tab 1: User Management -->
+        <div class="admin-tab-content active" id="adminTabUsers">
+          <div class="admin-section-toolbar">
+            <div class="admin-search-box">
+              <input type="text" id="adminUserSearch" class="admin-search-input" placeholder="🔍 Search users by email, name, or UID..."/>
+            </div>
+            <div class="admin-filter-actions">
+              <span id="userCountSummary" style="font-size: 13px; color: var(--text-muted);">0 users loaded</span>
+            </div>
+          </div>
+
+          <div class="admin-table-container">
+            <table class="admin-data-table" id="adminUsersTable">
+              <thead>
+                <tr>
+                  <th>User / Name</th>
+                  <th>Email</th>
+                  <th>UID</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Last Active</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Circuit Management -->
+        <div class="admin-tab-content" id="adminTabCircuits">
+          <div class="admin-section-toolbar">
+            <div class="admin-search-box">
+              <input type="text" id="adminCircuitSearch" class="admin-search-input" placeholder="🔍 Search circuits by name, owner, or ID..."/>
+            </div>
+            <div class="admin-filter-actions">
+              <span id="circuitCountSummary" style="font-size: 13px; color: var(--text-muted);">0 circuits loaded</span>
+            </div>
+          </div>
+
+          <div class="admin-table-container">
+            <table class="admin-data-table" id="adminCircuitsTable">
+              <thead>
+                <tr>
+                  <th>Circuit Name</th>
+                  <th>Owner</th>
+                  <th>Owner UID</th>
+                  <th>Visibility</th>
+                  <th>Components</th>
+                  <th>Last Updated</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminCircuitsTableBody">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading circuits...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 3: Activity Audit Log -->
+        <div class="admin-tab-content" id="adminTabActivity">
+          <div class="admin-section-toolbar">
+            <div class="admin-search-box">
+              <input type="text" id="adminActivitySearch" class="admin-search-input" placeholder="🔍 Filter audit events by type, actor, or ID..."/>
+            </div>
+            <div class="admin-filter-actions">
+              <button class="btn btn-outline" id="btnRefreshLogs" style="font-size: 12px; padding: 4px 8px;">🔄 Refresh Logs</button>
+            </div>
+          </div>
+
+          <div class="admin-table-container">
+            <table class="admin-data-table" id="adminActivityTable">
+              <thead>
+                <tr>
+                  <th>Event Type</th>
+                  <th>Actor Email</th>
+                  <th>Actor UID</th>
+                  <th>Target ID</th>
+                  <th>Metadata</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="adminActivityTableBody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading activity audit logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
     </div>
 
   </div>
@@ -979,7 +1189,7 @@
     <div class="modal-content" style="max-width: 480px;">
       <div class="modal-header">
         <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 20px;">📲</span> Install Switcha
+          <span style="font-size: 20px;">📲</span> Install e-Samastha
         </h3>
         <button class="modal-close" data-close="installModal">&times;</button>
       </div>
@@ -990,7 +1200,7 @@
               <path d="M4 16 H10 L13 8 L18 24 L21 12 L24 16 H28" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <h4 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Switcha Web App</h4>
+          <h4 style="font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">e-Samastha Web App</h4>
           <p style="font-size: 13px; color: var(--text-muted);">Install on Windows, Mac, Linux, Android, iPhone or iPad for instant offline simulation!</p>
         </div>
 
@@ -1004,7 +1214,7 @@
         </div>
 
         <button class="btn btn-primary btn-large" id="btnTriggerInstallPrompt" style="width: 100%; font-weight: 700; font-size: 15px;">
-          ⬇️ Install Switcha Now
+          ⬇️ Install e-Samastha Now
         </button>
       </div>
     </div>
@@ -1014,7 +1224,7 @@
   <div class="modal-overlay" id="loginModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Log in to Switcha</h3>
+        <h3 class="modal-title">Log in to e-Samastha</h3>
         <button class="modal-close" data-close="loginModal">&times;</button>
       </div>
       <div class="modal-body">
@@ -1038,7 +1248,7 @@
   <div class="modal-overlay" id="signupModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Create Free Switcha Account</h3>
+        <h3 class="modal-title">Create Free e-Samastha Account</h3>
         <button class="modal-close" data-close="signupModal">&times;</button>
       </div>
       <div class="modal-body">
@@ -1125,6 +1335,31 @@
   <!-- Spectrum Analyzer Modal -->
   <div class="modal-overlay" id="spectrumAnalyzerModal">
     <div class="modal-content" id="spectrumAnalyzerModalContent" style="max-width: 840px; width: 92%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 0; border-radius: 12px; overflow: hidden;">
+    </div>
+  </div>
+
+  <!-- Admin Delete Confirmation Modal -->
+  <div class="modal-overlay" id="adminDeleteModal">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header" style="background: #fef2f2; border-bottom: 1px solid #fee2e2;">
+        <h3 class="modal-title" style="color: #b91c1c; display: flex; align-items: center; gap: 8px;">
+          <span>⚠️</span> Confirm Permanent Deletion
+        </h3>
+        <button class="modal-close" data-close="adminDeleteModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13.5px; color: #374151; margin-bottom: 12px;">
+          Are you sure you want to permanently delete circuit <strong id="adminDeleteCircuitName"></strong>?
+        </p>
+        <p style="font-size: 12.5px; color: #b91c1c; background: #fff1f2; padding: 10px; border-radius: 6px; border: 1px solid #ffe4e6; margin-bottom: 14px;">
+          This action cannot be undone. To prevent accidental deletion, type <strong>DELETE</strong> below:
+        </p>
+        <input type="text" id="adminDeleteConfirmInput" class="form-control" placeholder="Type DELETE to confirm" style="margin-bottom: 14px;"/>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn btn-outline" data-close="adminDeleteModal">Cancel</button>
+          <button class="btn btn-primary" id="btnAdminConfirmDelete" disabled style="background: #ef4444; border-color: #ef4444;">Permanently Delete</button>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -20,6 +20,7 @@ import { BlockLibrary, SwitchaBlocksLibrary } from './blocks/block-library.js';
 import { SwitchaMath, CodeEngine, SwitchaCodeEngine } from './code/code-engine.js?v=2.3';
 import { SwitchaPlot, SwitchaPlotter } from './code/code-plotter.js?v=2.3';
 import { SwitchaCodeEditor } from './code/code-editor.js?v=2.3';
+import { ArduinoController } from './arduino/arduino-controller.js';
 
 class SwitchaApp {
   constructor() {
@@ -42,6 +43,9 @@ class SwitchaApp {
 
     // Switcha Code Environment
     this.codeEditor = null;
+
+    // Arduino IDE & Hardware Lab Environment
+    this.arduinoController = null;
 
     // Lab Instruments Suite
     this.instruments = { dmm: null, logicAnalyzer: null, spectrumAnalyzer: null };
@@ -103,11 +107,13 @@ class SwitchaApp {
     this.initLabInstruments();
     this.initBlocksEnvironment();
     this.initCodeEnvironment();
+    this.initArduinoEnvironment();
     this.initRouter();
     this.initToolbarControls();
     this.initModals();
     this.initFeaturedCards();
     this.initDiscoverPage();
+    this.initAdminPortal();
     this.initSplitGutter();
     this.initQuickSearch();
 
@@ -179,7 +185,7 @@ class SwitchaApp {
         id: 'circuit_starter_rc_oscillator',
         name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
         description: '3-Stage High-Pass RC Ladder Sine Wave Oscillator with LM741 Op-Amp (C1=C2=C3=100nF, R3=R4=R5=3.3kΩ, Rin=33kΩ, Rf=1.5MΩ, R6=33kΩ) producing spontaneous, continuous ~200Hz sinusoidal oscillations.',
-        author: 'Switcha Studio',
+        author: 'e-Samastha Studio',
         updatedAt: Date.now() - 900000,
         presetKey: 'rcPhaseShiftOscillator',
         components: [],
@@ -189,7 +195,7 @@ class SwitchaApp {
         id: 'circuit_starter_sample_hold',
         name: 'Sample & Hold Amplifier Circuit',
         description: 'Precision Analog-to-Digital Converter front-end Sample & Hold circuit sampling a 1 kHz analog sine wave at 10 kHz clock rate with holding capacitor and buffered staircase waveform output.',
-        author: 'Switcha Studio',
+        author: 'e-Samastha Studio',
         updatedAt: Date.now() - 600000,
         presetKey: 'sampleAndHoldCircuit',
         components: [],
@@ -199,7 +205,7 @@ class SwitchaApp {
         id: 'circuit_starter_1',
         name: 'Interactive Switch & LED Lamp',
         description: 'Dual interactive switch setup: SPST toggle switch powering an incandescent light bulb and glowing LED indicator with 9V DC source.',
-        author: 'Switcha Studio',
+        author: 'e-Samastha Studio',
         updatedAt: Date.now() - 3600000,
         presetKey: 'switchSpstLamp',
         components: [
@@ -227,7 +233,7 @@ class SwitchaApp {
         id: 'circuit_starter_2',
         name: '555 Timer Astable Flasher',
         description: 'Square wave pulse generator with RC timing network driving an oscillating LED indicator.',
-        author: 'Switcha Studio',
+        author: 'e-Samastha Studio',
         updatedAt: Date.now() - 7200000,
         presetKey: 'timer555',
         components: [],
@@ -237,7 +243,7 @@ class SwitchaApp {
         id: 'circuit_starter_3',
         name: 'Digital Logic Half Adder',
         description: 'XOR and AND gates computing binary SUM and CARRY from interactive input logic levels.',
-        author: 'Switcha Studio',
+        author: 'e-Samastha Studio',
         updatedAt: Date.now() - 14400000,
         presetKey: 'halfAdder',
         components: [],
@@ -247,7 +253,7 @@ class SwitchaApp {
         id: 'circuit_starter_nor_suite',
         name: 'Universal Logic: NOR Gate Equivalents',
         description: 'Complete digital logic laboratory: NOT, OR, AND, and XOR gates constructed entirely from 2-input NOR gates with DG interactive switches and LED indicators.',
-        author: 'Switcha Studio',
+        author: 'e-Samastha Studio',
         updatedAt: Date.now() - 1800000,
         presetKey: 'universalNorGates',
         components: [],
@@ -290,6 +296,10 @@ class SwitchaApp {
   }
 
   async saveCurrentCircuitToMyCircuits(customName = null) {
+    if (this.isReadOnlyInspection) {
+      this.showToast('⚠️ Inspection Mode: Modifying or saving student circuits is disabled in read-only mode.', 'warning');
+      return;
+    }
     const circuits = this.getMyCircuits();
     const nameInput = document.getElementById('circuitNameInput');
     const name = customName || (nameInput ? nameInput.value.trim() : 'Untitled Circuit') || 'Untitled Circuit';
@@ -390,7 +400,7 @@ class SwitchaApp {
 
       const nameInput = document.getElementById('circuitNameInput');
       if (nameInput) nameInput.value = circuit.name;
-      document.title = `${circuit.name} - Switcha`;
+      document.title = `${circuit.name} - e-Samastha`;
 
       // Automatically start simulation on loading circuit
       this.startSimulation();
@@ -476,7 +486,7 @@ class SwitchaApp {
       if (this.activeMyCircuitId === circuitId) {
         const nameInput = document.getElementById('circuitNameInput');
         if (nameInput) nameInput.value = target.name;
-        document.title = `${target.name} - Switcha`;
+        document.title = `${target.name} - e-Samastha`;
       }
       this.showToast(`✏️ Renamed to "${target.name}"`, 'info');
     }
@@ -525,7 +535,7 @@ class SwitchaApp {
         this.engine.setCircuit([], []);
         const nameInput = document.getElementById('circuitNameInput');
         if (nameInput) nameInput.value = 'Untitled Circuit';
-        document.title = 'Untitled Circuit - Switcha';
+        document.title = 'Untitled Circuit - e-Samastha';
         this.canvas.render();
         this.grapher.render();
         window.location.hash = '#/create';
@@ -630,6 +640,8 @@ class SwitchaApp {
         items = await window.SwitchaStorage.getModels();
       } else if (this.currentWorkspaceTab === 'scripts') {
         items = await window.SwitchaStorage.getScripts();
+      } else if (this.currentWorkspaceTab === 'arduino') {
+        items = await window.SwitchaStorage.getArduinoProjects();
       }
     }
     if ((!items || items.length === 0) && this.currentWorkspaceTab === 'circuits') {
@@ -644,16 +656,16 @@ class SwitchaApp {
     });
 
     if (countEl) {
-      const typeLabel = this.currentWorkspaceTab === 'circuits' ? 'Circuit' : (this.currentWorkspaceTab === 'models' ? 'Model' : 'Script');
+      const typeLabel = this.currentWorkspaceTab === 'circuits' ? 'Circuit' : (this.currentWorkspaceTab === 'models' ? 'Model' : (this.currentWorkspaceTab === 'scripts' ? 'Script' : 'Arduino Project'));
       countEl.textContent = `${items.length} ${typeLabel}${items.length === 1 ? '' : 's'} Saved`;
     }
 
     grid.innerHTML = '';
 
     if (filtered.length === 0) {
-      const icon = this.currentWorkspaceTab === 'circuits' ? '🔌' : (this.currentWorkspaceTab === 'models' ? '🧩' : '💻');
-      const actionLink = this.currentWorkspaceTab === 'circuits' ? '#/create' : (this.currentWorkspaceTab === 'models' ? '#/blocks' : '#/code');
-      const actionText = this.currentWorkspaceTab === 'circuits' ? '⚡ Open Circuit Studio' : (this.currentWorkspaceTab === 'models' ? '🧩 Open Blocks Studio' : '💻 Open Code IDE');
+      const icon = this.currentWorkspaceTab === 'circuits' ? '🔌' : (this.currentWorkspaceTab === 'models' ? '🧩' : (this.currentWorkspaceTab === 'scripts' ? '💻' : '⚡'));
+      const actionLink = this.currentWorkspaceTab === 'circuits' ? '#/create' : (this.currentWorkspaceTab === 'models' ? '#/blocks' : (this.currentWorkspaceTab === 'scripts' ? '#/code' : '#/labs/arduino'));
+      const actionText = this.currentWorkspaceTab === 'circuits' ? '⚡ Open Circuit Studio' : (this.currentWorkspaceTab === 'models' ? '🧩 Open Blocks Studio' : (this.currentWorkspaceTab === 'scripts' ? '💻 Open Code IDE' : '⚡ Open Arduino Lab'));
       grid.innerHTML = `
         <div class="empty-circuits-state">
           <div class="empty-circuits-icon">${icon}</div>
@@ -683,12 +695,13 @@ class SwitchaApp {
       const isCircuit = this.currentWorkspaceTab === 'circuits';
       const isModel = this.currentWorkspaceTab === 'models';
       const isScript = this.currentWorkspaceTab === 'scripts';
+      const isArduino = this.currentWorkspaceTab === 'arduino';
 
-      const metaInfo = isCircuit ? `⚡ ${item.components?.length || 0} comps` : (isModel ? `🧩 ${item.blocks?.length || 0} blocks` : `💻 Code Script`);
+      const metaInfo = isCircuit ? `⚡ ${item.components?.length || 0} comps` : (isModel ? `🧩 ${item.blocks?.length || 0} blocks` : (isScript ? `💻 Code Script` : `⚡ Arduino Sketch`));
 
       cardEl.innerHTML = `
         <div class="card-thumbnail" style="background: #0f172a; display:flex; align-items:center; justify-content:center; height:100px; cursor: pointer;">
-          <span style="font-size: 36px;">${isCircuit ? '🔌' : (isModel ? '🧩' : '💻')}</span>
+          <span style="font-size: 36px;">${isCircuit ? '🔌' : (isModel ? '🧩' : (isScript ? '💻' : '⚡'))}</span>
         </div>
         <div class="card-body">
           <div class="my-circuit-meta">
@@ -735,6 +748,20 @@ class SwitchaApp {
           window.location.hash = '#/code';
           this.switchView('code');
           this.showToast(`💻 Opened "${item.name}" in Code IDE`, 'info');
+        } else if (isArduino) {
+          if (this.arduinoController) {
+            if (item.code) this.arduinoController.els.codeEditor.value = item.code;
+            if (item.board) {
+              this.arduinoController.els.boardSelect.value = item.board;
+              this.arduinoController.setBoardType(item.board);
+            }
+            if (item.components) {
+              this.arduinoController.canvasController.setPreset(item);
+            }
+          }
+          window.location.hash = '#/labs/arduino';
+          this.switchView('arduino');
+          this.showToast(`⚡ Opened "${item.name}" in Arduino Lab`, 'info');
         }
       };
 
@@ -752,6 +779,7 @@ class SwitchaApp {
             if (isCircuit) await window.SwitchaStorage.deleteCircuit(item.id);
             if (isModel) await window.SwitchaStorage.deleteModel(item.id);
             if (isScript) await window.SwitchaStorage.deleteScript(item.id);
+            if (isArduino) await window.SwitchaStorage.deleteArduinoProject(item.id);
           }
           this.renderWorkspaceProjects();
           this.showToast(`🗑️ "${item.name}" deleted`, 'warning');
@@ -768,6 +796,7 @@ class SwitchaApp {
               if (isCircuit) await window.SwitchaStorage.saveCircuit(item);
               if (isModel) await window.SwitchaStorage.saveModel(item);
               if (isScript) await window.SwitchaStorage.saveScript(item);
+              if (isArduino) await window.SwitchaStorage.saveArduinoProject(item);
             } catch (_) {}
           }
           if (isCircuit) {
@@ -778,7 +807,7 @@ class SwitchaApp {
             if (this.activeMyCircuitId === item.id) {
               const nameInput = document.getElementById('circuitNameInput');
               if (nameInput) nameInput.value = item.name;
-              document.title = `${item.name} - Switcha`;
+              document.title = `${item.name} - e-Samastha`;
             }
           }
           this.renderWorkspaceProjects();
@@ -788,20 +817,21 @@ class SwitchaApp {
 
       cardEl.querySelector('[data-action="duplicate"]').addEventListener('click', async () => {
         const copy = JSON.parse(JSON.stringify(item));
-        copy.id = `${isCircuit ? 'circuit' : (isModel ? 'model' : 'script')}_${Date.now()}`;
+        copy.id = `${isCircuit ? 'circuit' : (isModel ? 'model' : (isScript ? 'script' : 'arduino'))}_${Date.now()}`;
         copy.name = `${item.name} (Copy)`;
         copy.updatedAt = Date.now();
         if (window.SwitchaStorage) {
           if (isCircuit) await window.SwitchaStorage.saveCircuit(copy);
           if (isModel) await window.SwitchaStorage.saveModel(copy);
           if (isScript) await window.SwitchaStorage.saveScript(copy);
+          if (isArduino) await window.SwitchaStorage.saveArduinoProject(copy);
         }
         this.renderWorkspaceProjects();
         this.showToast(`📋 Duplicated "${item.name}"`, 'success');
       });
 
       cardEl.querySelector('[data-action="export"]').addEventListener('click', () => {
-        const ext = isCircuit ? 'swcirc' : (isModel ? 'swblock' : 'swcode');
+        const ext = isCircuit ? 'swcirc' : (isModel ? 'swblock' : (isScript ? 'swcode' : 'swino'));
         const content = isScript ? (item.content || '') : JSON.stringify(item, null, 2);
         const type = isScript ? 'text/plain' : 'application/json';
         const blob = new Blob([content], { type });
@@ -1266,6 +1296,18 @@ class SwitchaApp {
     }
   }
 
+  // --- Arduino IDE & Hardware Simulation Lab ---
+  initArduinoEnvironment() {
+    try {
+      const container = document.getElementById('arduinoLabContainer');
+      if (container && !this.arduinoController) {
+        this.arduinoController = new ArduinoController(container);
+      }
+    } catch (err) {
+      console.warn('Arduino environment initialization warning:', err);
+    }
+  }
+
   populatePresetDropdown() {
     const select = document.getElementById('circuitPresetSelect');
     if (!select) return;
@@ -1288,15 +1330,24 @@ class SwitchaApp {
         this.switchView('studio');
         if (queryString) {
           const params = new URLSearchParams(queryString);
-          const presetKey = params.get('circuit') || params.get('preset') || params.get('id');
-          if (presetKey && CircuitLibrary[presetKey]) {
-            this.loadCircuitPreset(presetKey);
+          const inspectUser = params.get('inspectUser');
+          const inspectCircuit = params.get('inspectCircuit');
+          const readOnly = params.get('readOnly') === 'true';
+          if (inspectUser && inspectCircuit) {
+            this.loadCircuitForAdminInspection(inspectUser, inspectCircuit, readOnly);
+          } else {
+            const presetKey = params.get('circuit') || params.get('preset') || params.get('id');
+            if (presetKey && CircuitLibrary[presetKey]) {
+              this.loadCircuitPreset(presetKey);
+            }
           }
         }
       } else if (routePath.startsWith('#/blocks')) {
         this.switchView('blocks');
       } else if (routePath.startsWith('#/code')) {
         this.switchView('code');
+      } else if (routePath.startsWith('#/labs/arduino') || routePath.startsWith('#/arduino')) {
+        this.switchView('arduino');
       } else if (routePath.startsWith('#/my-circuits') || routePath.startsWith('#/workspace')) {
         this.switchView('my-circuits');
       } else if (routePath.startsWith('#/discover')) {
@@ -1311,6 +1362,10 @@ class SwitchaApp {
         }
       } else if (routePath.startsWith('#/features')) {
         this.switchView('features');
+      } else if (routePath.startsWith('#/admin/login')) {
+        this.switchView('admin-login');
+      } else if (routePath.startsWith('#/admin')) {
+        this.handleAdminRoute();
       } else {
         this.switchView('home');
       }
@@ -1337,6 +1392,18 @@ class SwitchaApp {
     this.currentView = viewName;
     document.querySelectorAll('.view-page').forEach(page => page.classList.remove('active'));
 
+    // Reset admin read-only inspection mode if navigating away from studio
+    if (viewName !== 'studio' && this.isReadOnlyInspection) {
+      this.isReadOnlyInspection = false;
+      const banner = document.getElementById('adminInspectionBanner');
+      if (banner) banner.style.display = 'none';
+      const saveBtn = document.getElementById('btnSaveMyCircuit');
+      if (saveBtn) {
+        saveBtn.removeAttribute('disabled');
+        saveBtn.title = 'Save to My Circuits (Ctrl+S)';
+      }
+    }
+
     const targetPage = document.getElementById(`view-${viewName}`);
     if (targetPage) targetPage.classList.add('active');
 
@@ -1345,6 +1412,7 @@ class SwitchaApp {
     if (viewName === 'studio') document.getElementById('nav-circuits-env')?.classList.add('active');
     if (viewName === 'blocks') document.getElementById('nav-blocks-env')?.classList.add('active');
     if (viewName === 'code') document.getElementById('nav-code-env')?.classList.add('active');
+    if (viewName === 'arduino') document.getElementById('nav-arduino-env')?.classList.add('active');
     if (viewName === 'my-circuits') document.getElementById('nav-my-circuits')?.classList.add('active');
     if (viewName === 'features') document.getElementById('nav-features')?.classList.add('active');
     if (viewName === 'discover') document.getElementById('nav-circuits')?.classList.add('active');
@@ -1384,6 +1452,15 @@ class SwitchaApp {
     if (viewName === 'code') {
       setTimeout(() => {
         this.codeEditor?.plotter?.resizeCanvas();
+      }, 50);
+    }
+
+    if (viewName === 'arduino') {
+      if (!this.arduinoController) {
+        this.initArduinoEnvironment();
+      }
+      setTimeout(() => {
+        this.arduinoController?.canvasController?.render();
       }, 50);
     }
   }
@@ -2046,7 +2123,7 @@ class SwitchaApp {
     });
 
     document.getElementById('circuitNameInput')?.addEventListener('change', (e) => {
-      document.title = `${e.target.value} - Switcha`;
+      document.title = `${e.target.value} - e-Samastha`;
     });
 
     // Global keyboard shortcuts (Ctrl+S to Save)
@@ -2267,7 +2344,7 @@ class SwitchaApp {
     this.engine.setCircuit([], []);
     const nameInput = document.getElementById('circuitNameInput');
     if (nameInput) nameInput.value = 'Untitled Circuit';
-    document.title = 'Untitled Circuit - Switcha';
+    document.title = 'Untitled Circuit - e-Samastha';
     this.canvas.render();
     this.grapher.render();
     window.location.hash = '#/create';
@@ -2712,7 +2789,7 @@ class SwitchaApp {
     if (nameInput) nameInput.value = preset.name;
     const select = document.getElementById('circuitPresetSelect');
     if (select) select.value = presetKey;
-    document.title = `${preset.name} - Switcha`;
+    document.title = `${preset.name} - e-Samastha`;
 
     // Auto-start simulation so waveforms run live immediately upon loading preset
     this.startSimulation();
@@ -2784,7 +2861,7 @@ class SwitchaApp {
       if (deferredPrompt) {
         deferredPrompt.prompt();
       } else {
-        alert('To install Switcha on iOS/Safari, tap the Share icon ⎋ and select "Add to Home Screen ⊕". On desktop browsers, click the ⊕ icon in your address bar.');
+        alert('To install e-Samastha on iOS/Safari, tap the Share icon ⎋ and select "Add to Home Screen ⊕". On desktop browsers, click the ⊕ icon in your address bar.');
       }
     });
 
@@ -3476,7 +3553,7 @@ class SwitchaApp {
             if (data.name) {
               const nameInput = document.getElementById('circuitNameInput');
               if (nameInput) nameInput.value = data.name;
-              document.title = `${data.name} - Switcha`;
+              document.title = `${data.name} - e-Samastha`;
             }
             this.engine.reset();
             this.engine.setCircuit(this.canvas.components, this.canvas.wires);
@@ -3637,8 +3714,454 @@ class SwitchaApp {
     // Logout Button
     document.getElementById('btnLogout')?.addEventListener('click', async () => {
       await firebaseService.signOut();
-      this.showToast('👋 Logged out of ElectroSim', 'info');
+      this.showToast('👋 Logged out of e-Samastha', 'info');
     });
+  }
+
+  // ==========================================================================
+  // SWITCHA 2.0 — ADMIN PORTAL CONTROLLER & MANAGEMENT SYSTEM
+  // ==========================================================================
+  initAdminPortal() {
+    this.adminUsers = [];
+    this.adminCircuits = [];
+    this.adminActivityLogs = [];
+    this.targetDeleteCircuit = null;
+    this.isReadOnlyInspection = false;
+
+    // 1. Admin Login Form Handler
+    const adminLoginForm = document.getElementById('adminLoginForm');
+    const adminLoginAlert = document.getElementById('adminLoginAlert');
+    const btnAdminLoginSubmit = document.getElementById('btnAdminLoginSubmit');
+
+    if (adminLoginForm) {
+      adminLoginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('adminEmail')?.value.trim();
+        const password = document.getElementById('adminPassword')?.value;
+        if (!email || !password) return;
+
+        if (adminLoginAlert) adminLoginAlert.style.display = 'none';
+        if (btnAdminLoginSubmit) {
+          btnAdminLoginSubmit.disabled = true;
+          btnAdminLoginSubmit.textContent = 'Verifying administrator credentials...';
+        }
+
+        try {
+          await firebaseService.signIn(email, password);
+          const isAdmin = await firebaseService.verifyAdmin(true);
+          if (!isAdmin) {
+            if (adminLoginAlert) {
+              adminLoginAlert.textContent = 'Access Denied: Your account does not have administrator privileges ({ admin: true } claim missing).';
+              adminLoginAlert.style.display = 'block';
+            }
+            await firebaseService.signOut();
+            return;
+          }
+
+          // Authoritative admin authenticated
+          this.showToast('✔ Administrator authentication successful!', 'success');
+          window.location.hash = '#/admin';
+        } catch (err) {
+          if (adminLoginAlert) {
+            adminLoginAlert.textContent = err.message ? err.message.replace('Firebase: ', '') : 'Authentication failed.';
+            adminLoginAlert.style.display = 'block';
+          }
+        } finally {
+          if (btnAdminLoginSubmit) {
+            btnAdminLoginSubmit.disabled = false;
+            btnAdminLoginSubmit.textContent = '🔐 Authenticate Administrator';
+          }
+        }
+      });
+    }
+
+    // 2. Admin Header Controls (Refresh & Logout)
+    document.getElementById('btnAdminRefresh')?.addEventListener('click', () => {
+      this.loadAdminData();
+    });
+
+    document.getElementById('btnAdminLogout')?.addEventListener('click', async () => {
+      await firebaseService.signOut();
+      this.showToast('Administrator session ended.', 'info');
+      window.location.hash = '#/create';
+    });
+
+    // 3. Admin Tabs Navigation
+    document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.dataset.adminTab;
+        document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+
+        if (tabName === 'users') document.getElementById('adminTabUsers')?.classList.add('active');
+        if (tabName === 'circuits') document.getElementById('adminTabCircuits')?.classList.add('active');
+        if (tabName === 'activity') document.getElementById('adminTabActivity')?.classList.add('active');
+      });
+    });
+
+    // 4. Admin Search Filters
+    document.getElementById('adminUserSearch')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = this.adminUsers.filter(u => 
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+        (u.uid && u.uid.toLowerCase().includes(q))
+      );
+      this.renderAdminUsers(filtered);
+    });
+
+    document.getElementById('adminCircuitSearch')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = this.adminCircuits.filter(c =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.author && c.author.toLowerCase().includes(q)) ||
+        (c.ownerEmail && c.ownerEmail.toLowerCase().includes(q)) ||
+        (c.ownerUid && c.ownerUid.toLowerCase().includes(q))
+      );
+      this.renderAdminCircuits(filtered);
+    });
+
+    document.getElementById('adminActivitySearch')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = this.adminActivityLogs.filter(l =>
+        (l.type && l.type.toLowerCase().includes(q)) ||
+        (l.actorEmail && l.actorEmail.toLowerCase().includes(q)) ||
+        (l.actorUid && l.actorUid.toLowerCase().includes(q)) ||
+        (l.targetId && l.targetId.toLowerCase().includes(q))
+      );
+      this.renderAdminActivity(filtered);
+    });
+
+    document.getElementById('btnRefreshLogs')?.addEventListener('click', () => {
+      this.loadAdminData();
+    });
+
+    // 5. Circuit Deletion Modal Confirmation
+    const confirmInput = document.getElementById('adminDeleteConfirmInput');
+    const confirmBtn = document.getElementById('btnAdminConfirmDelete');
+    const deleteModal = document.getElementById('adminDeleteModal');
+
+    if (confirmInput && confirmBtn) {
+      confirmInput.addEventListener('input', (e) => {
+        confirmBtn.disabled = e.target.value.trim().toUpperCase() !== 'DELETE';
+      });
+
+      confirmBtn.addEventListener('click', async () => {
+        if (!this.targetDeleteCircuit) return;
+        const { ownerUid, id, name } = this.targetDeleteCircuit;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting...';
+
+        const ok = await firebaseService.deleteCircuitAdmin(ownerUid, id);
+        if (ok) {
+          this.showToast(`Circuit "${name}" permanently deleted.`, 'info');
+          if (deleteModal) deleteModal.classList.remove('active');
+          confirmInput.value = '';
+          this.targetDeleteCircuit = null;
+          this.loadAdminData();
+        } else {
+          this.showToast('Failed to delete circuit from cloud.', 'warning');
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Permanently Delete';
+      });
+    }
+  }
+
+  /**
+   * Authoritative Route Guard for #/admin
+   */
+  async handleAdminRoute() {
+    if (!firebaseService.currentUser) {
+      window.location.hash = '#/admin/login';
+      return;
+    }
+
+    const isAdmin = await firebaseService.verifyAdmin(false);
+    if (!isAdmin) {
+      this.showToast('Access Denied: Administrator privileges required.', 'warning');
+      window.location.hash = '#/create';
+      return;
+    }
+
+    this.switchView('admin');
+    this.loadAdminData();
+  }
+
+  /**
+   * Fetch and populate live data & factual statistics for Admin Dashboard
+   */
+  async loadAdminData() {
+    const adminEmailBadge = document.getElementById('adminCurrentEmail');
+    if (adminEmailBadge && firebaseService.currentUser) {
+      adminEmailBadge.textContent = firebaseService.currentUser.email || 'Admin';
+    }
+
+    try {
+      const [users, circuits, logs] = await Promise.all([
+        firebaseService.loadAllUsers(),
+        firebaseService.loadAllCircuits(),
+        firebaseService.loadActivityLogs(100)
+      ]);
+
+      this.adminUsers = users || [];
+      this.adminCircuits = circuits || [];
+      this.adminActivityLogs = logs || [];
+
+      // Factual statistics (strictly 0 if empty)
+      const now = Date.now();
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const activeUsersCount = this.adminUsers.filter(u => u.lastActiveAt && (now - u.lastActiveAt) < thirtyDaysMs).length;
+      const publicCircuitsCount = this.adminCircuits.filter(c => Boolean(c.isPublic)).length;
+
+      const statTotalUsersEl = document.getElementById('statTotalUsers');
+      const statActiveUsersEl = document.getElementById('statActiveUsers');
+      const statTotalCircuitsEl = document.getElementById('statTotalCircuits');
+      const statPublicCircuitsEl = document.getElementById('statPublicCircuits');
+      const statRecentActivityEl = document.getElementById('statRecentActivity');
+
+      if (statTotalUsersEl) statTotalUsersEl.textContent = this.adminUsers.length;
+      if (statActiveUsersEl) statActiveUsersEl.textContent = activeUsersCount;
+      if (statTotalCircuitsEl) statTotalCircuitsEl.textContent = this.adminCircuits.length;
+      if (statPublicCircuitsEl) statPublicCircuitsEl.textContent = publicCircuitsCount;
+      if (statRecentActivityEl) statRecentActivityEl.textContent = this.adminActivityLogs.length;
+
+      const userSummaryEl = document.getElementById('userCountSummary');
+      if (userSummaryEl) userSummaryEl.textContent = `${this.adminUsers.length} user(s) loaded`;
+
+      const circuitSummaryEl = document.getElementById('circuitCountSummary');
+      if (circuitSummaryEl) circuitSummaryEl.textContent = `${this.adminCircuits.length} circuit(s) loaded`;
+
+      this.renderAdminUsers(this.adminUsers);
+      this.renderAdminCircuits(this.adminCircuits);
+      this.renderAdminActivity(this.adminActivityLogs);
+    } catch (err) {
+      console.error('[Admin] Error loading admin dashboard data:', err);
+      this.showToast('Failed to load live data for Admin Dashboard.', 'warning');
+    }
+  }
+
+  renderAdminUsers(users) {
+    const tbody = document.getElementById('adminUsersTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!users || users.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No registered users found in database.</td></tr>`;
+      return;
+    }
+
+    users.forEach(u => {
+      const tr = document.createElement('tr');
+      const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—';
+      const activeStr = u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString() : '—';
+      const roleStr = u.role === 'admin' ? 'admin' : 'user';
+      const statusStr = u.status || 'active';
+
+      tr.innerHTML = `
+        <td><strong>${u.displayName || 'Anonymous'}</strong></td>
+        <td>${u.email || '—'}</td>
+        <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 11px;">${u.uid || '—'}</code></td>
+        <td><span class="admin-role-badge ${roleStr}">${roleStr}</span></td>
+        <td><span style="color: ${statusStr === 'active' ? '#10b981' : '#f59e0b'}; font-weight: 600;">● ${statusStr}</span></td>
+        <td>${createdStr}</td>
+        <td>${activeStr}</td>
+        <td>
+          <button class="btn btn-outline btn-copy-uid" data-uid="${u.uid || ''}" style="padding: 3px 8px; font-size: 11px; margin-right: 4px;">Copy UID</button>
+          <button class="btn btn-outline btn-filter-user-circuits" data-uid="${u.uid || ''}" style="padding: 3px 8px; font-size: 11px;">Circuits</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.btn-copy-uid').forEach(b => {
+      b.addEventListener('click', () => {
+        const uid = b.dataset.uid;
+        if (uid && navigator.clipboard) {
+          navigator.clipboard.writeText(uid);
+          this.showToast(`Copied UID: ${uid}`, 'info');
+        }
+      });
+    });
+
+    tbody.querySelectorAll('.btn-filter-user-circuits').forEach(b => {
+      b.addEventListener('click', () => {
+        const uid = b.dataset.uid;
+        const circuitTabBtn = document.querySelector('[data-admin-tab="circuits"]');
+        if (circuitTabBtn) circuitTabBtn.click();
+        const searchInput = document.getElementById('adminCircuitSearch');
+        if (searchInput) {
+          searchInput.value = uid;
+          searchInput.dispatchEvent(new Event('input'));
+        }
+      });
+    });
+  }
+
+  renderAdminCircuits(circuits) {
+    const tbody = document.getElementById('adminCircuitsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!circuits || circuits.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No saved circuits found.</td></tr>`;
+      return;
+    }
+
+    circuits.forEach(c => {
+      const tr = document.createElement('tr');
+      const compCount = Array.isArray(c.components) ? c.components.length : 0;
+      const updatedStr = c.updatedAt ? new Date(c.updatedAt).toLocaleString() : '—';
+      const isPub = Boolean(c.isPublic);
+
+      tr.innerHTML = `
+        <td><strong>${c.name || 'Untitled Circuit'}</strong></td>
+        <td>${c.author || c.ownerEmail || '—'}</td>
+        <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 11px;">${c.ownerUid || '—'}</code></td>
+        <td><span class="admin-visibility-badge ${isPub ? 'public' : 'private'}">${isPub ? 'Public' : 'Private'}</span></td>
+        <td>${compCount} component(s)</td>
+        <td>${updatedStr}</td>
+        <td>
+          <button class="btn btn-outline btn-inspect-circuit" data-owner="${c.ownerUid || ''}" data-id="${c.id || ''}" style="padding: 3px 8px; font-size: 11px; margin-right: 4px; border-color: #03b585; color: #037f52;">🔍 Inspect</button>
+          <button class="btn btn-outline btn-delete-circuit" data-owner="${c.ownerUid || ''}" data-id="${c.id || ''}" data-name="${c.name || 'Circuit'}" style="padding: 3px 8px; font-size: 11px; border-color: #ef4444; color: #dc2626;">🗑️ Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.btn-inspect-circuit').forEach(b => {
+      b.addEventListener('click', () => {
+        const ownerUid = b.dataset.owner;
+        const circuitId = b.dataset.id;
+        if (ownerUid && circuitId) {
+          window.location.hash = `#/create?inspectUser=${ownerUid}&inspectCircuit=${circuitId}&readOnly=true`;
+        }
+      });
+    });
+
+    tbody.querySelectorAll('.btn-delete-circuit').forEach(b => {
+      b.addEventListener('click', () => {
+        this.targetDeleteCircuit = {
+          ownerUid: b.dataset.owner,
+          id: b.dataset.id,
+          name: b.dataset.name
+        };
+        const nameEl = document.getElementById('adminDeleteCircuitName');
+        const inputEl = document.getElementById('adminDeleteConfirmInput');
+        const btnConfirm = document.getElementById('btnAdminConfirmDelete');
+        if (nameEl) nameEl.textContent = `"${this.targetDeleteCircuit.name}"`;
+        if (inputEl) inputEl.value = '';
+        if (btnConfirm) btnConfirm.disabled = true;
+
+        const modal = document.getElementById('adminDeleteModal');
+        if (modal) modal.classList.add('active');
+      });
+    });
+  }
+
+  renderAdminActivity(logs) {
+    const tbody = document.getElementById('adminActivityTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!logs || logs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">No audit events recorded yet.</td></tr>`;
+      return;
+    }
+
+    logs.forEach(l => {
+      const tr = document.createElement('tr');
+      const timeStr = l.timestamp ? new Date(l.timestamp).toLocaleString() : '—';
+      let metaStr = '—';
+      if (l.metadata && typeof l.metadata === 'object' && Object.keys(l.metadata).length > 0) {
+        metaStr = JSON.stringify(l.metadata);
+      }
+
+      tr.innerHTML = `
+        <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #0284c7;">${l.type || 'event'}</code></td>
+        <td>${l.actorEmail || '—'}</td>
+        <td><code style="font-size: 11px; color: #64748b;">${l.actorUid || '—'}</code></td>
+        <td><code style="font-size: 11px;">${l.targetId || '—'}</code></td>
+        <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: #64748b;" title="${metaStr}">${metaStr}</td>
+        <td>${timeStr}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  /**
+   * Load circuit for Admin Read-Only Inspection Mode
+   */
+  async loadCircuitForAdminInspection(userId, circuitId, readOnly = true) {
+    this.isReadOnlyInspection = Boolean(readOnly);
+    const banner = document.getElementById('adminInspectionBanner');
+    const infoSpan = document.getElementById('inspectCircuitInfo');
+    const saveBtn = document.getElementById('btnSaveMyCircuit');
+
+    if (banner) banner.style.display = 'flex';
+    if (saveBtn) {
+      saveBtn.setAttribute('disabled', 'true');
+      saveBtn.title = 'Save disabled in Admin Read-Only Inspection Mode';
+    }
+
+    try {
+      let circuit = null;
+      if (firebaseService.isInitialized && firebaseService.db) {
+        const docRef = firebaseService.sdk.doc(firebaseService.db, 'users', userId, 'circuits', circuitId);
+        const snap = await firebaseService.sdk.getDoc(docRef);
+        if (snap && snap.exists()) {
+          circuit = snap.data();
+        }
+      }
+
+      if (!circuit && window.SwitchaStorage) {
+        circuit = await window.SwitchaStorage.getCircuit(circuitId).catch(() => null);
+      }
+
+      if (!circuit) {
+        this.showToast(`Could not load circuit ${circuitId} for inspection.`, 'warning');
+        return;
+      }
+
+      if (infoSpan) {
+        infoSpan.textContent = `"${circuit.name || 'Untitled'}" by ${circuit.author || circuit.ownerEmail || userId}`;
+      }
+
+      const titleInput = document.getElementById('circuitNameInput');
+      if (titleInput) {
+        titleInput.value = `[INSPECT] ${circuit.name || 'Untitled Circuit'}`;
+      }
+
+      if (this.canvas) {
+        this.canvas.clear();
+        if (Array.isArray(circuit.components)) {
+          this.canvas.components = JSON.parse(JSON.stringify(circuit.components));
+        }
+        if (Array.isArray(circuit.wires)) {
+          this.canvas.wires = JSON.parse(JSON.stringify(circuit.wires));
+        }
+        this.engine.reset();
+        this.engine.setCircuit(this.canvas.components, this.canvas.wires);
+        this.canvas.fitToScreen();
+        this.canvas.render();
+        this.grapher?.render();
+      }
+
+      // Log inspection in audit logs
+      await firebaseService.logActivity({
+        type: 'admin_inspect_circuit',
+        actorUid: firebaseService.currentUser?.uid || 'admin',
+        actorEmail: firebaseService.currentUser?.email || '',
+        targetId: circuitId,
+        metadata: { ownerUid: userId, circuitName: circuit.name }
+      }).catch(() => {});
+
+      this.showToast(`🔍 Opened "${circuit.name}" in Read-Only Inspection Mode.`, 'info');
+    } catch (err) {
+      console.error('[Admin Inspection] Failed to inspect circuit:', err);
+      this.showToast('Failed to load circuit for inspection.', 'warning');
+    }
   }
 }
 
@@ -3648,7 +4171,7 @@ if (typeof window !== 'undefined') {
     try {
       if (!window.app) {
         window.app = new SwitchaApp();
-        console.log('⚡ Switcha EDA Platform initialized successfully.');
+        console.log('⚡ e-Samastha Platform initialized successfully.');
       }
     } catch (err) {
       console.error('Fatal initialization error in SwitchaApp:', err);

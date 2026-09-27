@@ -18,17 +18,17 @@ console.log('===================================================================
 
 // 1. Manifest verification
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'manifest.json'), 'utf8'));
-assert.strictEqual(manifest.name, 'Switcha - Interactive Electronic & Digital Circuit Simulator');
-assert.strictEqual(manifest.short_name, 'Switcha');
+assert.strictEqual(manifest.name, 'e-Samastha - Integrated ECE Engineering Simulation & Learning Platform');
+assert.strictEqual(manifest.short_name, 'e-Samastha');
 assert.strictEqual(manifest.theme_color, '#03b585');
 assert.ok(manifest.shortcuts && manifest.shortcuts.length >= 3, 'Manifest has shortcut actions');
-console.log('✓ PASS: Web App Manifest is fully configured for Switcha PWA installability');
+console.log('✓ PASS: Web App Manifest is fully configured for e-Samastha PWA installability');
 
 // 2. Icon verification
 const iconSvg = fs.readFileSync(path.join(rootDir, 'icons', 'icon.svg'), 'utf8');
-assert.ok(iconSvg.toLowerCase().includes('switcha'), 'Icon contains Switcha brand element');
+assert.ok(iconSvg.toLowerCase().includes('samastha'), 'Icon contains e-Samastha brand element');
 assert.ok(iconSvg.includes('<svg'), 'Valid SVG format');
-console.log('✓ PASS: App Icon SVG created with modern dark tech background and switch terminal aesthetics');
+console.log('✓ PASS: App Icon SVG created with modern dark tech background and circuit trace aesthetics');
 
 // 3. HTML markup verification
 const indexHtml = fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8');

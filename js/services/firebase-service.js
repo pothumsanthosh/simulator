@@ -1,8 +1,8 @@
-﻿/**
+/**
  * Firebase Integration Service for ElectroSim / Switcha
  * Project: electrosim-4cf3f
  * Provides Firebase Authentication, Cloud Firestore circuit synchronization,
- * and Analytics with offline-first resilience.
+ * Role-based Admin authorization, activity auditing, and Analytics with offline-first resilience.
  */
 
 export const firebaseConfig = {
@@ -35,11 +35,16 @@ class FirebaseService {
       updateProfile: null,
       getFirestore: null,
       collection: null,
+      collectionGroup: null,
       doc: null,
       setDoc: null,
       getDoc: null,
       getDocs: null,
       deleteDoc: null,
+      query: null,
+      orderBy: null,
+      limit: null,
+      where: null,
       getAnalytics: null
     };
 
@@ -67,11 +72,16 @@ class FirebaseService {
 
       this.sdk.getFirestore = firestoreMod.getFirestore;
       this.sdk.collection = firestoreMod.collection;
+      this.sdk.collectionGroup = firestoreMod.collectionGroup;
       this.sdk.doc = firestoreMod.doc;
       this.sdk.setDoc = firestoreMod.setDoc;
       this.sdk.getDoc = firestoreMod.getDoc;
       this.sdk.getDocs = firestoreMod.getDocs;
       this.sdk.deleteDoc = firestoreMod.deleteDoc;
+      this.sdk.query = firestoreMod.query;
+      this.sdk.orderBy = firestoreMod.orderBy;
+      this.sdk.limit = firestoreMod.limit;
+      this.sdk.where = firestoreMod.where;
 
       if (analyticsMod) {
         this.sdk.getAnalytics = analyticsMod.getAnalytics;
@@ -88,10 +98,13 @@ class FirebaseService {
       }
 
       this.isInitialized = true;
-      console.log('[Firebase] ElectroSim Firebase initialized successfully (Project: electrosim-4cf3f)');
+      console.log('[Firebase] e-Samastha Firebase initialized successfully (Project: electrosim-4cf3f)');
 
-      this.sdk.onAuthStateChanged(this.auth, (user) => {
+      this.sdk.onAuthStateChanged(this.auth, async (user) => {
         this.currentUser = user;
+        if (user) {
+          await this.syncUserProfile(user).catch(() => {});
+        }
         this.notifyAuthListeners(user);
       });
     } catch (err) {
@@ -118,6 +131,41 @@ class FirebaseService {
     });
   }
 
+  async syncUserProfile(user, extra = {}) {
+    if (!this.isInitialized || !this.db || !user) return;
+    try {
+      const userRef = this.sdk.doc(this.db, 'users', user.uid);
+      const payload = {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || extra.displayName || '',
+        lastActiveAt: Date.now(),
+        updatedAt: Date.now(),
+        ...extra
+      };
+      await this.sdk.setDoc(userRef, payload, { merge: true });
+    } catch (e) {
+      console.warn('[Firebase] Could not sync user profile to Firestore:', e.message);
+    }
+  }
+
+  /**
+   * Verify authoritative administrator authorization via Firebase custom claims.
+   * Preferred claim: admin: true
+   * Returns true strictly if custom claims indicate administrator.
+   */
+  async verifyAdmin(forceRefresh = false) {
+    if (!this.currentUser) return false;
+    try {
+      const tokenResult = await this.currentUser.getIdTokenResult(forceRefresh);
+      const isAdmin = Boolean(tokenResult?.claims?.admin === true);
+      return isAdmin;
+    } catch (err) {
+      console.warn('[Firebase] verifyAdmin failed:', err.message);
+      return false;
+    }
+  }
+
   async signUp(email, password, displayName = '') {
     if (!this.isInitialized || !this.auth) {
       throw new Error('Firebase Auth is not available. Please check your internet connection.');
@@ -127,6 +175,24 @@ class FirebaseService {
       await this.sdk.updateProfile(userCredential.user, { displayName });
     }
     this.currentUser = userCredential.user;
+
+    // Create user profile in Firestore
+    await this.syncUserProfile(userCredential.user, {
+      displayName: displayName || '',
+      role: 'user',
+      status: 'active',
+      createdAt: Date.now()
+    }).catch(() => {});
+
+    // Log sign-up activity
+    await this.logActivity({
+      type: 'user_signup',
+      actorUid: userCredential.user.uid,
+      actorEmail: userCredential.user.email,
+      targetId: userCredential.user.uid,
+      metadata: { displayName }
+    }).catch(() => {});
+
     return userCredential.user;
   }
 
@@ -136,15 +202,40 @@ class FirebaseService {
     }
     const userCredential = await this.sdk.signInWithEmailAndPassword(this.auth, email, password);
     this.currentUser = userCredential.user;
+
+    // Sync active timestamp
+    await this.syncUserProfile(userCredential.user).catch(() => {});
+
+    // Log sign-in activity
+    await this.logActivity({
+      type: 'user_login',
+      actorUid: userCredential.user.uid,
+      actorEmail: userCredential.user.email,
+      targetId: userCredential.user.uid,
+      metadata: {}
+    }).catch(() => {});
+
     return userCredential.user;
   }
 
   async signOut() {
     if (!this.isInitialized || !this.auth) return;
+    if (this.currentUser) {
+      await this.logActivity({
+        type: 'user_logout',
+        actorUid: this.currentUser.uid,
+        actorEmail: this.currentUser.email,
+        targetId: this.currentUser.uid,
+        metadata: {}
+      }).catch(() => {});
+    }
     await this.sdk.signOut(this.auth);
     this.currentUser = null;
   }
 
+  /**
+   * Save circuit with verified ownerUid and ownerEmail.
+   */
   async saveCircuit(circuit) {
     if (!this.isInitialized || !this.db || !this.currentUser) {
       return false;
@@ -158,15 +249,29 @@ class FirebaseService {
         id: circuitId,
         name: circuit.name || 'Untitled Circuit',
         description: circuit.description || '',
-        author: circuit.author || this.currentUser.displayName || this.currentUser.email || 'ElectroSim User',
+        author: circuit.author || this.currentUser.displayName || this.currentUser.email || 'e-Samastha User',
+        ownerUid: this.currentUser.uid,
+        ownerEmail: this.currentUser.email || '',
         components: circuit.components || [],
         wires: circuit.wires || [],
         presetKey: circuit.presetKey || null,
+        isPublic: Boolean(circuit.isPublic),
+        createdAt: circuit.createdAt || Date.now(),
         updatedAt: Date.now()
       };
 
       await this.sdk.setDoc(userCircuitRef, payload, { merge: true });
       console.log('[Firebase] Circuit ' + payload.name + ' synced to cloud Firestore.');
+
+      // Log activity
+      await this.logActivity({
+        type: circuit.id ? 'circuit_updated' : 'circuit_created',
+        actorUid: this.currentUser.uid,
+        actorEmail: this.currentUser.email,
+        targetId: circuitId,
+        metadata: { circuitName: payload.name, componentCount: payload.components.length }
+      }).catch(() => {});
+
       return true;
     } catch (e) {
       console.warn('[Firebase] Failed to save circuit to cloud Firestore:', e);
@@ -203,9 +308,134 @@ class FirebaseService {
       const userCircuitRef = this.sdk.doc(this.db, 'users', this.currentUser.uid, 'circuits', circuitId);
       await this.sdk.deleteDoc(userCircuitRef);
       console.log('[Firebase] Circuit ' + circuitId + ' deleted from cloud Firestore.');
+
+      await this.logActivity({
+        type: 'circuit_deleted',
+        actorUid: this.currentUser.uid,
+        actorEmail: this.currentUser.email,
+        targetId: circuitId,
+        metadata: {}
+      }).catch(() => {});
+
       return true;
     } catch (e) {
       console.warn('[Firebase] Failed to delete circuit from cloud Firestore:', e);
+      return false;
+    }
+  }
+
+  // ==========================================
+  // ACTIVITY AUDIT LOGGING (SECURITY TRAIL)
+  // ==========================================
+  async logActivity(event) {
+    if (!this.isInitialized || !this.db) return false;
+    try {
+      const logId = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      const logRef = this.sdk.doc(this.db, 'activity_logs', logId);
+      const payload = {
+        eventId: logId,
+        type: event.type || 'generic_event',
+        actorUid: event.actorUid || this.currentUser?.uid || 'guest',
+        actorEmail: event.actorEmail || this.currentUser?.email || '',
+        targetId: event.targetId || '',
+        metadata: event.metadata || {},
+        timestamp: Date.now()
+      };
+      await this.sdk.setDoc(logRef, payload);
+      return true;
+    } catch (err) {
+      console.warn('[Firebase] Failed to log activity:', err.message);
+      return false;
+    }
+  }
+
+  async loadActivityLogs(limitCount = 50) {
+    if (!this.isInitialized || !this.db) return [];
+    try {
+      const logsCol = this.sdk.collection(this.db, 'activity_logs');
+      let q = logsCol;
+      if (this.sdk.query && this.sdk.orderBy && this.sdk.limit) {
+        q = this.sdk.query(logsCol, this.sdk.orderBy('timestamp', 'desc'), this.sdk.limit(limitCount));
+      }
+      const snap = await this.sdk.getDocs(q);
+      const logs = [];
+      snap.forEach(d => logs.push(d.data()));
+      return logs;
+    } catch (err) {
+      console.warn('[Firebase] Failed to load activity logs:', err.message);
+      return [];
+    }
+  }
+
+  // ==========================================
+  // ADMIN PORTAL OPERATIONS
+  // ==========================================
+  async loadAllUsers() {
+    if (!this.isInitialized || !this.db) return [];
+    try {
+      const usersCol = this.sdk.collection(this.db, 'users');
+      const snap = await this.sdk.getDocs(usersCol);
+      const users = [];
+      snap.forEach(d => {
+        const u = d.data();
+        users.push(u);
+      });
+      return users;
+    } catch (err) {
+      console.warn('[Firebase] Failed to load all users:', err.message);
+      return [];
+    }
+  }
+
+  async loadAllCircuits() {
+    if (!this.isInitialized || !this.db) return [];
+    const allCircuits = [];
+    try {
+      if (this.sdk.collectionGroup) {
+        const groupRef = this.sdk.collectionGroup(this.db, 'circuits');
+        const snap = await this.sdk.getDocs(groupRef);
+        snap.forEach(docSnap => {
+          allCircuits.push(docSnap.data());
+        });
+        return allCircuits;
+      }
+    } catch (err) {
+      console.warn('[Firebase] collectionGroup query failed, falling back to users list:', err.message);
+    }
+
+    // Fallback: iterate users
+    try {
+      const users = await this.loadAllUsers();
+      for (const u of users) {
+        if (!u.uid) continue;
+        const subCol = this.sdk.collection(this.db, 'users', u.uid, 'circuits');
+        const subSnap = await this.sdk.getDocs(subCol);
+        subSnap.forEach(cs => allCircuits.push(cs.data()));
+      }
+      return allCircuits;
+    } catch (e) {
+      console.warn('[Firebase] loadAllCircuits fallback failed:', e.message);
+      return [];
+    }
+  }
+
+  async deleteCircuitAdmin(ownerUid, circuitId) {
+    if (!this.isInitialized || !this.db) return false;
+    try {
+      const circRef = this.sdk.doc(this.db, 'users', ownerUid, 'circuits', circuitId);
+      await this.sdk.deleteDoc(circRef);
+
+      await this.logActivity({
+        type: 'admin_delete_circuit',
+        actorUid: this.currentUser?.uid || 'admin',
+        actorEmail: this.currentUser?.email || '',
+        targetId: circuitId,
+        metadata: { ownerUid, circuitId }
+      }).catch(() => {});
+
+      return true;
+    } catch (err) {
+      console.error('[Firebase] Admin delete circuit failed:', err);
       return false;
     }
   }

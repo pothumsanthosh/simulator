@@ -1,7 +1,7 @@
 {
-  "name": "Switcha - Interactive Electronic & Digital Circuit Simulator",
-  "short_name": "Switcha",
-  "description": "Design. Switch. Simulate. Build electronic and digital circuits with interactive switches, logic gates, and real-time SPICE simulation.",
+  "name": "e-Samastha - Integrated ECE Engineering Simulation & Learning Platform",
+  "short_name": "e-Samastha",
+  "description": "e-Samastha is an integrated ECE engineering simulation and learning platform for designing, simulating, saving, and managing electronic circuits and engineering projects.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -21,7 +21,7 @@
     {
       "name": "Launch Circuit Editor",
       "url": "./index.html#/create",
-      "description": "Open Switcha schematic studio with interactive switches and live simulation"
+      "description": "Open e-Samastha schematic studio with interactive switches and live simulation"
     },
     {
       "name": "My Circuits",
