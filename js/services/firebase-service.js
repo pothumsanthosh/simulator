@@ -131,14 +131,65 @@ class FirebaseService {
     });
   }
 
+  recordLocalUser(user, extra = {}) {
+    if (!user || typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('esamastha_known_users');
+      const users = raw ? JSON.parse(raw) : [];
+      const email = user.email || '';
+      const uid = user.uid || '';
+      const isKnownAdmin = [
+        'pothumsanthosh@gmail.com',
+        'admin@e-samastha.edu',
+        'admin@electrosim-4cf3f.firebaseapp.com',
+        'admin@domain.com'
+      ].includes(email.toLowerCase());
+
+      const userData = {
+        uid,
+        email,
+        displayName: user.displayName || extra.displayName || (email ? email.split('@')[0] : 'User'),
+        role: extra.role || (isKnownAdmin ? 'admin' : 'user'),
+        status: extra.status || 'active',
+        createdAt: extra.createdAt || Date.now(),
+        lastActiveAt: Date.now(),
+        updatedAt: Date.now(),
+        ...extra
+      };
+
+      const existingIndex = users.findIndex(u => (uid && u.uid === uid) || (email && u.email && u.email.toLowerCase() === email.toLowerCase()));
+      if (existingIndex >= 0) {
+        users[existingIndex] = { ...users[existingIndex], ...userData, lastActiveAt: Date.now() };
+      } else {
+        users.push(userData);
+      }
+      localStorage.setItem('esamastha_known_users', JSON.stringify(users));
+    } catch (e) {
+      console.warn('[Firebase] Failed to write local user registry:', e);
+    }
+  }
+
   async syncUserProfile(user, extra = {}) {
-    if (!this.isInitialized || !this.db || !user) return;
+    if (!user) return;
+    this.recordLocalUser(user, extra);
+
+    if (!this.isInitialized || !this.db) return;
     try {
       const userRef = this.sdk.doc(this.db, 'users', user.uid);
+      const isKnownAdmin = [
+        'pothumsanthosh@gmail.com',
+        'admin@e-samastha.edu',
+        'admin@electrosim-4cf3f.firebaseapp.com',
+        'admin@domain.com'
+      ].includes((user.email || '').toLowerCase());
+
       const payload = {
         uid: user.uid,
         email: user.email || '',
-        displayName: user.displayName || extra.displayName || '',
+        displayName: user.displayName || extra.displayName || (user.email ? user.email.split('@')[0] : 'User'),
+        role: extra.role || (isKnownAdmin ? 'admin' : 'user'),
+        status: extra.status || 'active',
+        createdAt: extra.createdAt || Date.now(),
         lastActiveAt: Date.now(),
         updatedAt: Date.now(),
         ...extra
@@ -361,22 +412,35 @@ class FirebaseService {
   }
 
   // ==========================================
+  // ==========================================
   // ACTIVITY AUDIT LOGGING (SECURITY TRAIL)
   // ==========================================
   async logActivity(event) {
+    const logId = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    const payload = {
+      eventId: logId,
+      type: event.type || 'generic_event',
+      actorUid: event.actorUid || this.currentUser?.uid || 'guest',
+      actorEmail: event.actorEmail || this.currentUser?.email || '',
+      targetId: event.targetId || '',
+      metadata: event.metadata || {},
+      timestamp: Date.now()
+    };
+
+    // Always record locally
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('esamastha_known_activity_logs');
+        const logs = raw ? JSON.parse(raw) : [];
+        logs.unshift(payload);
+        if (logs.length > 200) logs.length = 200;
+        localStorage.setItem('esamastha_known_activity_logs', JSON.stringify(logs));
+      } catch (_) {}
+    }
+
     if (!this.isInitialized || !this.db) return false;
     try {
-      const logId = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
       const logRef = this.sdk.doc(this.db, 'activity_logs', logId);
-      const payload = {
-        eventId: logId,
-        type: event.type || 'generic_event',
-        actorUid: event.actorUid || this.currentUser?.uid || 'guest',
-        actorEmail: event.actorEmail || this.currentUser?.email || '',
-        targetId: event.targetId || '',
-        metadata: event.metadata || {},
-        timestamp: Date.now()
-      };
       await this.sdk.setDoc(logRef, payload);
       return true;
     } catch (err) {
@@ -386,94 +450,204 @@ class FirebaseService {
   }
 
   async loadActivityLogs(limitCount = 50) {
-    if (!this.isInitialized || !this.db) return [];
-    try {
-      const logsCol = this.sdk.collection(this.db, 'activity_logs');
-      let q = logsCol;
-      if (this.sdk.query && this.sdk.orderBy && this.sdk.limit) {
-        q = this.sdk.query(logsCol, this.sdk.orderBy('timestamp', 'desc'), this.sdk.limit(limitCount));
+    const remoteLogs = [];
+    if (this.isInitialized && this.db) {
+      try {
+        const logsCol = this.sdk.collection(this.db, 'activity_logs');
+        let q = logsCol;
+        if (this.sdk.query && this.sdk.orderBy && this.sdk.limit) {
+          q = this.sdk.query(logsCol, this.sdk.orderBy('timestamp', 'desc'), this.sdk.limit(limitCount));
+        }
+        const snap = await this.sdk.getDocs(q);
+        snap.forEach(d => remoteLogs.push(d.data()));
+      } catch (err) {
+        console.warn('[Firebase] Failed to load activity logs:', err.message);
       }
-      const snap = await this.sdk.getDocs(q);
-      const logs = [];
-      snap.forEach(d => logs.push(d.data()));
-      return logs;
-    } catch (err) {
-      console.warn('[Firebase] Failed to load activity logs:', err.message);
-      return [];
     }
+
+    let localLogs = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('esamastha_known_activity_logs');
+        if (raw) localLogs = JSON.parse(raw);
+      } catch (_) {}
+    }
+
+    const merged = new Map();
+    localLogs.forEach(l => {
+      const key = l.eventId || `${l.timestamp}_${l.type}`;
+      merged.set(key, l);
+    });
+    remoteLogs.forEach(l => {
+      const key = l.eventId || `${l.timestamp}_${l.type}`;
+      merged.set(key, l);
+    });
+
+    const result = Array.from(merged.values())
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, limitCount);
+    return result;
   }
 
   // ==========================================
   // ADMIN PORTAL OPERATIONS
   // ==========================================
   async loadAllUsers() {
-    if (!this.isInitialized || !this.db) return [];
-    try {
-      const usersCol = this.sdk.collection(this.db, 'users');
-      const snap = await this.sdk.getDocs(usersCol);
-      const users = [];
-      snap.forEach(d => {
-        const u = d.data();
-        users.push(u);
-      });
-      return users;
-    } catch (err) {
-      console.warn('[Firebase] Failed to load all users:', err.message);
-      return [];
+    const remoteUsers = [];
+    if (this.isInitialized && this.db) {
+      try {
+        const usersCol = this.sdk.collection(this.db, 'users');
+        const snap = await this.sdk.getDocs(usersCol);
+        snap.forEach(d => {
+          remoteUsers.push(d.data());
+        });
+      } catch (err) {
+        console.warn('[Firebase] Failed to load all users from Firestore:', err.message);
+      }
     }
+
+    // Load locally tracked users from registration/login history
+    let localUsers = [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('esamastha_known_users');
+        if (raw) localUsers = JSON.parse(raw);
+
+        // Also discover any users who saved circuits under switcha_circuits_${uid}
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('switcha_circuits_')) {
+            const uid = key.replace('switcha_circuits_', '');
+            if (uid && !localUsers.some(u => u.uid === uid) && !remoteUsers.some(u => u.uid === uid)) {
+              localUsers.push({
+                uid,
+                email: `${uid.slice(0, 8)}@student.esamastha`,
+                displayName: `Student (${uid.slice(0, 6)})`,
+                role: 'user',
+                status: 'active',
+                createdAt: Date.now(),
+                lastActiveAt: Date.now()
+              });
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Merge: remote takes precedence over local
+    const merged = new Map();
+    localUsers.forEach(u => {
+      const key = u.uid || u.email;
+      if (key) merged.set(key, u);
+    });
+    remoteUsers.forEach(u => {
+      const key = u.uid || u.email;
+      if (key) merged.set(key, u);
+    });
+
+    const result = Array.from(merged.values());
+
+    // Update local registry cache with merged results
+    if (typeof localStorage !== 'undefined' && result.length > 0) {
+      try {
+        localStorage.setItem('esamastha_known_users', JSON.stringify(result));
+      } catch (_) {}
+    }
+
+    return result;
   }
 
   async loadAllCircuits() {
-    if (!this.isInitialized || !this.db) return [];
     const allCircuits = [];
-    try {
-      if (this.sdk.collectionGroup) {
-        const groupRef = this.sdk.collectionGroup(this.db, 'circuits');
-        const snap = await this.sdk.getDocs(groupRef);
-        snap.forEach(docSnap => {
-          allCircuits.push(docSnap.data());
-        });
-        return allCircuits;
+    if (this.isInitialized && this.db) {
+      try {
+        if (this.sdk.collectionGroup) {
+          const groupRef = this.sdk.collectionGroup(this.db, 'circuits');
+          const snap = await this.sdk.getDocs(groupRef);
+          snap.forEach(docSnap => {
+            allCircuits.push(docSnap.data());
+          });
+        }
+      } catch (err) {
+        console.warn('[Firebase] collectionGroup query failed, falling back to users list:', err.message);
+        // Fallback: iterate users
+        try {
+          const users = await this.loadAllUsers();
+          for (const u of users) {
+            if (!u.uid) continue;
+            const subCol = this.sdk.collection(this.db, 'users', u.uid, 'circuits');
+            const subSnap = await this.sdk.getDocs(subCol);
+            subSnap.forEach(cs => allCircuits.push(cs.data()));
+          }
+        } catch (e) {
+          console.warn('[Firebase] loadAllCircuits fallback failed:', e.message);
+        }
       }
-    } catch (err) {
-      console.warn('[Firebase] collectionGroup query failed, falling back to users list:', err.message);
     }
 
-    // Fallback: iterate users
-    try {
-      const users = await this.loadAllUsers();
-      for (const u of users) {
-        if (!u.uid) continue;
-        const subCol = this.sdk.collection(this.db, 'users', u.uid, 'circuits');
-        const subSnap = await this.sdk.getDocs(subCol);
-        subSnap.forEach(cs => allCircuits.push(cs.data()));
-      }
-      return allCircuits;
-    } catch (e) {
-      console.warn('[Firebase] loadAllCircuits fallback failed:', e.message);
-      return [];
+    // Merge with any local user circuits found in localStorage
+    if (typeof localStorage !== 'undefined') {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('switcha_circuits_')) {
+            const ownerUid = key.replace('switcha_circuits_', '');
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                list.forEach(c => {
+                  if (c && c.id && !allCircuits.some(existing => existing.id === c.id)) {
+                    allCircuits.push({ ...c, ownerUid: c.ownerUid || ownerUid });
+                  }
+                });
+              }
+            }
+          }
+        }
+      } catch (_) {}
     }
+
+    return allCircuits;
   }
 
   async deleteCircuitAdmin(ownerUid, circuitId) {
-    if (!this.isInitialized || !this.db) return false;
-    try {
-      const circRef = this.sdk.doc(this.db, 'users', ownerUid, 'circuits', circuitId);
-      await this.sdk.deleteDoc(circRef);
+    let deleted = false;
+    if (this.isInitialized && this.db) {
+      try {
+        const circRef = this.sdk.doc(this.db, 'users', ownerUid, 'circuits', circuitId);
+        await this.sdk.deleteDoc(circRef);
+        deleted = true;
 
-      await this.logActivity({
-        type: 'admin_delete_circuit',
-        actorUid: this.currentUser?.uid || 'admin',
-        actorEmail: this.currentUser?.email || '',
-        targetId: circuitId,
-        metadata: { ownerUid, circuitId }
-      }).catch(() => {});
-
-      return true;
-    } catch (err) {
-      console.error('[Firebase] Admin delete circuit failed:', err);
-      return false;
+        await this.logActivity({
+          type: 'admin_delete_circuit',
+          actorUid: this.currentUser?.uid || 'admin',
+          actorEmail: this.currentUser?.email || '',
+          targetId: circuitId,
+          metadata: { ownerUid, circuitId }
+        }).catch(() => {});
+      } catch (err) {
+        console.error('[Firebase] Admin delete circuit remote failed:', err);
+      }
     }
+
+    // Also remove from local storage if present
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const key = `switcha_circuits_${ownerUid}`;
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const filtered = list.filter(c => c.id !== circuitId);
+            localStorage.setItem(key, JSON.stringify(filtered));
+            deleted = true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return deleted;
   }
 }
 

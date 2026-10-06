@@ -1908,19 +1908,24 @@ class SwitchaApp {
         userProfileBadge.title = 'Logged in as Administrator (Pothumsanthosh@gmail.com)';
       }
 
-      // 3. Ensure Admin Console button exists in topbar
-      if (!adminControls && userControls) {
-        adminControls = document.createElement('div');
-        adminControls.id = 'userProfileAdminGroup';
-        adminControls.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-right: 6px;';
-        adminControls.innerHTML = `
-          <a href="#/admin" class="btn btn-outline" id="userProfileAdminBtn" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(245, 158, 11, 0.15);" title="Return to Admin Console (Users, Circuits, Activity)">
-            <span>🛡️</span> Admin Console
-          </a>
-        `;
-        userControls.insertBefore(adminControls, btnLogout);
+      // 3. Ensure Admin Console button exists in topbar ONLY when returning from a lab on index.html
+      const shouldShowAdminReturnBtn = !isPortalAdmin && this.currentView !== 'admin';
+      if (shouldShowAdminReturnBtn) {
+        if (!adminControls && userControls) {
+          adminControls = document.createElement('div');
+          adminControls.id = 'userProfileAdminGroup';
+          adminControls.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-right: 6px;';
+          adminControls.innerHTML = `
+            <a href="#/admin" class="btn btn-outline" id="userProfileAdminBtn" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(245, 158, 11, 0.15);" title="Return to Admin Console (Users, Circuits, Activity)">
+              <span>🛡️</span> Admin Console
+            </a>
+          `;
+          userControls.insertBefore(adminControls, btnLogout);
+        } else if (adminControls) {
+          adminControls.style.display = 'inline-flex';
+        }
       } else if (adminControls) {
-        adminControls.style.display = 'inline-flex';
+        adminControls.style.display = 'none';
       }
 
       // 4. Change logout button to "Admin Logout"
@@ -2027,6 +2032,10 @@ class SwitchaApp {
     const targetPage = document.getElementById(`view-${viewName}`);
     if (targetPage) targetPage.classList.add('active');
 
+    if (viewName === 'admin') {
+      this.loadAdminData();
+    }
+
     // Update nav links
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     if (viewName === 'studio') document.getElementById('nav-circuits-env')?.classList.add('active');
@@ -2036,6 +2045,7 @@ class SwitchaApp {
     if (viewName === 'my-circuits') document.getElementById('nav-my-circuits')?.classList.add('active');
     if (viewName === 'features') document.getElementById('nav-features')?.classList.add('active');
     if (viewName === 'discover') document.getElementById('nav-circuits')?.classList.add('active');
+    if (viewName === 'admin') document.getElementById('nav-admin-console')?.classList.add('active');
 
     if (viewName === 'my-circuits') {
       if (!this.currentWorkspaceTab) this.currentWorkspaceTab = 'circuits';
@@ -4399,6 +4409,12 @@ class SwitchaApp {
           console.warn('[Firebase] Error loading user circuits from cloud:', err);
           this.currentUserCircuits = this.getMyCircuits();
         }
+
+        // If currently on admin view or in admin portal, refresh admin data immediately
+        const isPortalAdmin = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
+        if (this.currentView === 'admin' || isPortalAdmin || (typeof window !== 'undefined' && window.location.hash.startsWith('#/admin'))) {
+          this.loadAdminData();
+        }
       } else {
         if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
           window.SwitchaStorage.setUserId(null);
@@ -4811,15 +4827,20 @@ class SwitchaApp {
       return;
     }
 
-    if (!firebaseService.currentUser) {
-      window.location.hash = '#/admin/login';
-      return;
+    const hasStoredAdminSession = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('esamastha_authenticated_admin_uid');
+
+    if (!firebaseService.currentUser && !hasStoredAdminSession) {
+      // Allow Firebase Auth a moment to restore persistent token on page load
+      let waitCount = 0;
+      while (!firebaseService.currentUser && waitCount < 5) {
+        await new Promise(r => setTimeout(r, 200));
+        waitCount++;
+      }
     }
 
     const isAdmin = await firebaseService.verifyAdmin(false);
-    if (!isAdmin) {
-      this.showToast('Access Denied: Administrator privileges required.', 'warning');
-      window.location.hash = '#/create';
+    if (!isAdmin && !hasStoredAdminSession) {
+      window.location.hash = '#/admin/login';
       return;
     }
 

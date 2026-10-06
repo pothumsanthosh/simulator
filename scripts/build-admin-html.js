@@ -16,7 +16,7 @@ const adminHeader = `
        ADMINISTRATOR PORTAL HEADER
        ==================================================================== -->
   <header class="topbar site-header theme-dark" role="banner" style="background: #0f172a !important; border-bottom: 1px solid #1e293b !important;">
-    <div class="topbar-inner">
+    <div class="topbar-container">
       <div class="topbar-left">
         <a href="#/admin" class="brand" aria-label="e-Samastha Admin Portal" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
           <svg class="brand-icon" viewBox="0 0 40 40" width="30" height="30" aria-hidden="true">
@@ -84,11 +84,10 @@ let bodyPart = indexHtml.substring(mainStart);
 // In admin.html, ensure admin return buttons are visible by default
 bodyPart = bodyPart.replaceAll('class="btn btn-outline admin-only-return-btn" style="display: none;', 'class="btn btn-outline admin-only-return-btn" style="display: inline-flex;');
 bodyPart = bodyPart.replaceAll('class="btn btn-outline admin-only-return-btn" id="studioAdminReturnBtn" style="display: none;', 'class="btn btn-outline admin-only-return-btn" id="studioAdminReturnBtn" style="display: inline-flex;');
-bodyPart = bodyPart.replaceAll('class="btn btn-outline admin-only-return-btn" id="studioAdminReturnRightBtn" style="display: none;', 'class="btn btn-outline admin-only-return-btn" id="studioAdminReturnRightBtn" style="display: inline-flex;');
 
 // Construct final admin.html
 const adminHtmlContent = `${headPart}</head>
-<body class="admin-view-active">
+<body class="admin-view-active is-admin-portal">
 ${adminHeader}
 ${bodyPart}`;
 

@@ -168,7 +168,8 @@ body.workspace-active .topbar--announcement {
 }
 
 body.announcement-hidden .topbar,
-body.workspace-active .topbar {
+body.workspace-active .topbar,
+body.is-admin-portal .topbar {
   top: 0 !important;
 }
 
@@ -2174,10 +2175,71 @@ body.workspace-active .studio-wrapper {
    ADMIN PORTAL COMPLETE ISOLATION
    Hides public website navigation, announcement, and guest auth from admin views
    ========================================================================== */
-body.admin-view-active .topbar .nav,
+body.admin-view-active:not(.is-admin-portal) .topbar .nav,
 body.admin-view-active #authGuestControls,
 body.admin-view-active #topAnnouncement {
   display: none !important;
+}
+
+body.is-admin-portal .topbar {
+  top: 0 !important;
+  background: #0f172a !important;
+  border-bottom: 1px solid #1e293b !important;
+}
+
+body.is-admin-portal .topbar-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  padding: 0 24px !important;
+  box-sizing: border-box !important;
+}
+
+body.is-admin-portal .topbar-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 20px !important;
+  min-width: 0 !important;
+}
+
+body.is-admin-portal .topbar .nav {
+  display: flex !important;
+  align-items: center !important;
+}
+
+body.is-admin-portal .nav-list {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px !important;
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.is-admin-portal .nav-link {
+  color: #94a3b8 !important;
+  text-decoration: none !important;
+  padding: 6px 12px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s !important;
+}
+
+body.is-admin-portal .nav-link:hover,
+body.is-admin-portal .nav-link.active {
+  color: #00F59B !important;
+  background: rgba(3, 181, 133, 0.15) !important;
+}
+
+body.is-admin-portal .topbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
 }
 
 body.admin-view-active .topbar {

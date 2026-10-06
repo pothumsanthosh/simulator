@@ -19,17 +19,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Roboto+Mono:wght@400;500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261005i"/>
+  <link rel="stylesheet" href="css/style.css?v=20261006c"/>
   <link rel="stylesheet" href="css/simulator.css?v=20261005i"/>
   <link rel="stylesheet" href="css/arduino.css?v=20261005i"/>
 </head>
-<body class="admin-view-active">
+<body class="admin-view-active is-admin-portal">
 
   <!-- ====================================================================
        ADMINISTRATOR PORTAL HEADER
        ==================================================================== -->
   <header class="topbar site-header theme-dark" role="banner" style="background: #0f172a !important; border-bottom: 1px solid #1e293b !important;">
-    <div class="topbar-inner">
+    <div class="topbar-container">
       <div class="topbar-left">
         <a href="#/admin" class="brand" aria-label="e-Samastha Admin Portal" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
           <svg class="brand-icon" viewBox="0 0 40 40" width="30" height="30" aria-hidden="true">
@@ -583,7 +583,6 @@
             <span class="breadcrumb-current" id="studioBreadcrumbTitle">Untitled Circuit</span>
           </div>
           <div class="breadcrumb-right">
-            <a href="#/admin" class="btn btn-outline admin-only-return-btn" id="studioAdminReturnRightBtn" style="display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">🛡️ Admin Console</a>
             <div class="sim-status-badge ready" id="circuitSimStatusBadge" title="Simulation Engine Status">
               <span class="status-dot"></span>
               <span id="circuitSimStatusText">Ready</span>
@@ -1061,7 +1060,6 @@
           <span class="breadcrumb-current">DSP Signal Analysis</span>
         </div>
         <div class="breadcrumb-right">
-          <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">🛡️ Admin Console</a>
           <div class="sim-status-badge ready"><span class="status-dot"></span><span>Ready</span></div>
         </div>
       </div>
@@ -1084,7 +1082,6 @@
           <span class="breadcrumb-current" id="arduinoBreadcrumbTitle">Blink (LED 13)</span>
         </div>
         <div class="breadcrumb-right">
-          <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">🛡️ Admin Console</a>
           <div class="sim-status-badge ready" id="arduinoStatusBadge" title="Virtual Microcontroller State">
             <span class="status-dot"></span>
             <span id="arduinoStatusText">Ready</span>
@@ -1263,7 +1260,6 @@
           <div class="admin-header-right">
             <button class="btn btn-outline" id="btnAdminRefresh" title="Refresh Live Data">🔄 Refresh</button>
             <a href="#/create" class="btn btn-primary" id="btnAdminOpenStudio" title="Open Studio (All Labs Included)" style="text-decoration: none; font-size: 13px; font-weight: 700; background: #03b585; border-color: #03b585;">⚡ Studio</a>
-            <button class="btn btn-primary" id="btnAdminLogout" style="background: #ef4444; border-color: #ef4444;">🚪 Admin Logout</button>
           </div>
         </div>
 
@@ -1762,6 +1758,6 @@
   <div class="switcha-toast" id="switchaToast"></div>
 
   <!-- Main JavaScript App Loader (ES Module) -->
-  <script type="module" src="js/app.js?v=20261006a"></script>
+  <script type="module" src="js/app.js?v=20261006c"></script>
 </body>
 </html>
