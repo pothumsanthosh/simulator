@@ -1,8 +1,10 @@
 /**
  * Firebase Integration Service for ElectroSim / Switcha
  * Project: electrosim-4cf3f
- * Provides Firebase Authentication, Cloud Firestore circuit synchronization,
- * Role-based Admin authorization, activity auditing, and Analytics with offline-first resilience.
+ * Architecture: Isolated Dual-Context Authentication Engine
+ * - UserAuthContext: Operates on dedicated User Firebase App ('[DEFAULT]')
+ * - AdminAuthContext: Operates on dedicated Admin Firebase App ('esamasthaAdmin')
+ * Strictly eliminates shared authentication state, token bleeding, and cross-tab overwrites.
  */
 
 export const firebaseConfig = {
@@ -15,18 +17,133 @@ export const firebaseConfig = {
   measurementId: "G-G3BRPKB6SY"
 };
 
-class FirebaseService {
-  constructor() {
-    this.app = null;
-    this.auth = null;
-    this.db = null;
-    this.analytics = null;
+/**
+ * Isolated User Authentication Context
+ * Manages regular student / educator sessions, project persistence, and user Firestore actions.
+ */
+export class UserAuthContext {
+  constructor(service) {
+    this.service = service;
     this.currentUser = null;
     this.isInitialized = false;
-    this.authListeners = [];
+    this.listeners = [];
+  }
+
+  get auth() {
+    return this.service.userAuth;
+  }
+
+  get db() {
+    return this.service.userDb;
+  }
+
+  onAuthStateChanged(callback) {
+    if (typeof callback === 'function') {
+      this.listeners.push(callback);
+      if (this.isInitialized) {
+        callback(this.currentUser);
+      }
+    }
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== callback);
+    };
+  }
+
+  notify(user) {
+    this.currentUser = user;
+    this.isInitialized = true;
+    this.listeners.forEach(cb => {
+      try { cb(user); } catch (e) { console.error('[UserAuthContext] listener error:', e); }
+    });
+  }
+
+  async signIn(email, password) {
+    return this.service.signInUser(email, password);
+  }
+
+  async signUp(email, password, displayName = '') {
+    return this.service.signUpUser(email, password, displayName);
+  }
+
+  async signOut() {
+    return this.service.signOutUser();
+  }
+}
+
+/**
+ * Isolated Admin Authentication Context
+ * Manages elevated administrator credentials, custom claims, and admin Firestore audit / console operations.
+ */
+export class AdminAuthContext {
+  constructor(service) {
+    this.service = service;
+    this.currentUser = null;
+    this.isInitialized = false;
+    this.listeners = [];
+  }
+
+  get auth() {
+    return this.service.adminAuth;
+  }
+
+  get db() {
+    return this.service.adminDb;
+  }
+
+  onAuthStateChanged(callback) {
+    if (typeof callback === 'function') {
+      this.listeners.push(callback);
+      if (this.isInitialized) {
+        callback(this.currentUser);
+      }
+    }
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== callback);
+    };
+  }
+
+  notify(user) {
+    this.currentUser = user;
+    this.isInitialized = true;
+    this.listeners.forEach(cb => {
+      try { cb(user); } catch (e) { console.error('[AdminAuthContext] listener error:', e); }
+    });
+  }
+
+  async signIn(email, password) {
+    return this.service.signInAdmin(email, password);
+  }
+
+  async signOut() {
+    return this.service.signOutAdmin();
+  }
+
+  async verifyAdmin(forceRefresh = false) {
+    return this.service.verifyAdmin(forceRefresh);
+  }
+}
+
+class FirebaseService {
+  constructor() {
+    this.isInitialized = false;
+
+    // Dual-Context Instances
+    this.userApp = null;
+    this.userAuth = null;
+    this.userDb = null;
+    this.userContext = new UserAuthContext(this);
+
+    this.adminApp = null;
+    this.adminAuth = null;
+    this.adminDb = null;
+    this.adminContext = new AdminAuthContext(this);
+
+    this.analytics = null;
 
     this.sdk = {
       initializeApp: null,
+      getApp: null,
+      getApps: null,
       getAuth: null,
       signInWithEmailAndPassword: null,
       createUserWithEmailAndPassword: null,
@@ -52,6 +169,15 @@ class FirebaseService {
       this.init();
     }
   }
+
+  // --- Convenience Getters & Setters for Backward Compatibility ---
+  get app() { return this.userApp; }
+  get auth() { return this.userAuth; }
+  get db() { return this.userDb; }
+  get currentUser() { return this.userContext.currentUser; }
+  set currentUser(val) { this.userContext.currentUser = val; }
+  get adminUser() { return this.adminContext.currentUser; }
+  set adminUser(val) { this.adminContext.currentUser = val; }
 
   async init() {
     try {
@@ -89,76 +215,242 @@ class FirebaseService {
         this.sdk.getAnalytics = analyticsMod.getAnalytics;
       }
 
-      const isPortalAdmin = typeof window !== 'undefined' && (
-        window.location.pathname.toLowerCase().includes('admin.html') ||
-        window.location.pathname.toLowerCase().startsWith('/admin')
-      );
+      // Initialize Dual App Instances with Partitioned Storage
+      // 1. User App ('[DEFAULT]')
+      // 2. Admin App ('esamasthaAdmin')
+      const existingApps = this.sdk.getApps ? this.sdk.getApps() : [];
+      let targetUserApp = existingApps.find(a => a.name === '[DEFAULT]') || null;
+      let targetAdminApp = existingApps.find(a => a.name === 'esamasthaAdmin') || null;
 
-      // Multi-App Isolation:
-      // 'esamasthaAdmin' app instance for the Admin Portal (admin.html)
-      // '[DEFAULT]' app instance for the User Portal (index.html)
-      // This isolates authentication sessions so admin logins never
-      // leak into user portal pages, and student logins never overwrite admin portal sessions.
-      const appName = isPortalAdmin ? 'esamasthaAdmin' : '[DEFAULT]';
-      let targetApp = null;
-      try {
-        if (this.sdk.getApps && this.sdk.getApps().length > 0) {
-          targetApp = this.sdk.getApps().find(a => a.name === appName) || null;
-        }
-      } catch (_) {}
-
-      if (!targetApp) {
-        if (isPortalAdmin) {
-          targetApp = this.sdk.initializeApp(firebaseConfig, 'esamasthaAdmin');
-        } else {
-          targetApp = this.sdk.initializeApp(firebaseConfig);
-        }
+      if (!targetUserApp) {
+        targetUserApp = this.sdk.initializeApp(firebaseConfig);
+      }
+      if (!targetAdminApp) {
+        targetAdminApp = this.sdk.initializeApp(firebaseConfig, 'esamasthaAdmin');
       }
 
-      this.app = targetApp;
-      this.auth = this.sdk.getAuth(this.app);
-      this.db = this.sdk.getFirestore(this.app);
+      this.userApp = targetUserApp;
+      this.userAuth = this.sdk.getAuth(this.userApp);
+      this.userDb = this.sdk.getFirestore(this.userApp);
+
+      this.adminApp = targetAdminApp;
+      this.adminAuth = this.sdk.getAuth(this.adminApp);
+      this.adminDb = this.sdk.getFirestore(this.adminApp);
 
       if (this.sdk.getAnalytics && typeof window !== 'undefined') {
         try {
-          this.analytics = this.sdk.getAnalytics(this.app);
+          this.analytics = this.sdk.getAnalytics(this.userApp);
         } catch (_) {}
       }
 
       this.isInitialized = true;
-      console.log('[Firebase] e-Samastha Firebase initialized successfully (Project: electrosim-4cf3f)');
+      console.log('[Firebase] e-Samastha Dual-Context Auth initialized (Project: electrosim-4cf3f)');
 
-      this.sdk.onAuthStateChanged(this.auth, async (user) => {
-        this.currentUser = user;
+      // User Context Auth Listener
+      this.sdk.onAuthStateChanged(this.userAuth, async (user) => {
+        this.userContext.notify(user);
         if (user) {
           await this.syncUserProfile(user).catch(() => {});
         }
-        this.notifyAuthListeners(user);
+      });
+
+      // Admin Context Auth Listener
+      this.sdk.onAuthStateChanged(this.adminAuth, async (adminUser) => {
+        this.adminContext.notify(adminUser);
       });
     } catch (err) {
       console.warn('[Firebase] Firebase initialization skipped or offline:', err.message);
     }
   }
 
+  // --- User Auth Delegation ---
+  onUserAuthStateChange(callback) {
+    return this.userContext.onAuthStateChanged(callback);
+  }
+
+  // Backward compatibility alias
   onAuthStateChange(callback) {
-    if (typeof callback === 'function') {
-      this.authListeners.push(callback);
-      if (this.isInitialized) {
-        callback(this.currentUser);
-      }
-    }
+    return this.userContext.onAuthStateChanged(callback);
   }
 
   notifyAuthListeners(user) {
-    this.authListeners.forEach(cb => {
-      try {
-        cb(user);
-      } catch (e) {
-        console.error('[Firebase] Auth listener error:', e);
-      }
-    });
+    this.userContext.notify(user);
   }
 
+  async signInUser(email, password) {
+    if (!this.isInitialized || !this.userAuth) {
+      throw new Error('Firebase Auth is not available. Please check your internet connection.');
+    }
+    const userCredential = await this.sdk.signInWithEmailAndPassword(this.userAuth, email, password);
+    this.userContext.notify(userCredential.user);
+
+    await this.syncUserProfile(userCredential.user).catch(() => {});
+    await this.logActivity({
+      type: 'user_login',
+      actorUid: userCredential.user.uid,
+      actorEmail: userCredential.user.email,
+      targetId: userCredential.user.uid,
+      metadata: {}
+    }).catch(() => {});
+
+    return userCredential.user;
+  }
+
+  async signUpUser(email, password, displayName = '') {
+    if (!this.isInitialized || !this.userAuth) {
+      throw new Error('Firebase Auth is not available. Please check your internet connection.');
+    }
+    const userCredential = await this.sdk.createUserWithEmailAndPassword(this.userAuth, email, password);
+    if (displayName && this.sdk.updateProfile) {
+      await this.sdk.updateProfile(userCredential.user, { displayName });
+    }
+    this.userContext.notify(userCredential.user);
+
+    await this.syncUserProfile(userCredential.user, {
+      displayName: displayName || '',
+      role: 'user',
+      status: 'active',
+      createdAt: Date.now()
+    }).catch(() => {});
+
+    await this.logActivity({
+      type: 'user_signup',
+      actorUid: userCredential.user.uid,
+      actorEmail: userCredential.user.email,
+      targetId: userCredential.user.uid,
+      metadata: { displayName }
+    }).catch(() => {});
+
+    return userCredential.user;
+  }
+
+  async signOutUser() {
+    if (!this.isInitialized || !this.userAuth) return;
+    const user = this.userContext.currentUser;
+    if (user) {
+      await this.logActivity({
+        type: 'user_logout',
+        actorUid: user.uid,
+        actorEmail: user.email,
+        targetId: user.uid,
+        metadata: {}
+      }).catch(() => {});
+    }
+    await this.sdk.signOut(this.userAuth);
+    this.userContext.notify(null);
+  }
+
+  // Backward compatibility alias for user operations
+  async signIn(email, password) {
+    return this.signInUser(email, password);
+  }
+
+  async signUp(email, password, displayName = '') {
+    return this.signUpUser(email, password, displayName);
+  }
+
+  async signOut() {
+    return this.signOutUser();
+  }
+
+  // --- Admin Auth Operations ---
+  onAdminAuthStateChange(callback) {
+    return this.adminContext.onAuthStateChanged(callback);
+  }
+
+  async signInAdmin(email, password) {
+    if (!this.isInitialized || !this.adminAuth) {
+      throw new Error('Firebase Admin Auth is not available. Please check your internet connection.');
+    }
+    const userCredential = await this.sdk.signInWithEmailAndPassword(this.adminAuth, email, password);
+    this.adminContext.notify(userCredential.user);
+
+    // Two-Layered Security: Authoritative verification of admin privileges
+    const isAdmin = await this.verifyAdmin(true);
+    if (!isAdmin) {
+      await this.sdk.signOut(this.adminAuth);
+      this.adminContext.notify(null);
+      throw new Error('Access Denied: This account does not possess administrator privileges ({ admin: true } claim missing).');
+    }
+
+    await this.syncUserProfile(userCredential.user, {
+      role: 'admin',
+      isAdmin: true,
+      adminAuthenticatedAt: Date.now()
+    }).catch(() => {});
+
+    await this.logActivity({
+      type: 'admin_login',
+      actorUid: userCredential.user.uid,
+      actorEmail: userCredential.user.email,
+      targetId: userCredential.user.uid,
+      metadata: {}
+    }).catch(() => {});
+
+    return userCredential.user;
+  }
+
+  async signOutAdmin() {
+    if (!this.isInitialized || !this.adminAuth) return;
+    const adminUser = this.adminContext.currentUser;
+    if (adminUser) {
+      await this.logActivity({
+        type: 'admin_logout',
+        actorUid: adminUser.uid,
+        actorEmail: adminUser.email,
+        targetId: adminUser.uid,
+        metadata: {}
+      }).catch(() => {});
+    }
+    await this.sdk.signOut(this.adminAuth);
+    this.adminContext.notify(null);
+  }
+
+  /**
+   * Verify authoritative administrator authorization via Firebase custom claims.
+   * Model: Firebase Authentication -> Authenticated identity -> Admin claim ({ admin: true })
+   */
+  async verifyAdmin(forceRefresh = false) {
+    const user = this.adminContext.currentUser || this.adminAuth?.currentUser;
+    if (!user) return false;
+
+    try {
+      // 1. Authoritative Firebase ID token custom claim verification
+      const tokenResult = await user.getIdTokenResult(forceRefresh).catch(() => null);
+      if (tokenResult?.claims?.admin === true) return true;
+      if (tokenResult?.claims?.admin === false) return false;
+
+      // 2. Pre-authorized admin email check
+      const authorizedAdminEmails = [
+        'pothumsanthosh@gmail.com',
+        'admin@e-samastha.edu',
+        'admin@electrosim-4cf3f.firebaseapp.com',
+        'admin@domain.com'
+      ];
+      if (authorizedAdminEmails.includes(user.email?.toLowerCase())) {
+        return true;
+      }
+
+      // 3. Authoritative Firestore role check
+      if (this.adminDb && user.uid) {
+        const userRef = this.sdk.doc(this.adminDb, 'users', user.uid);
+        const snap = await this.sdk.getDoc(userRef).catch(() => null);
+        if (snap && snap.exists()) {
+          const data = snap.data();
+          if (data?.role === 'admin' || data?.isAdmin === true) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    } catch (err) {
+      console.warn('[Firebase] verifyAdmin failed:', err.message);
+      return false;
+    }
+  }
+
+  // --- User Profiles and Registries ---
   recordLocalUser(user, extra = {}) {
     if (!user || typeof localStorage === 'undefined') return;
     try {
@@ -201,9 +493,10 @@ class FirebaseService {
     if (!user) return;
     this.recordLocalUser(user, extra);
 
-    if (!this.isInitialized || !this.db) return;
+    const db = this.userDb || this.db;
+    if (!this.isInitialized || !db) return;
     try {
-      const userRef = this.sdk.doc(this.db, 'users', user.uid);
+      const userRef = this.sdk.doc(db, 'users', user.uid);
       const isKnownAdmin = [
         'pothumsanthosh@gmail.com',
         'admin@e-samastha.edu',
@@ -228,145 +521,25 @@ class FirebaseService {
     }
   }
 
-  /**
-   * Verify authoritative administrator authorization via Firebase custom claims.
-   * Preferred claim: admin: true
-   * Returns true strictly if custom claims indicate administrator.
-   */
-  async verifyAdmin(forceRefresh = false) {
-    if (!this.currentUser) return false;
-    try {
-      // Pre-authorized Administrator Email Check (Instant 0ms)
-      const authorizedAdminEmails = [
-        'pothumsanthosh@gmail.com',
-        'admin@e-samastha.edu',
-        'admin@electrosim-4cf3f.firebaseapp.com',
-        'admin@domain.com'
-      ];
-      if (authorizedAdminEmails.includes(this.currentUser.email?.toLowerCase())) {
-        return true;
-      }
-
-      // Verified Authenticated Admin Session Check (Instant 0ms)
-      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('esamastha_authenticated_admin_uid') === this.currentUser.uid) {
-        return true;
-      }
-
-      const tokenResult = await this.currentUser.getIdTokenResult(forceRefresh).catch(() => null);
-      if (tokenResult?.claims?.admin === true) return true;
-      if (tokenResult?.claims?.admin === false) return false;
-
-      // Authoritative Firestore Role Check
-      if (this.db && this.currentUser.uid) {
-        try {
-          const userRef = this.sdk.doc(this.db, 'users', this.currentUser.uid);
-          const snap = await this.sdk.getDoc(userRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            if (data?.role === 'admin' || data?.isAdmin === true) {
-              return true;
-            }
-          }
-        } catch (_) {}
-      }
-
-      return false;
-    } catch (err) {
-      console.warn('[Firebase] verifyAdmin failed:', err.message);
-      return false;
-    }
-  }
-
-  async signUp(email, password, displayName = '') {
-    if (!this.isInitialized || !this.auth) {
-      throw new Error('Firebase Auth is not available. Please check your internet connection.');
-    }
-    const userCredential = await this.sdk.createUserWithEmailAndPassword(this.auth, email, password);
-    if (displayName && this.sdk.updateProfile) {
-      await this.sdk.updateProfile(userCredential.user, { displayName });
-    }
-    this.currentUser = userCredential.user;
-
-    // Create user profile in Firestore
-    await this.syncUserProfile(userCredential.user, {
-      displayName: displayName || '',
-      role: 'user',
-      status: 'active',
-      createdAt: Date.now()
-    }).catch(() => {});
-
-    // Log sign-up activity
-    await this.logActivity({
-      type: 'user_signup',
-      actorUid: userCredential.user.uid,
-      actorEmail: userCredential.user.email,
-      targetId: userCredential.user.uid,
-      metadata: { displayName }
-    }).catch(() => {});
-
-    return userCredential.user;
-  }
-
-  async signIn(email, password) {
-    if (!this.isInitialized || !this.auth) {
-      throw new Error('Firebase Auth is not available. Please check your internet connection.');
-    }
-    const userCredential = await this.sdk.signInWithEmailAndPassword(this.auth, email, password);
-    this.currentUser = userCredential.user;
-
-    // Sync active timestamp
-    await this.syncUserProfile(userCredential.user).catch(() => {});
-
-    // Log sign-in activity
-    await this.logActivity({
-      type: 'user_login',
-      actorUid: userCredential.user.uid,
-      actorEmail: userCredential.user.email,
-      targetId: userCredential.user.uid,
-      metadata: {}
-    }).catch(() => {});
-
-    return userCredential.user;
-  }
-
-  async signOut() {
-    if (!this.isInitialized || !this.auth) return;
-    if (this.currentUser) {
-      await this.logActivity({
-        type: 'user_logout',
-        actorUid: this.currentUser.uid,
-        actorEmail: this.currentUser.email,
-        targetId: this.currentUser.uid,
-        metadata: {}
-      }).catch(() => {});
-    }
-    await this.sdk.signOut(this.auth);
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem('esamastha_authenticated_admin_uid');
-    }
-    this.currentUser = null;
-    this.notifyAuthListeners(null);
-  }
-
-  /**
-   * Save circuit with verified ownerUid and ownerEmail.
-   */
+  // --- User Circuit Operations (Scoped strictly to User Context) ---
   async saveCircuit(circuit) {
-    if (!this.isInitialized || !this.db || !this.currentUser) {
+    const user = this.userContext.currentUser;
+    const db = this.userDb || this.db;
+    if (!this.isInitialized || !db || !user) {
       return false;
     }
 
     try {
       const circuitId = circuit.id || ('circuit_' + Date.now());
-      const userCircuitRef = this.sdk.doc(this.db, 'users', this.currentUser.uid, 'circuits', circuitId);
-      
+      const userCircuitRef = this.sdk.doc(db, 'users', user.uid, 'circuits', circuitId);
+
       const payload = {
         id: circuitId,
         name: circuit.name || 'Untitled Circuit',
         description: circuit.description || '',
-        author: circuit.author || this.currentUser.displayName || this.currentUser.email || 'e-Samastha User',
-        ownerUid: this.currentUser.uid,
-        ownerEmail: this.currentUser.email || '',
+        author: circuit.author || user.displayName || user.email || 'e-Samastha User',
+        ownerUid: user.uid,
+        ownerEmail: user.email || '',
         components: circuit.components || [],
         wires: circuit.wires || [],
         presetKey: circuit.presetKey || null,
@@ -378,11 +551,10 @@ class FirebaseService {
       await this.sdk.setDoc(userCircuitRef, payload, { merge: true });
       console.log('[Firebase] Circuit ' + payload.name + ' synced to cloud Firestore.');
 
-      // Log activity
       await this.logActivity({
         type: circuit.id ? 'circuit_updated' : 'circuit_created',
-        actorUid: this.currentUser.uid,
-        actorEmail: this.currentUser.email,
+        actorUid: user.uid,
+        actorEmail: user.email,
         targetId: circuitId,
         metadata: { circuitName: payload.name, componentCount: payload.components.length }
       }).catch(() => {});
@@ -395,12 +567,14 @@ class FirebaseService {
   }
 
   async loadUserCircuits() {
-    if (!this.isInitialized || !this.db || !this.currentUser) {
+    const user = this.userContext.currentUser;
+    const db = this.userDb || this.db;
+    if (!this.isInitialized || !db || !user) {
       return [];
     }
 
     try {
-      const circuitsColRef = this.sdk.collection(this.db, 'users', this.currentUser.uid, 'circuits');
+      const circuitsColRef = this.sdk.collection(db, 'users', user.uid, 'circuits');
       const snapshot = await this.sdk.getDocs(circuitsColRef);
       const circuits = [];
       snapshot.forEach(docSnap => {
@@ -415,19 +589,21 @@ class FirebaseService {
   }
 
   async deleteCircuit(circuitId) {
-    if (!this.isInitialized || !this.db || !this.currentUser) {
+    const user = this.userContext.currentUser;
+    const db = this.userDb || this.db;
+    if (!this.isInitialized || !db || !user) {
       return false;
     }
 
     try {
-      const userCircuitRef = this.sdk.doc(this.db, 'users', this.currentUser.uid, 'circuits', circuitId);
+      const userCircuitRef = this.sdk.doc(db, 'users', user.uid, 'circuits', circuitId);
       await this.sdk.deleteDoc(userCircuitRef);
       console.log('[Firebase] Circuit ' + circuitId + ' deleted from cloud Firestore.');
 
       await this.logActivity({
         type: 'circuit_deleted',
-        actorUid: this.currentUser.uid,
-        actorEmail: this.currentUser.email,
+        actorUid: user.uid,
+        actorEmail: user.email,
         targetId: circuitId,
         metadata: {}
       }).catch(() => {});
@@ -439,23 +615,20 @@ class FirebaseService {
     }
   }
 
-  // ==========================================
-  // ==========================================
-  // ACTIVITY AUDIT LOGGING (SECURITY TRAIL)
-  // ==========================================
+  // --- Activity Audit Logging ---
   async logActivity(event) {
     const logId = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    const currentUser = this.adminContext.currentUser || this.userContext.currentUser;
     const payload = {
       eventId: logId,
       type: event.type || 'generic_event',
-      actorUid: event.actorUid || this.currentUser?.uid || 'guest',
-      actorEmail: event.actorEmail || this.currentUser?.email || '',
+      actorUid: event.actorUid || currentUser?.uid || 'guest',
+      actorEmail: event.actorEmail || currentUser?.email || '',
       targetId: event.targetId || '',
       metadata: event.metadata || {},
       timestamp: Date.now()
     };
 
-    // Always record locally
     if (typeof localStorage !== 'undefined') {
       try {
         const raw = localStorage.getItem('esamastha_known_activity_logs');
@@ -466,9 +639,10 @@ class FirebaseService {
       } catch (_) {}
     }
 
-    if (!this.isInitialized || !this.db) return false;
+    const db = this.adminDb || this.userDb || this.db;
+    if (!this.isInitialized || !db) return false;
     try {
-      const logRef = this.sdk.doc(this.db, 'activity_logs', logId);
+      const logRef = this.sdk.doc(db, 'activity_logs', logId);
       await this.sdk.setDoc(logRef, payload);
       return true;
     } catch (err) {
@@ -479,9 +653,10 @@ class FirebaseService {
 
   async loadActivityLogs(limitCount = 50) {
     const remoteLogs = [];
-    if (this.isInitialized && this.db) {
+    const db = this.adminDb || this.db;
+    if (this.isInitialized && db) {
       try {
-        const logsCol = this.sdk.collection(this.db, 'activity_logs');
+        const logsCol = this.sdk.collection(db, 'activity_logs');
         let q = logsCol;
         if (this.sdk.query && this.sdk.orderBy && this.sdk.limit) {
           q = this.sdk.query(logsCol, this.sdk.orderBy('timestamp', 'desc'), this.sdk.limit(limitCount));
@@ -517,14 +692,13 @@ class FirebaseService {
     return result;
   }
 
-  // ==========================================
-  // ADMIN PORTAL OPERATIONS
-  // ==========================================
+  // --- Admin Portal Operations (Scoped strictly to Admin Context & Admin DB) ---
   async loadAllUsers() {
     const remoteUsers = [];
-    if (this.isInitialized && this.db) {
+    const db = this.adminDb || this.db;
+    if (this.isInitialized && db) {
       try {
-        const usersCol = this.sdk.collection(this.db, 'users');
+        const usersCol = this.sdk.collection(db, 'users');
         const snap = await this.sdk.getDocs(usersCol);
         snap.forEach(d => {
           remoteUsers.push(d.data());
@@ -534,14 +708,12 @@ class FirebaseService {
       }
     }
 
-    // Load locally tracked users from registration/login history
     let localUsers = [];
     if (typeof localStorage !== 'undefined') {
       try {
         const raw = localStorage.getItem('esamastha_known_users');
         if (raw) localUsers = JSON.parse(raw);
 
-        // Also discover any users who saved circuits under switcha_circuits_${uid}
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith('switcha_circuits_')) {
@@ -562,7 +734,6 @@ class FirebaseService {
       } catch (_) {}
     }
 
-    // Merge: remote takes precedence over local
     const merged = new Map();
     localUsers.forEach(u => {
       const key = u.uid || u.email;
@@ -575,7 +746,6 @@ class FirebaseService {
 
     const result = Array.from(merged.values());
 
-    // Update local registry cache with merged results
     if (typeof localStorage !== 'undefined' && result.length > 0) {
       try {
         localStorage.setItem('esamastha_known_users', JSON.stringify(result));
@@ -587,10 +757,11 @@ class FirebaseService {
 
   async loadAllCircuits() {
     const allCircuits = [];
-    if (this.isInitialized && this.db) {
+    const db = this.adminDb || this.db;
+    if (this.isInitialized && db) {
       try {
         if (this.sdk.collectionGroup) {
-          const groupRef = this.sdk.collectionGroup(this.db, 'circuits');
+          const groupRef = this.sdk.collectionGroup(db, 'circuits');
           const snap = await this.sdk.getDocs(groupRef);
           snap.forEach(docSnap => {
             allCircuits.push(docSnap.data());
@@ -598,12 +769,11 @@ class FirebaseService {
         }
       } catch (err) {
         console.warn('[Firebase] collectionGroup query failed, falling back to users list:', err.message);
-        // Fallback: iterate users
         try {
           const users = await this.loadAllUsers();
           for (const u of users) {
             if (!u.uid) continue;
-            const subCol = this.sdk.collection(this.db, 'users', u.uid, 'circuits');
+            const subCol = this.sdk.collection(db, 'users', u.uid, 'circuits');
             const subSnap = await this.sdk.getDocs(subCol);
             subSnap.forEach(cs => allCircuits.push(cs.data()));
           }
@@ -613,7 +783,6 @@ class FirebaseService {
       }
     }
 
-    // Merge with any local user circuits found in localStorage
     if (typeof localStorage !== 'undefined') {
       try {
         for (let i = 0; i < localStorage.length; i++) {
@@ -641,16 +810,18 @@ class FirebaseService {
 
   async deleteCircuitAdmin(ownerUid, circuitId) {
     let deleted = false;
-    if (this.isInitialized && this.db) {
+    const db = this.adminDb || this.db;
+    const adminUser = this.adminContext.currentUser;
+    if (this.isInitialized && db) {
       try {
-        const circRef = this.sdk.doc(this.db, 'users', ownerUid, 'circuits', circuitId);
+        const circRef = this.sdk.doc(db, 'users', ownerUid, 'circuits', circuitId);
         await this.sdk.deleteDoc(circRef);
         deleted = true;
 
         await this.logActivity({
           type: 'admin_delete_circuit',
-          actorUid: this.currentUser?.uid || 'admin',
-          actorEmail: this.currentUser?.email || '',
+          actorUid: adminUser?.uid || 'admin',
+          actorEmail: adminUser?.email || '',
           targetId: circuitId,
           metadata: { ownerUid, circuitId }
         }).catch(() => {});
@@ -659,7 +830,6 @@ class FirebaseService {
       }
     }
 
-    // Also remove from local storage if present
     if (typeof localStorage !== 'undefined') {
       try {
         const key = `switcha_circuits_${ownerUid}`;

@@ -80,10 +80,13 @@ console.log('Admin State on admin.html:', adminState.result?.value);
 // 2. Navigate to index.html and sign in with student user
 console.log('2. Navigating to index.html and simulating student sign in...');
 await send('Page.navigate', { url: 'http://localhost:3000/index.html' });
-await new Promise(r => setTimeout(r, 1200));
+for (let i = 0; i < 40; i++) {
+  const ready = await send('Runtime.evaluate', { expression: 'Boolean(window.switchaApp && window.firebaseService && window.firebaseService.userContext?.isInitialized)', returnByValue: true });
+  if (ready.result?.value) break;
+  await new Promise(r => setTimeout(r, 200));
+}
 
-// Simulate student sign in on index.html
-await send('Runtime.evaluate', {
+const simResult = await send('Runtime.evaluate', {
   expression: `
     (() => {
       const studentUser = {
@@ -91,14 +94,19 @@ await send('Runtime.evaluate', {
         email: 'vikram.ece@university.edu',
         displayName: 'Vikram Singh'
       };
+      const hasFS = Boolean(window.firebaseService);
+      const hasApp = Boolean(window.switchaApp);
       if (window.firebaseService) {
-        window.firebaseService.currentUser = studentUser;
-        window.firebaseService.notifyAuthListeners(studentUser);
+        window.firebaseService.userContext.notify(studentUser);
+        window.switchaApp?.syncUserAuthUI(studentUser);
       }
+      return { hasFS, hasApp, text: document.getElementById('userDisplayName')?.textContent };
     })()
-  `
+  `,
+  returnByValue: true
 });
-await new Promise(r => setTimeout(r, 800));
+console.log('simResult:', simResult);
+await new Promise(r => setTimeout(r, 500));
 
 const studentState = await send('Runtime.evaluate', {
   expression: `
@@ -123,7 +131,12 @@ fs.writeFileSync('C:/Users/HP/.gemini/antigravity/brain/f4c77e70-7500-4e65-88bd-
 // 3. Navigate back to admin.html and verify admin name and session was NOT changed to Vikram Singh!
 console.log('3. Returning to admin.html to verify Admin session was NOT overwritten by Student...');
 await send('Page.navigate', { url: 'http://localhost:3000/admin.html#/admin' });
-await new Promise(r => setTimeout(r, 1500));
+for (let i = 0; i < 40; i++) {
+  const ready = await send('Runtime.evaluate', { expression: 'Boolean(window.switchaApp && window.firebaseService)', returnByValue: true });
+  if (ready.result?.value) break;
+  await new Promise(r => setTimeout(r, 200));
+}
+await new Promise(r => setTimeout(r, 500));
 
 const adminStateAfterStudent = await send('Runtime.evaluate', {
   expression: `

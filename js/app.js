@@ -1873,120 +1873,73 @@ class SwitchaApp {
     });
   }
 
-  // --- Centralized Authentication UI Synchronizer ---
-  syncAuthUI(explicitUser = undefined) {
-    const isPortalAdmin = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
+  // --- Dedicated Public / User Authentication UI Synchronizer ---
+  syncUserAuthUI(explicitUser = undefined) {
+    const isPortalAdminFile = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
+    if (isPortalAdminFile) return;
+
     const guestControls = document.getElementById('authGuestControls');
     const userControls = document.getElementById('authUserControls');
     const userDisplayName = document.getElementById('userDisplayName');
     const userProfileBadge = document.getElementById('userProfileBadge');
     const btnLogout = document.getElementById('btnLogout');
-    let adminControls = document.getElementById('userProfileAdminGroup');
 
-    const currentUser = explicitUser !== undefined ? explicitUser : (firebaseService?.currentUser || null);
-    // Strict Portal Separation: Admin UI and Admin Logout are strictly restricted to admin.html
-    const hasAdminSession = isPortalAdmin || this.isAdminDemo;
+    const currentUser = explicitUser !== undefined ? explicitUser : (firebaseService?.userContext?.currentUser || null);
 
-    if (hasAdminSession) {
-      // 1. Admin is authenticated: Hide guest controls ("Log in" and "Sign up") completely
-      if (guestControls) {
-        guestControls.style.display = 'none';
-      }
-      if (userControls) {
-        userControls.style.display = 'inline-flex';
-      }
-
-      // 2. Set admin display badge
-      if (userDisplayName) {
-        userDisplayName.textContent = (currentUser?.email && currentUser.email.split('@')[0]) || 'pothumsanthosh';
-      }
-      if (userProfileBadge) {
-        userProfileBadge.title = 'Logged in as Administrator (Pothumsanthosh@gmail.com)';
-      }
-
-      // 3. Ensure Admin Console button exists in topbar ONLY when returning from a lab on index.html
-      const shouldShowAdminReturnBtn = !isPortalAdmin && this.currentView !== 'admin';
-      if (shouldShowAdminReturnBtn) {
-        if (!adminControls && userControls) {
-          adminControls = document.createElement('div');
-          adminControls.id = 'userProfileAdminGroup';
-          adminControls.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-right: 6px;';
-          adminControls.innerHTML = `
-            <a href="#/admin" class="btn btn-outline" id="userProfileAdminBtn" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(245, 158, 11, 0.15);" title="Return to Admin Console (Users, Circuits, Activity)">
-              <span>🛡️</span> Admin Console
-            </a>
-          `;
-          userControls.insertBefore(adminControls, btnLogout);
-        } else if (adminControls) {
-          adminControls.style.display = 'inline-flex';
-        }
-      } else if (adminControls) {
-        adminControls.style.display = 'none';
-      }
-
-      // 4. Change logout button to "Admin Logout"
-      if (btnLogout) {
-        btnLogout.className = 'btn btn-primary admin-logout-btn';
-        btnLogout.innerHTML = '<span>🚪</span> Admin Logout';
-        btnLogout.title = 'Log out of Administrator Session';
-      }
-
-      // 5. Reveal return buttons in all labs
-      document.querySelectorAll('.admin-only-return-btn').forEach(b => {
-        b.style.display = 'inline-flex';
-      });
-    } else if (currentUser) {
-      // Regular user authenticated: Normal user view, normal Log out button
-      if (guestControls) {
-        guestControls.style.display = 'none';
-      }
-      if (userControls) {
-        userControls.style.display = 'inline-flex';
-      }
-      if (adminControls) {
-        adminControls.remove();
-      }
-
-      if (userDisplayName) {
-        userDisplayName.textContent = currentUser.displayName || currentUser.email.split('@')[0];
-      }
-      if (userProfileBadge) {
-        userProfileBadge.title = `Logged in as ${currentUser.email} (Firebase Cloud Synced)`;
-      }
-
+    if (currentUser) {
+      if (guestControls) guestControls.style.display = 'none';
+      if (userControls) userControls.style.display = 'inline-flex';
+      if (userDisplayName) userDisplayName.textContent = currentUser.displayName || currentUser.email.split('@')[0];
+      if (userProfileBadge) userProfileBadge.title = `Logged in as ${currentUser.email} (Firebase Cloud Synced)`;
       if (btnLogout) {
         btnLogout.className = 'btn btn-outline';
         btnLogout.innerHTML = 'Log out';
         btnLogout.title = 'Log out of e-Samastha';
       }
-
-      // Hide all admin return buttons
-      document.querySelectorAll('.admin-only-return-btn').forEach(b => {
-        b.style.display = 'none';
-      });
     } else {
-      // Guest on public user page: Normal "Log in" and "Sign up" buttons
-      if (guestControls) {
-        guestControls.style.display = 'inline-flex';
-      }
-      if (userControls) {
-        userControls.style.display = 'none';
-      }
-      if (adminControls) {
-        adminControls.remove();
-      }
-
+      if (guestControls) guestControls.style.display = 'inline-flex';
+      if (userControls) userControls.style.display = 'none';
+      if (userDisplayName) userDisplayName.textContent = 'User';
       if (btnLogout) {
         btnLogout.className = 'btn btn-outline';
         btnLogout.innerHTML = 'Log out';
         btnLogout.title = 'Log out';
       }
-
-      // Hide all admin return buttons
-      document.querySelectorAll('.admin-only-return-btn').forEach(b => {
-        b.style.display = 'none';
-      });
     }
+  }
+
+  // --- Dedicated Administrator Authentication UI Synchronizer ---
+  syncAdminAuthUI(explicitAdmin = undefined) {
+    const isPortalAdminFile = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
+    const adminUser = explicitAdmin !== undefined ? explicitAdmin : (firebaseService?.adminContext?.currentUser || null);
+
+    const adminEmailBadge = document.getElementById('adminCurrentEmail');
+    if (adminEmailBadge && adminUser) {
+      adminEmailBadge.textContent = adminUser.email || 'Admin';
+    }
+
+    if (isPortalAdminFile) {
+      const userControls = document.getElementById('authUserControls');
+      const userDisplayName = document.getElementById('userDisplayName');
+      const btnLogout = document.getElementById('btnLogout');
+
+      if (adminUser) {
+        if (userControls) userControls.style.display = 'inline-flex';
+        if (userDisplayName) userDisplayName.textContent = adminUser.displayName || adminUser.email.split('@')[0];
+        if (btnLogout) {
+          btnLogout.className = 'btn btn-primary admin-logout-btn';
+          btnLogout.innerHTML = '<span>🚪</span> Admin Logout';
+          btnLogout.title = 'Log out of Administrator Session';
+        }
+      } else {
+        if (userControls) userControls.style.display = 'none';
+      }
+    }
+  }
+
+  syncAuthUI(explicitUser = undefined) {
+    this.syncUserAuthUI(explicitUser);
+    this.syncAdminAuthUI();
   }
 
   switchView(viewName) {
@@ -3587,7 +3540,7 @@ class SwitchaApp {
   initPWA() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=20261005i').then((reg) => {
+        navigator.serviceWorker.register('./sw.js?v=20261006e').then((reg) => {
           console.log('[e-Samastha] Service Worker registered successfully:', reg.scope);
           reg.update().catch(() => {});
         }).catch((err) => {
@@ -4387,13 +4340,13 @@ class SwitchaApp {
     const loginErrorAlert = document.getElementById('loginErrorAlert');
     const signupErrorAlert = document.getElementById('signupErrorAlert');
 
-    firebaseService.onAuthStateChange(async (user) => {
-      this.syncAuthUI(user);
+    // --- Isolated User Auth Listener (Dedicated to User Portal & Projects) ---
+    firebaseService.onUserAuthStateChange(async (user) => {
+      this.syncUserAuthUI(user);
       if (user) {
         if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
           window.SwitchaStorage.setUserId(user.uid);
         }
-        // Load this user's unique circuits directly from Firebase Firestore database
         try {
           const cloudCircuits = await firebaseService.loadUserCircuits();
           this.currentUserCircuits = Array.isArray(cloudCircuits) ? cloudCircuits : [];
@@ -4404,12 +4357,6 @@ class SwitchaApp {
         } catch (err) {
           console.warn('[Firebase] Error loading user circuits from cloud:', err);
           this.currentUserCircuits = this.getMyCircuits();
-        }
-
-        // If currently on admin view or in admin portal, refresh admin data immediately
-        const isPortalAdmin = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
-        if (this.currentView === 'admin' || isPortalAdmin || (typeof window !== 'undefined' && window.location.hash.startsWith('#/admin'))) {
-          this.loadAdminData();
         }
       } else {
         if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
@@ -4424,7 +4371,17 @@ class SwitchaApp {
       }
     });
 
-    // Login Form Submit (Firebase Auth)
+    // --- Isolated Admin Auth Listener (Dedicated to Admin Console & Security) ---
+    firebaseService.onAdminAuthStateChange(async (adminUser) => {
+      this.syncAdminAuthUI(adminUser);
+      if (adminUser) {
+        if (this.currentView === 'admin' || (typeof window !== 'undefined' && window.location.hash.startsWith('#/admin'))) {
+          this.loadAdminData();
+        }
+      }
+    });
+
+    // Login Form Submit (User Context)
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
       loginForm.addEventListener('submit', async (e) => {
@@ -4438,7 +4395,7 @@ class SwitchaApp {
 
         try {
           if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Logging in...'; }
-          const user = await firebaseService.signIn(email, password);
+          const user = await firebaseService.signInUser(email, password);
           document.getElementById('loginModal')?.classList.remove('active');
           loginForm.reset();
           this.showToast(`👋 Welcome back, ${user.displayName || user.email}!`, 'success');
@@ -4465,7 +4422,7 @@ class SwitchaApp {
       });
     }
 
-    // Sign Up Form Submit (Firebase Auth)
+    // Sign Up Form Submit (User Context)
     const signupForm = document.getElementById('signupForm');
     if (signupForm) {
       signupForm.addEventListener('submit', async (e) => {
@@ -4480,7 +4437,7 @@ class SwitchaApp {
 
         try {
           if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Creating Account...'; }
-          const user = await firebaseService.signUp(email, password, name);
+          const user = await firebaseService.signUpUser(email, password, name);
           document.getElementById('signupModal')?.classList.remove('active');
           signupForm.reset();
           this.showToast(`🎉 Account created! Welcome, ${user.displayName || user.email}!`, 'success');
@@ -4507,17 +4464,8 @@ class SwitchaApp {
       });
     }
 
-    // Unified Logout Handler (Admin vs Regular User)
-    const handleLogout = async () => {
-      const isPortal = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
-      const wasAdmin = isPortal || this.isAdminDemo;
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.removeItem('esamastha_authenticated_admin_uid');
-      }
-      this.isAdminDemo = false;
-      await firebaseService.signOut();
-
-      // Reset active circuit, in-memory projects, and reset canvas to blank
+    // Context-Specific User Logout Handler
+    const handleUserLogout = async () => {
       this.currentUserCircuits = [];
       this.activeMyCircuitId = null;
       if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
@@ -4536,23 +4484,35 @@ class SwitchaApp {
         this.grapher?.render();
       }
 
-      this.syncAuthUI(null);
-      if (wasAdmin) {
-        this.showToast('Administrator session ended.', 'info');
-        if (this.isAdminPortalFile) {
-          window.location.hash = '#/admin/login';
-          this.switchView('admin-login');
-          return;
-        }
-      } else {
-        this.showToast('👋 Logged out of e-Samastha', 'info');
+      await firebaseService.signOutUser();
+      this.syncUserAuthUI(null);
+      this.showToast('👋 Logged out of e-Samastha', 'info');
+      if (this.currentView === 'my-circuits') {
+        window.location.hash = '#/create';
+        this.switchView('studio');
       }
-      window.location.hash = '#/create';
-      this.switchView('studio');
     };
 
-    document.getElementById('btnLogout')?.addEventListener('click', handleLogout);
-    this.handleSystemLogout = handleLogout;
+    // Context-Specific Admin Logout Handler
+    const handleAdminLogout = async () => {
+      await firebaseService.signOutAdmin();
+      this.syncAdminAuthUI(null);
+      this.showToast('Administrator session ended.', 'info');
+      window.location.hash = '#/admin/login';
+      this.switchView('admin-login');
+    };
+
+    this.handleUserLogout = handleUserLogout;
+    this.handleAdminLogout = handleAdminLogout;
+
+    const btnLogout = document.getElementById('btnLogout');
+    if (btnLogout) {
+      if (this.isAdminPortalFile) {
+        btnLogout.addEventListener('click', handleAdminLogout);
+      } else {
+        btnLogout.addEventListener('click', handleUserLogout);
+      }
+    }
   }
 
   // ==========================================================================
@@ -4565,7 +4525,7 @@ class SwitchaApp {
     this.targetDeleteCircuit = null;
     this.isReadOnlyInspection = false;
 
-    // 1. Admin Login Form Handler
+    // 1. Admin Login Form Handler (Strictly Scoped to AdminAuthContext)
     const adminLoginForm = document.getElementById('adminLoginForm');
     const adminLoginAlert = document.getElementById('adminLoginAlert');
     const btnAdminLoginSubmit = document.getElementById('btnAdminLoginSubmit');
@@ -4586,51 +4546,21 @@ class SwitchaApp {
         try {
           let user;
           try {
-            user = await firebaseService.signIn(email, password);
+            user = await firebaseService.signInAdmin(email, password);
           } catch (signInErr) {
             if (email.toLowerCase() !== email) {
               try {
-                user = await firebaseService.signIn(email.toLowerCase(), password);
+                user = await firebaseService.signInAdmin(email.toLowerCase(), password);
               } catch (_) {}
             }
-            if (!user) {
-              const isAuthorized = email.toLowerCase() === 'pothumsanthosh@gmail.com' ||
-                                   email.toLowerCase() === 'admin@e-samastha.edu';
-              if (isAuthorized && (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential')) {
-                try {
-                  user = await firebaseService.signUp(email, password, 'Santhosh (Admin)');
-                } catch (_) {}
-              }
-              if (!user) throw signInErr;
-            }
+            if (!user) throw signInErr;
           }
 
-          if (user) {
-            if (typeof sessionStorage !== 'undefined') {
-              sessionStorage.setItem('esamastha_authenticated_admin_uid', user.uid);
-            }
-            // Non-blocking fire-and-forget sync
-            firebaseService.syncUserProfile(user, {
-              role: 'admin',
-              isAdmin: true,
-              adminAuthenticatedAt: Date.now()
-            }).catch(() => {});
-          }
-
-          const isAdmin = await firebaseService.verifyAdmin(true);
-          if (!isAdmin) {
-            if (adminLoginAlert) {
-              adminLoginAlert.textContent = 'Access Denied: Your account does not have administrator privileges ({ admin: true } claim missing).';
-              adminLoginAlert.style.display = 'block';
-            }
-            await firebaseService.signOut();
-            return;
-          }
-
-          // Authoritative admin authenticated
-          this.syncAuthUI(user);
+          this.syncAdminAuthUI(user);
           this.showToast(`✔ Welcome, Administrator ${user.displayName || user.email}!`, 'success');
           window.location.hash = '#/admin';
+          this.switchView('admin');
+          this.loadAdminData();
         } catch (err) {
           if (adminLoginAlert) {
             adminLoginAlert.textContent = err.message ? err.message.replace('Firebase: ', '') : 'Authentication failed.';
@@ -4645,31 +4575,13 @@ class SwitchaApp {
       });
     }
 
-    // Demo Mode Preview Button
-    document.getElementById('btnAdminDemoPreview')?.addEventListener('click', () => {
-      this.enterAdminDemoMode();
-    });
-
     // 2. Admin Header Controls (Refresh & Logout)
     document.getElementById('btnAdminRefresh')?.addEventListener('click', () => {
       this.loadAdminData();
     });
 
     document.getElementById('btnAdminLogout')?.addEventListener('click', () => {
-      if (this.handleSystemLogout) {
-        this.handleSystemLogout();
-      } else {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem('esamastha_authenticated_admin_uid');
-        }
-        this.isAdminDemo = false;
-        firebaseService.signOut().finally(() => {
-          this.syncAuthUI(null);
-          this.showToast('Administrator session ended.', 'info');
-          window.location.hash = '#/create';
-          this.switchView('studio');
-        });
-      }
+      this.handleAdminLogout();
     });
 
     // 3. Admin Tabs Navigation
@@ -4755,85 +4667,44 @@ class SwitchaApp {
     }
   }
 
-  enterAdminDemoMode() {
-    this.isAdminDemo = true;
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem('esamastha_authenticated_admin_uid', 'demo_admin_uid');
-    }
-    this.showToast('Entering Admin Console in interactive demo mode...', 'info');
-    this.adminUsers = [
-      { uid: 'usr_prof_rao', displayName: 'Prof. K. V. Rao', email: 'kvrao@iitb.ac.in', role: 'admin', lastActiveAt: Date.now() - 3600000, createdAt: Date.now() - 86400000 * 90 },
-      { uid: 'usr_ta_ananya', displayName: 'Ananya Sharma (TA)', email: 'ananya.s@univ.edu', role: 'admin', lastActiveAt: Date.now() - 7200000, createdAt: Date.now() - 86400000 * 60 },
-      { uid: 'usr_std_rahul', displayName: 'Rahul Verma', email: 'rahul.v@student.edu', role: 'student', lastActiveAt: Date.now() - 14400000, createdAt: Date.now() - 86400000 * 30 },
-      { uid: 'usr_std_priya', displayName: 'Priya Patel', email: 'priya.p@student.edu', role: 'student', lastActiveAt: Date.now() - 86400000 * 2, createdAt: Date.now() - 86400000 * 25 },
-      { uid: 'usr_std_kiran', displayName: 'Kiran Kumar', email: 'kiran.k@student.edu', role: 'student', lastActiveAt: Date.now() - 86400000 * 12, createdAt: Date.now() - 86400000 * 15 }
-    ];
-
-    this.adminCircuits = [
-      { id: 'c_buck_01', name: 'Simple Buck Converter (DC-DC)', ownerEmail: 'kvrao@iitb.ac.in', ownerUid: 'usr_prof_rao', isPublic: true, compCount: 14, updatedAt: Date.now() - 86400000 * 2 },
-      { id: 'c_rc_shift', name: 'Op-Amp RC Phase Shift Oscillator', ownerEmail: 'ananya.s@univ.edu', ownerUid: 'usr_ta_ananya', isPublic: true, compCount: 18, updatedAt: Date.now() - 86400000 * 5 },
-      { id: 'c_555_astable', name: '555 Timer Astable Multivibrator', ownerEmail: 'rahul.v@student.edu', ownerUid: 'usr_std_rahul', isPublic: false, compCount: 12, updatedAt: Date.now() - 86400000 * 1 },
-      { id: 'c_bjt_amp', name: 'Common Emitter BJT Voltage Amplifier', ownerEmail: 'priya.p@student.edu', ownerUid: 'usr_std_priya', isPublic: true, compCount: 11, updatedAt: Date.now() - 86400000 * 3 },
-      { id: 'c_wein_bridge', name: 'Wien Bridge Low-Distortion Oscillator', ownerEmail: 'kiran.k@student.edu', ownerUid: 'usr_std_kiran', isPublic: false, compCount: 16, updatedAt: Date.now() - 86400000 * 7 }
-    ];
-
-    this.adminActivityLogs = [
-      { eventId: 'act_091', type: 'ADMIN_LOGIN', actorEmail: 'kvrao@iitb.ac.in', actorUid: 'usr_prof_rao', targetId: 'SESSION_START', metadata: JSON.stringify({ ip: '10.20.1.45', authMethod: 'demo_session' }), timestamp: Date.now() - 1800000 },
-      { eventId: 'act_090', type: 'CIRCUIT_PUBLISH', actorEmail: 'priya.p@student.edu', actorUid: 'usr_std_priya', targetId: 'c_bjt_amp', metadata: JSON.stringify({ circuitName: 'Common Emitter BJT Voltage Amplifier' }), timestamp: Date.now() - 3600000 * 4 },
-      { eventId: 'act_089', type: 'CIRCUIT_SAVE', actorEmail: 'rahul.v@student.edu', actorUid: 'usr_std_rahul', targetId: 'c_555_astable', metadata: JSON.stringify({ components: 12, wires: 15 }), timestamp: Date.now() - 86400000 * 1 },
-      { eventId: 'act_088', type: 'USER_REGISTER', actorEmail: 'kiran.k@student.edu', actorUid: 'usr_std_kiran', targetId: 'usr_std_kiran', metadata: JSON.stringify({ provider: 'email' }), timestamp: Date.now() - 86400000 * 15 }
-    ];
-
-    const adminEmailBadge = document.getElementById('adminCurrentEmail');
-    if (adminEmailBadge) adminEmailBadge.textContent = 'admin.demo@e-samastha.edu';
-
-    const statTotalUsersEl = document.getElementById('statTotalUsers');
-    const statActiveUsersEl = document.getElementById('statActiveUsers');
-    const statTotalCircuitsEl = document.getElementById('statTotalCircuits');
-    const statPublicCircuitsEl = document.getElementById('statPublicCircuits');
-    const statRecentActivityEl = document.getElementById('statRecentActivity');
-
-    if (statTotalUsersEl) statTotalUsersEl.textContent = '5';
-    if (statActiveUsersEl) statActiveUsersEl.textContent = '4';
-    if (statTotalCircuitsEl) statTotalCircuitsEl.textContent = '5';
-    if (statPublicCircuitsEl) statPublicCircuitsEl.textContent = '3';
-    if (statRecentActivityEl) statRecentActivityEl.textContent = '4';
-
-    const userSummaryEl = document.getElementById('userCountSummary');
-    if (userSummaryEl) userSummaryEl.textContent = '5 user(s) loaded';
-    const circuitSummaryEl = document.getElementById('circuitCountSummary');
-    if (circuitSummaryEl) circuitSummaryEl.textContent = '5 circuit(s) loaded';
-
-    this.renderAdminUsers(this.adminUsers);
-    this.renderAdminCircuits(this.adminCircuits);
-    this.renderAdminActivity(this.adminActivityLogs);
-
-    this.switchView('admin');
-  }
-
   /**
    * Authoritative Route Guard for #/admin
+   * Required model:
+   * 1. Unauthenticated -> #/admin/login
+   * 2. Authenticated non-admin -> ACCESS DENIED -> #/create
+   * 3. Authenticated authorized administrator -> ADMIN DASHBOARD
    */
   async handleAdminRoute() {
-    if (window.location.hash.includes('demo=true') || this.isAdminDemo) {
-      this.enterAdminDemoMode();
+    let adminUser = firebaseService.adminContext?.currentUser;
+
+    if (!adminUser && !firebaseService.adminContext?.isInitialized) {
+      let waitCount = 0;
+      while (!firebaseService.adminContext?.currentUser && waitCount < 5) {
+        await new Promise(r => setTimeout(r, 150));
+        waitCount++;
+      }
+      adminUser = firebaseService.adminContext?.currentUser;
+    }
+
+    if (!adminUser) {
+      // If a regular user is authenticated in the user context, strictly deny access
+      if (firebaseService.userContext?.currentUser) {
+        this.showToast('🚫 Access Denied: Administrator privileges required.', 'warning');
+        window.location.hash = '#/create';
+        this.switchView('studio');
+        return;
+      }
+      // Guest: redirect to admin login
+      window.location.hash = '#/admin/login';
+      this.switchView('admin-login');
       return;
     }
 
-    const hasStoredAdminSession = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('esamastha_authenticated_admin_uid');
-
-    if (!firebaseService.currentUser && !hasStoredAdminSession) {
-      // Allow Firebase Auth a moment to restore persistent token on page load
-      let waitCount = 0;
-      while (!firebaseService.currentUser && waitCount < 5) {
-        await new Promise(r => setTimeout(r, 200));
-        waitCount++;
-      }
-    }
-
     const isAdmin = await firebaseService.verifyAdmin(false);
-    if (!isAdmin && !hasStoredAdminSession) {
-      window.location.hash = '#/admin/login';
+    if (!isAdmin) {
+      this.showToast('🚫 Access Denied: Administrator privileges required ({ admin: true } claim missing).', 'warning');
+      window.location.hash = '#/create';
+      this.switchView('studio');
       return;
     }
 
@@ -5122,29 +4993,37 @@ class SwitchaApp {
   // =========================================================================
 
   async handleAdminStudioRoute(queryString = '') {
-    const isDemo = new URLSearchParams(queryString).get('demo') === 'true' || this.isAdminDemo;
+    let adminUser = firebaseService.adminContext?.currentUser;
 
-    if (!firebaseService.currentUser && !isDemo) {
+    if (!adminUser && !firebaseService.adminContext?.isInitialized) {
+      let waitCount = 0;
+      while (!firebaseService.adminContext?.currentUser && waitCount < 5) {
+        await new Promise(r => setTimeout(r, 150));
+        waitCount++;
+      }
+      adminUser = firebaseService.adminContext?.currentUser;
+    }
+
+    if (!adminUser) {
+      if (firebaseService.userContext?.currentUser) {
+        this.showToast('🚫 Access Denied: Administrator privileges required.', 'warning');
+        window.location.hash = '#/create';
+        this.switchView('studio');
+        return;
+      }
       window.location.hash = '#/admin/login';
       this.switchView('admin-login');
       return;
     }
 
-    if (!isDemo) {
-      const isAdmin = await firebaseService.verifyAdmin(false);
-      if (!isAdmin) {
-        this.showToast('Access Denied: Administrator privileges required.', 'warning');
-        window.location.hash = '#/create';
-        return;
-      }
-
-      // Live Administrator: direct to full Studio with every lab and component included
-      this.switchView('studio');
+    const isAdmin = await firebaseService.verifyAdmin(false);
+    if (!isAdmin) {
+      this.showToast('🚫 Access Denied: Administrator privileges required.', 'warning');
       window.location.hash = '#/create';
+      this.switchView('studio');
       return;
     }
 
-    // Demo Mode for deep QA test suites
     this.switchView('admin-studio');
     this.initAdminStudioOnce();
 
@@ -5581,6 +5460,7 @@ if (typeof window !== 'undefined') {
       if (!window.app) {
         window.firebaseService = firebaseService;
         window.app = new SwitchaApp();
+        window.switchaApp = window.app;
         console.log('⚡ e-Samastha Platform initialized successfully.');
       }
     } catch (err) {
