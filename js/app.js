@@ -1884,12 +1884,8 @@ class SwitchaApp {
     let adminControls = document.getElementById('userProfileAdminGroup');
 
     const currentUser = explicitUser !== undefined ? explicitUser : (firebaseService?.currentUser || null);
-    const hasAdminSession = !!(
-      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('esamastha_authenticated_admin_uid')) ||
-      (currentUser?.email && ['pothumsanthosh@gmail.com', 'admin@e-samastha.edu'].includes(currentUser.email.toLowerCase())) ||
-      this.isAdminDemo ||
-      isPortalAdmin
-    );
+    // Strict Portal Separation: Admin UI and Admin Logout are strictly restricted to admin.html
+    const hasAdminSession = isPortalAdmin || this.isAdminDemo;
 
     if (hasAdminSession) {
       // 1. Admin is authenticated: Hide guest controls ("Log in" and "Sign up") completely
@@ -4513,11 +4509,8 @@ class SwitchaApp {
 
     // Unified Logout Handler (Admin vs Regular User)
     const handleLogout = async () => {
-      const wasAdmin = !!(
-        (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('esamastha_authenticated_admin_uid')) ||
-        (firebaseService?.currentUser?.email && ['pothumsanthosh@gmail.com', 'admin@e-samastha.edu'].includes(firebaseService.currentUser.email.toLowerCase())) ||
-        this.isAdminDemo
-      );
+      const isPortal = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
+      const wasAdmin = isPortal || this.isAdminDemo;
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.removeItem('esamastha_authenticated_admin_uid');
       }

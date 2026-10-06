@@ -63,6 +63,8 @@ class FirebaseService {
       ]);
 
       this.sdk.initializeApp = appMod.initializeApp;
+      this.sdk.getApp = appMod.getApp;
+      this.sdk.getApps = appMod.getApps;
       this.sdk.getAuth = authMod.getAuth;
       this.sdk.signInWithEmailAndPassword = authMod.signInWithEmailAndPassword;
       this.sdk.createUserWithEmailAndPassword = authMod.createUserWithEmailAndPassword;
@@ -87,7 +89,33 @@ class FirebaseService {
         this.sdk.getAnalytics = analyticsMod.getAnalytics;
       }
 
-      this.app = this.sdk.initializeApp(firebaseConfig);
+      const isPortalAdmin = typeof window !== 'undefined' && (
+        window.location.pathname.toLowerCase().includes('admin.html') ||
+        window.location.pathname.toLowerCase().startsWith('/admin')
+      );
+
+      // Multi-App Isolation:
+      // 'esamasthaAdmin' app instance for the Admin Portal (admin.html)
+      // '[DEFAULT]' app instance for the User Portal (index.html)
+      // This isolates authentication sessions so admin logins never
+      // leak into user portal pages, and student logins never overwrite admin portal sessions.
+      const appName = isPortalAdmin ? 'esamasthaAdmin' : '[DEFAULT]';
+      let targetApp = null;
+      try {
+        if (this.sdk.getApps && this.sdk.getApps().length > 0) {
+          targetApp = this.sdk.getApps().find(a => a.name === appName) || null;
+        }
+      } catch (_) {}
+
+      if (!targetApp) {
+        if (isPortalAdmin) {
+          targetApp = this.sdk.initializeApp(firebaseConfig, 'esamasthaAdmin');
+        } else {
+          targetApp = this.sdk.initializeApp(firebaseConfig);
+        }
+      }
+
+      this.app = targetApp;
       this.auth = this.sdk.getAuth(this.app);
       this.db = this.sdk.getFirestore(this.app);
 
