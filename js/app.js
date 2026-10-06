@@ -1800,8 +1800,27 @@ class SwitchaApp {
 
   // --- Router & Views ---
   initRouter() {
+    this.isAdminPortalFile = (typeof window !== 'undefined') && (
+      window.location.pathname.toLowerCase().includes('admin.html') ||
+      window.location.pathname.toLowerCase().startsWith('/admin')
+    );
+
     const handleHash = () => {
-      const hashStr = window.location.hash || '#/';
+      let hashStr = window.location.hash || '';
+
+      // If accessing admin.html with root or empty hash, default directly to #/admin
+      if (this.isAdminPortalFile && (!hashStr || hashStr === '#/' || hashStr === '#')) {
+        window.location.hash = '#/admin';
+        return;
+      }
+
+      // If user on index.html accesses an admin path, redirect directly to admin.html
+      if (!this.isAdminPortalFile && hashStr.startsWith('#/admin')) {
+        window.location.href = 'admin.html' + hashStr;
+        return;
+      }
+
+      if (!hashStr) hashStr = '#/';
       const [routePath, queryString] = hashStr.split('?');
       if (routePath.startsWith('#/create') || routePath.startsWith('#/circuits')) {
         this.switchView('studio');
@@ -1869,6 +1888,7 @@ class SwitchaApp {
 
   // --- Centralized Authentication UI Synchronizer ---
   syncAuthUI(explicitUser = undefined) {
+    const isPortalAdmin = this.isAdminPortalFile || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin.html'));
     const guestControls = document.getElementById('authGuestControls');
     const userControls = document.getElementById('authUserControls');
     const userDisplayName = document.getElementById('userDisplayName');
@@ -1880,7 +1900,8 @@ class SwitchaApp {
     const hasAdminSession = !!(
       (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('esamastha_authenticated_admin_uid')) ||
       (currentUser?.email && ['pothumsanthosh@gmail.com', 'admin@e-samastha.edu'].includes(currentUser.email.toLowerCase())) ||
-      this.isAdminDemo
+      this.isAdminDemo ||
+      isPortalAdmin
     );
 
     if (hasAdminSession) {
@@ -4474,6 +4495,11 @@ class SwitchaApp {
       this.syncAuthUI(null);
       if (wasAdmin) {
         this.showToast('Administrator session ended.', 'info');
+        if (this.isAdminPortalFile) {
+          window.location.hash = '#/admin/login';
+          this.switchView('admin-login');
+          return;
+        }
       } else {
         this.showToast('👋 Logged out of e-Samastha', 'info');
       }
