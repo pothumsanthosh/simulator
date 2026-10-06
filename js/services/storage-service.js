@@ -70,17 +70,29 @@ export class StorageService {
     });
   }
 
+  setUserId(uid) {
+    this.currentUid = uid || null;
+  }
+
   // --- Generic Store CRUD ---
 
   async getAll(storeName) {
     await this.initPromise;
+    const uid = this.currentUid || (typeof window !== 'undefined' && window.firebaseService?.currentUser?.uid);
     if (this.db) {
       return new Promise((resolve) => {
         try {
           const tx = this.db.transaction(storeName, 'readonly');
           const store = tx.objectStore(storeName);
           const req = store.getAll();
-          req.onsuccess = () => resolve(req.result || []);
+          req.onsuccess = () => {
+            const raw = req.result || [];
+            if (uid) {
+              resolve(raw.filter(i => !i.ownerUid || i.ownerUid === uid));
+            } else {
+              resolve(raw);
+            }
+          };
           req.onerror = () => resolve(this.getFallback(storeName));
         } catch (_) {
           resolve(this.getFallback(storeName));
@@ -117,6 +129,10 @@ export class StorageService {
     await this.initPromise;
     if (!item.id) item.id = `${storeName}_${Date.now()}`;
     item.updatedAt = Date.now();
+    const uid = this.currentUid || (typeof window !== 'undefined' && window.firebaseService?.currentUser?.uid);
+    if (uid && !item.ownerUid) {
+      item.ownerUid = uid;
+    }
 
     if (this.db) {
       new Promise((resolve) => {
@@ -157,6 +173,10 @@ export class StorageService {
   // --- LocalStorage Fallback Helper ---
 
   getFallbackKey(storeName) {
+    const uid = this.currentUid || (typeof window !== 'undefined' && window.firebaseService?.currentUser?.uid);
+    if (uid) {
+      return `switcha_${uid}_${storeName}`;
+    }
     return `switcha_my_${storeName}`;
   }
 

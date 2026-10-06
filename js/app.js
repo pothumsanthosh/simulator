@@ -619,119 +619,43 @@ class SwitchaApp {
 
   // --- My Circuits Hub & Storage Management ---
   getMyCircuits() {
-    // Default starter circuits
-    const starterCircuits = [
-      {
-        id: 'circuit_starter_rc_oscillator',
-        name: 'Op-Amp RC Phase Shift Sine Wave Oscillator',
-        description: '3-Stage High-Pass RC Ladder Sine Wave Oscillator with LM741 Op-Amp (C1=C2=C3=100nF, R3=R4=R5=3.3kΩ, Rin=33kΩ, Rf=1.5MΩ, R6=33kΩ) producing spontaneous, continuous ~200Hz sinusoidal oscillations.',
-        author: 'e-Samastha Studio',
-        updatedAt: Date.now() - 900000,
-        presetKey: 'rcPhaseShiftOscillator',
-        components: [],
-        wires: []
-      },
-      {
-        id: 'circuit_starter_sample_hold',
-        name: 'Sample & Hold Amplifier Circuit',
-        description: 'Precision Analog-to-Digital Converter front-end Sample & Hold circuit sampling a 1 kHz analog sine wave at 10 kHz clock rate with holding capacitor and buffered staircase waveform output.',
-        author: 'e-Samastha Studio',
-        updatedAt: Date.now() - 600000,
-        presetKey: 'sampleAndHoldCircuit',
-        components: [],
-        wires: []
-      },
-      {
-        id: 'circuit_starter_1',
-        name: 'Interactive Switch & LED Lamp',
-        description: 'Dual interactive switch setup: SPST toggle switch powering an incandescent light bulb and glowing LED indicator with 9V DC source.',
-        author: 'e-Samastha Studio',
-        updatedAt: Date.now() - 3600000,
-        presetKey: 'switchSpstLamp',
-        components: [
-          { id: 'txt1', type: ComponentTypes.TEXT_LABEL, x: 340, y: 50, params: { text: 'INTERACTIVE SWITCH & LED LAMP', fontSize: 14, bold: true, color: '#334155' }, rotation: 0, flipX: false, flipY: false },
-          { id: 'v1', type: ComponentTypes.DC_VOLTAGE, x: 120, y: 220, params: { voltage: 9 }, rotation: 0, flipX: false, flipY: false },
-          { id: 'gnd1', type: ComponentTypes.GROUND, x: 120, y: 340, params: {}, rotation: 0, flipX: false, flipY: false },
-          { id: 'sw1', type: ComponentTypes.SPST_SWITCH, x: 260, y: 140, params: { closed: true, name: 'Main Power' }, rotation: 0, flipX: false, flipY: false },
-          { id: 'lamp1', type: ComponentTypes.LAMP, x: 420, y: 140, params: { ratedVoltage: 9, ratedPower: 2 }, rotation: 0, flipX: false, flipY: false },
-          { id: 'r1', type: ComponentTypes.RESISTOR, x: 340, y: 260, params: { resistance: 330 }, rotation: 0, flipX: false, flipY: false },
-          { id: 'led1', type: ComponentTypes.LED, x: 440, y: 260, params: { color: '#ff3b30' }, rotation: 0, flipX: false, flipY: false },
-          { id: 'pr1', type: ComponentTypes.PROBE_V, x: 500, y: 80, params: { color: '#03b585', label: 'V_switched' }, rotation: 0, flipX: false, flipY: false }
-        ],
-        wires: [
-          { id: 'w1', fromPin: 'v1:p_neg', toPin: 'gnd1:p1' },
-          { id: 'w2', fromPin: 'v1:p_pos', toPin: 'sw1:p1' },
-          { id: 'w3', fromPin: 'sw1:p2', toPin: 'lamp1:p1' },
-          { id: 'w4', fromPin: 'sw1:p2', toPin: 'r1:p1' },
-          { id: 'w5', fromPin: 'sw1:p2', toPin: 'pr1:tip' },
-          { id: 'w6', fromPin: 'lamp1:p2', toPin: 'gnd1:p1' },
-          { id: 'w7', fromPin: 'r1:p2', toPin: 'led1:anode' },
-          { id: 'w8', fromPin: 'led1:cathode', toPin: 'gnd1:p1' }
-        ]
-      },
-      {
-        id: 'circuit_starter_2',
-        name: '555 Timer Astable Flasher',
-        description: 'Square wave pulse generator with RC timing network driving an oscillating LED indicator.',
-        author: 'e-Samastha Studio',
-        updatedAt: Date.now() - 7200000,
-        presetKey: 'timer555',
-        components: [],
-        wires: []
-      },
-      {
-        id: 'circuit_starter_3',
-        name: 'Digital Logic Half Adder',
-        description: 'XOR and AND gates computing binary SUM and CARRY from interactive input logic levels.',
-        author: 'e-Samastha Studio',
-        updatedAt: Date.now() - 14400000,
-        presetKey: 'halfAdder',
-        components: [],
-        wires: []
-      },
-      {
-        id: 'circuit_starter_nor_suite',
-        name: 'Universal Logic: NOR Gate Equivalents',
-        description: 'Complete digital logic laboratory: NOT, OR, AND, and XOR gates constructed entirely from 2-input NOR gates with DG interactive switches and LED indicators.',
-        author: 'e-Samastha Studio',
-        updatedAt: Date.now() - 1800000,
-        presetKey: 'universalNorGates',
-        components: [],
-        wires: []
-      }
-    ];
+    const user = firebaseService?.currentUser;
+    if (!user) {
+      // Guests do not have saved user projects
+      return [];
+    }
+
+    if (this.currentUserCircuits && Array.isArray(this.currentUserCircuits)) {
+      return this.currentUserCircuits;
+    }
 
     try {
-      const data = localStorage.getItem('switcha_my_circuits');
+      const storageKey = `switcha_circuits_${user.uid}`;
+      const data = localStorage.getItem(storageKey);
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure essential starter circuits like RC oscillator are present in the list
-          let added = false;
-          starterCircuits.forEach(sc => {
-            const hasIt = parsed.some(c => c.id === sc.id || (sc.presetKey && c.presetKey === sc.presetKey));
-            if (!hasIt) {
-              parsed.push(sc);
-              added = true;
-            }
-          });
-          if (added) this.saveMyCircuits(parsed);
+        if (Array.isArray(parsed)) {
+          this.currentUserCircuits = parsed;
           return parsed;
         }
       }
     } catch (e) {
-      console.warn('[Switcha] Failed to read my circuits from localStorage:', e);
+      console.warn('[Switcha] Failed to read user circuits from localStorage:', e);
     }
 
-    this.saveMyCircuits(starterCircuits);
-    return starterCircuits;
+    this.currentUserCircuits = [];
+    return [];
   }
 
   saveMyCircuits(circuits) {
+    const user = firebaseService?.currentUser;
+    if (!user) return;
+    this.currentUserCircuits = Array.isArray(circuits) ? circuits : [];
     try {
-      localStorage.setItem('switcha_my_circuits', JSON.stringify(circuits));
+      const storageKey = `switcha_circuits_${user.uid}`;
+      localStorage.setItem(storageKey, JSON.stringify(this.currentUserCircuits));
     } catch (e) {
-      console.warn('[Switcha] Failed to write my circuits to localStorage:', e);
+      console.warn('[Switcha] Failed to write user circuits to localStorage:', e);
     }
   }
 
@@ -743,7 +667,7 @@ class SwitchaApp {
 
     if (!firebaseService.currentUser) {
       this.pendingSaveAfterLogin = true;
-      this.showToast('🔒 Please sign in first to save projects to Firebase Cloud.', 'warning');
+      this.showToast('🔒 Please sign in first to save projects to your cloud account.', 'warning');
       document.getElementById('loginModal')?.classList.add('active');
       return;
     }
@@ -764,6 +688,8 @@ class SwitchaApp {
       circuits[existingIndex].name = name;
       circuits[existingIndex].components = currentComponents;
       circuits[existingIndex].wires = currentWires;
+      circuits[existingIndex].ownerUid = firebaseService.currentUser.uid;
+      circuits[existingIndex].ownerEmail = firebaseService.currentUser.email || '';
       circuits[existingIndex].updatedAt = Date.now();
       targetCircuit = circuits[existingIndex];
     } else {
@@ -773,6 +699,8 @@ class SwitchaApp {
         name: name,
         description: `Custom electronic circuit with ${currentComponents.length} components and ${currentWires.length} connections.`,
         author: firebaseService.currentUser?.displayName || firebaseService.currentUser?.email || 'You',
+        ownerUid: firebaseService.currentUser.uid,
+        ownerEmail: firebaseService.currentUser.email || '',
         updatedAt: Date.now(),
         components: currentComponents,
         wires: currentWires
@@ -789,7 +717,7 @@ class SwitchaApp {
     }
     this.renderWorkspaceProjects();
 
-    // Store in Firebase Cloud Firestore
+    // Store in Firebase Cloud Firestore database
     let cloudSynced = false;
     try {
       if (firebaseService && typeof firebaseService.saveCircuit === 'function') {
@@ -800,9 +728,9 @@ class SwitchaApp {
     }
 
     if (cloudSynced) {
-      this.showToast(`☁️ "${name}" securely stored in Firebase!`, 'success');
+      this.showToast(`☁️ "${name}" securely saved to your account in Firebase!`, 'success');
     } else {
-      this.showToast(`💾 "${name}" saved to My Circuits (offline copy).`, 'info');
+      this.showToast(`💾 "${name}" saved to your workspace copy.`, 'info');
     }
   }
 
@@ -881,7 +809,8 @@ class SwitchaApp {
     this.showToast(`⚡ Opened "${circuit.name}" in Studio`, 'info');
   }
 
-  deleteCircuit(circuitId) {
+  async deleteCircuit(circuitId) {
+    if (!firebaseService.currentUser) return;
     let circuits = this.getMyCircuits();
     const target = circuits.find(c => c.id === circuitId);
     if (!target) return;
@@ -889,9 +818,12 @@ class SwitchaApp {
       circuits = circuits.filter(c => c.id !== circuitId);
       if (this.activeMyCircuitId === circuitId) this.activeMyCircuitId = null;
       this.saveMyCircuits(circuits);
+      await firebaseService.deleteCircuit(circuitId);
+      if (window.SwitchaStorage) {
+        try { await window.SwitchaStorage.deleteCircuit(circuitId); } catch (_) {}
+      }
       this.renderMyCircuits();
-      firebaseService.deleteCircuit(circuitId);
-      this.showToast(`🗑️ "${target.name}" deleted`, 'warning');
+      this.showToast(`🗑️ "${target.name}" deleted from your cloud account`, 'warning');
     }
   }
 
@@ -922,7 +854,9 @@ class SwitchaApp {
       id: 'circuit_' + Date.now(),
       name: `${target.name} (Copy)`,
       description: target.description,
-      author: 'You',
+      author: firebaseService.currentUser?.displayName || firebaseService.currentUser?.email || 'You',
+      ownerUid: firebaseService.currentUser?.uid,
+      ownerEmail: firebaseService.currentUser?.email || '',
       updatedAt: Date.now(),
       components: JSON.parse(JSON.stringify(components || [])),
       wires: JSON.parse(JSON.stringify(wires || []))
@@ -930,6 +864,10 @@ class SwitchaApp {
 
     circuits.unshift(newCircuit);
     this.saveMyCircuits(circuits);
+    firebaseService.saveCircuit(newCircuit);
+    if (window.SwitchaStorage) {
+      try { window.SwitchaStorage.saveCircuit(newCircuit); } catch (_) {}
+    }
     this.renderMyCircuits();
     this.showToast(`📋 Duplicated "${target.name}"`, 'success');
   }
@@ -944,6 +882,10 @@ class SwitchaApp {
       target.name = newName.trim();
       target.updatedAt = Date.now();
       this.saveMyCircuits(circuits);
+      firebaseService.saveCircuit(target);
+      if (window.SwitchaStorage) {
+        try { window.SwitchaStorage.saveCircuit(target); } catch (_) {}
+      }
       this.renderMyCircuits();
       if (this.activeMyCircuitId === circuitId) {
         const nameInput = document.getElementById('circuitNameInput');
@@ -1023,7 +965,7 @@ class SwitchaApp {
     const clearBtn = document.getElementById('btnClearWorkspace');
     if (clearBtn) {
       clearBtn.addEventListener('click', async () => {
-        if (confirm('Are you sure you want to clear all your saved custom circuits and reset your workspace to default presets?')) {
+        if (confirm('Are you sure you want to clear all your saved custom circuits?')) {
           await this.clearAllCustomCircuits();
         }
       });
@@ -1033,6 +975,7 @@ class SwitchaApp {
     const openMyCircuitsDirect = (e) => {
       e?.preventDefault();
       if (!firebaseService.currentUser) {
+        this.pendingOpenProjectsAfterLogin = true;
         this.showToast('🔒 Please sign in first to access your saved projects in Firebase.', 'warning');
         document.getElementById('loginModal')?.classList.add('active');
         return;
@@ -1042,23 +985,27 @@ class SwitchaApp {
     };
     document.getElementById('nav-my-circuits')?.addEventListener('click', openMyCircuitsDirect);
     document.getElementById('btnStudioMyCircuits')?.addEventListener('click', openMyCircuitsDirect);
+    document.querySelectorAll('a[href^="#/my-circuits"]').forEach(el => {
+      el.addEventListener('click', openMyCircuitsDirect);
+    });
 
     this.renderMyCircuits();
   }
 
   async clearAllCustomCircuits() {
-    // 1. Reset localStorage to default starter circuits
+    const user = firebaseService.currentUser;
+    if (!user) return;
     try {
-      localStorage.removeItem('switcha_my_circuits');
-      localStorage.removeItem('switcha_my_models');
-      localStorage.removeItem('switcha_my_scripts');
+      localStorage.removeItem(`switcha_circuits_${user.uid}`);
     } catch (_) {}
+    this.currentUserCircuits = [];
+    this.activeMyCircuitId = null;
+    this.activeModelId = null;
 
-    // 2. Clear IndexedDB stores if available
     if (window.SwitchaStorage && window.SwitchaStorage.db) {
       try {
         const db = window.SwitchaStorage.db;
-        ['circuits', 'models', 'scripts'].forEach(storeName => {
+        ['circuits', 'models', 'scripts', 'arduino'].forEach(storeName => {
           if (db.objectStoreNames.contains(storeName)) {
             const tx = db.transaction(storeName, 'readwrite');
             tx.objectStore(storeName).clear();
@@ -1067,13 +1014,8 @@ class SwitchaApp {
       } catch (_) {}
     }
 
-    this.activeMyCircuitId = null;
-    this.activeModelId = null;
-
-    // 3. Re-seed default starter circuits
-    this.getMyCircuits();
     await this.renderWorkspaceProjects();
-    this.showToast('🧹 All custom saved circuits cleared and reset to defaults!', 'success');
+    this.showToast('🧹 All your saved circuits cleared!', 'success');
   }
 
   renderMyCircuits(filterQuery = '') {
@@ -1097,22 +1039,32 @@ class SwitchaApp {
     const countEl = document.getElementById('myCircuitsCount');
     if (!grid) return;
 
+    if (!firebaseService.currentUser) {
+      grid.innerHTML = `
+        <div class="empty-circuits-state" style="padding: 40px 20px; text-align: center;">
+          <div class="empty-circuits-icon" style="font-size: 48px; margin-bottom: 12px;">🔒</div>
+          <h3 class="empty-circuits-title" style="font-size: 18px; margin-bottom: 8px;">Please Sign In</h3>
+          <p class="empty-circuits-desc" style="color: #64748b; margin-bottom: 16px;">Sign in to your account to view and manage your saved cloud projects.</p>
+          <button class="btn btn-primary" onclick="document.getElementById('loginModal')?.classList.add('active')">Log In to Access Projects</button>
+        </div>
+      `;
+      if (countEl) countEl.textContent = '0 Projects Saved';
+      return;
+    }
+
     grid.innerHTML = '<div style="padding:20px; color:#94a3b8; text-align:center;">Loading workspace projects...</div>';
 
     let items = [];
-    if (window.SwitchaStorage) {
-      if (this.currentWorkspaceTab === 'circuits') {
-        items = await window.SwitchaStorage.getCircuits();
-      } else if (this.currentWorkspaceTab === 'models') {
+    if (this.currentWorkspaceTab === 'circuits') {
+      items = this.getMyCircuits();
+    } else if (window.SwitchaStorage) {
+      if (this.currentWorkspaceTab === 'models') {
         items = await window.SwitchaStorage.getModels();
       } else if (this.currentWorkspaceTab === 'scripts') {
         items = await window.SwitchaStorage.getScripts();
       } else if (this.currentWorkspaceTab === 'arduino') {
         items = await window.SwitchaStorage.getArduinoProjects();
       }
-    }
-    if ((!items || items.length === 0) && this.currentWorkspaceTab === 'circuits') {
-      items = this.getMyCircuits();
     }
 
     const filtered = items.filter(item => {
@@ -1247,6 +1199,13 @@ class SwitchaApp {
 
       cardEl.querySelector('[data-action="delete"]').addEventListener('click', async () => {
         if (confirm(`Delete "${item.name}"?`)) {
+          if (isCircuit) {
+            let list = this.getMyCircuits();
+            list = list.filter(c => c.id !== item.id);
+            if (this.activeMyCircuitId === item.id) this.activeMyCircuitId = null;
+            this.saveMyCircuits(list);
+            await firebaseService.deleteCircuit(item.id);
+          }
           if (window.SwitchaStorage) {
             if (isCircuit) await window.SwitchaStorage.deleteCircuit(item.id);
             if (isModel) await window.SwitchaStorage.deleteModel(item.id);
@@ -1263,6 +1222,18 @@ class SwitchaApp {
         if (newName && newName.trim()) {
           item.name = newName.trim();
           item.updatedAt = Date.now();
+          if (isCircuit) {
+            const list = this.getMyCircuits();
+            const idx = list.findIndex(c => c.id === item.id);
+            if (idx >= 0) list[idx].name = item.name;
+            this.saveMyCircuits(list);
+            firebaseService.saveCircuit(item);
+            if (this.activeMyCircuitId === item.id) {
+              const nameInput = document.getElementById('circuitNameInput');
+              if (nameInput) nameInput.value = item.name;
+              document.title = `${item.name} - e-Samastha`;
+            }
+          }
           if (window.SwitchaStorage) {
             try {
               if (isCircuit) await window.SwitchaStorage.saveCircuit(item);
@@ -1270,17 +1241,6 @@ class SwitchaApp {
               if (isScript) await window.SwitchaStorage.saveScript(item);
               if (isArduino) await window.SwitchaStorage.saveArduinoProject(item);
             } catch (_) {}
-          }
-          if (isCircuit) {
-            const list = this.getMyCircuits();
-            const idx = list.findIndex(c => c.id === item.id);
-            if (idx >= 0) list[idx].name = item.name;
-            this.saveMyCircuits(list);
-            if (this.activeMyCircuitId === item.id) {
-              const nameInput = document.getElementById('circuitNameInput');
-              if (nameInput) nameInput.value = item.name;
-              document.title = `${item.name} - e-Samastha`;
-            }
           }
           this.renderWorkspaceProjects();
           this.showToast(`✏️ Renamed to "${item.name}"`, 'info');
@@ -1292,6 +1252,14 @@ class SwitchaApp {
         copy.id = `${isCircuit ? 'circuit' : (isModel ? 'model' : (isScript ? 'script' : 'arduino'))}_${Date.now()}`;
         copy.name = `${item.name} (Copy)`;
         copy.updatedAt = Date.now();
+        if (isCircuit) {
+          copy.ownerUid = firebaseService.currentUser?.uid;
+          copy.ownerEmail = firebaseService.currentUser?.email || '';
+          const list = this.getMyCircuits();
+          list.unshift(copy);
+          this.saveMyCircuits(list);
+          firebaseService.saveCircuit(copy);
+        }
         if (window.SwitchaStorage) {
           if (isCircuit) await window.SwitchaStorage.saveCircuit(copy);
           if (isModel) await window.SwitchaStorage.saveModel(copy);
@@ -1845,6 +1813,18 @@ class SwitchaApp {
       } else if (routePath.startsWith('#/labs/arduino') || routePath.startsWith('#/arduino')) {
         this.switchView('arduino');
       } else if (routePath.startsWith('#/my-circuits') || routePath.startsWith('#/workspace')) {
+        if (!firebaseService.currentUser) {
+          this.pendingOpenProjectsAfterLogin = true;
+          this.showToast('🔒 Please sign in first to access your saved projects.', 'warning');
+          document.getElementById('loginModal')?.classList.add('active');
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '#/create');
+          } else {
+            window.location.hash = '#/create';
+          }
+          this.switchView('studio');
+          return;
+        }
         this.switchView('my-circuits');
       } else if (routePath.startsWith('#/discover')) {
         this.switchView('discover');
@@ -1878,6 +1858,13 @@ class SwitchaApp {
       if (link) {
         const href = link.getAttribute('href');
         if (href) {
+          if ((href.startsWith('#/my-circuits') || href.startsWith('#/workspace')) && !firebaseService.currentUser) {
+            e.preventDefault();
+            this.pendingOpenProjectsAfterLogin = true;
+            this.showToast('🔒 Please sign in first to access your saved projects.', 'warning');
+            document.getElementById('loginModal')?.classList.add('active');
+            return;
+          }
           e.preventDefault();
           window.location.hash = href;
           handleHash();
@@ -2002,6 +1989,17 @@ class SwitchaApp {
   }
 
   switchView(viewName) {
+    if (viewName === 'my-circuits' && !firebaseService.currentUser) {
+      this.pendingOpenProjectsAfterLogin = true;
+      this.showToast('🔒 Please sign in first to access your saved projects.', 'warning');
+      document.getElementById('loginModal')?.classList.add('active');
+      viewName = 'studio';
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', '#/create');
+      } else {
+        window.location.hash = '#/create';
+      }
+    }
     this.currentView = viewName;
     document.querySelectorAll('.view-page').forEach(page => page.classList.remove('active'));
 
@@ -4386,22 +4384,31 @@ class SwitchaApp {
     firebaseService.onAuthStateChange(async (user) => {
       this.syncAuthUI(user);
       if (user) {
-        // Merge and restore circuits from cloud
+        if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
+          window.SwitchaStorage.setUserId(user.uid);
+        }
+        // Load this user's unique circuits directly from Firebase Firestore database
         try {
           const cloudCircuits = await firebaseService.loadUserCircuits();
-          if (cloudCircuits && cloudCircuits.length > 0) {
-            const localCircuits = this.getMyCircuits();
-            const merged = [...cloudCircuits];
-            localCircuits.forEach(lc => {
-              if (!merged.some(mc => mc.id === lc.id)) {
-                merged.push(lc);
-                firebaseService.saveCircuit(lc);
-              }
-            });
-            this.saveMyCircuits(merged);
-            this.renderMyCircuits();
+          this.currentUserCircuits = Array.isArray(cloudCircuits) ? cloudCircuits : [];
+          this.saveMyCircuits(this.currentUserCircuits);
+          if (this.currentView === 'my-circuits') {
+            this.renderWorkspaceProjects();
           }
-        } catch (_) {}
+        } catch (err) {
+          console.warn('[Firebase] Error loading user circuits from cloud:', err);
+          this.currentUserCircuits = this.getMyCircuits();
+        }
+      } else {
+        if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
+          window.SwitchaStorage.setUserId(null);
+        }
+        this.currentUserCircuits = [];
+        this.activeMyCircuitId = null;
+        if (this.currentView === 'my-circuits') {
+          window.location.hash = '#/create';
+          this.switchView('studio');
+        }
       }
     });
 
@@ -4424,8 +4431,12 @@ class SwitchaApp {
           loginForm.reset();
           this.showToast(`👋 Welcome back, ${user.displayName || user.email}!`, 'success');
 
-          // Auto-save pending circuit if triggered from Save button
-          if (this.pendingSaveAfterLogin) {
+          // Auto-open projects or auto-save pending circuit if triggered from Save button
+          if (this.pendingOpenProjectsAfterLogin) {
+            this.pendingOpenProjectsAfterLogin = false;
+            window.location.hash = '#/my-circuits';
+            this.switchView('my-circuits');
+          } else if (this.pendingSaveAfterLogin) {
             this.pendingSaveAfterLogin = false;
             setTimeout(() => this.saveCurrentCircuitToMyCircuits(), 250);
           }
@@ -4462,8 +4473,12 @@ class SwitchaApp {
           signupForm.reset();
           this.showToast(`🎉 Account created! Welcome, ${user.displayName || user.email}!`, 'success');
 
-          // Auto-save pending circuit if triggered from Save button
-          if (this.pendingSaveAfterLogin) {
+          // Auto-open projects or auto-save pending circuit if triggered from Save button
+          if (this.pendingOpenProjectsAfterLogin) {
+            this.pendingOpenProjectsAfterLogin = false;
+            window.location.hash = '#/my-circuits';
+            this.switchView('my-circuits');
+          } else if (this.pendingSaveAfterLogin) {
             this.pendingSaveAfterLogin = false;
             setTimeout(() => this.saveCurrentCircuitToMyCircuits(), 250);
           }
@@ -4492,6 +4507,26 @@ class SwitchaApp {
       }
       this.isAdminDemo = false;
       await firebaseService.signOut();
+
+      // Reset active circuit, in-memory projects, and reset canvas to blank
+      this.currentUserCircuits = [];
+      this.activeMyCircuitId = null;
+      if (window.SwitchaStorage && typeof window.SwitchaStorage.setUserId === 'function') {
+        window.SwitchaStorage.setUserId(null);
+      }
+      if (this.engine && this.canvas) {
+        this.engine.reset();
+        this.canvas.saveState();
+        this.canvas.components = [];
+        this.canvas.wires = [];
+        this.engine.setCircuit([], []);
+        const nameInput = document.getElementById('circuitNameInput');
+        if (nameInput) nameInput.value = 'Untitled Circuit';
+        document.title = 'e-Samastha Studio';
+        this.canvas.render();
+        this.grapher?.render();
+      }
+
       this.syncAuthUI(null);
       if (wasAdmin) {
         this.showToast('Administrator session ended.', 'info');
