@@ -80,9 +80,11 @@ async function main() {
   const userPortalGuestState = await send('Runtime.evaluate', {
     expression: `
       (() => {
-        const guestDiv = document.getElementById("guestAuthButtons");
+        const guestDiv = document.getElementById("authGuestControls");
+        const userDiv = document.getElementById("authUserControls");
         return {
-          isGuestVisible: !guestDiv?.classList.contains("hidden"),
+          isGuestVisible: guestDiv && guestDiv.style.display !== "none",
+          isUserControlsHidden: !userDiv || userDiv.style.display === "none",
           hasAdminLogout: Array.from(document.querySelectorAll("button, a")).some(b => b.textContent.includes("Admin Logout"))
         };
       })()
