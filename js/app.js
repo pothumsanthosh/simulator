@@ -4717,8 +4717,9 @@ class SwitchaApp {
    */
   async loadAdminData() {
     const adminEmailBadge = document.getElementById('adminCurrentEmail');
-    if (adminEmailBadge && firebaseService.currentUser) {
-      adminEmailBadge.textContent = firebaseService.currentUser.email || 'Admin';
+    const adminUser = firebaseService.adminContext?.currentUser || firebaseService.adminUser;
+    if (adminEmailBadge) {
+      adminEmailBadge.textContent = adminUser?.email || 'admin@e-samastha';
     }
 
     try {
@@ -4972,10 +4973,11 @@ class SwitchaApp {
       }
 
       // Log inspection in audit logs
+      const currentAdmin = firebaseService.adminContext?.currentUser || firebaseService.adminUser;
       await firebaseService.logActivity({
         type: 'admin_inspect_circuit',
-        actorUid: firebaseService.currentUser?.uid || 'admin',
-        actorEmail: firebaseService.currentUser?.email || '',
+        actorUid: currentAdmin?.uid || 'admin',
+        actorEmail: currentAdmin?.email || '',
         targetId: circuitId,
         metadata: { ownerUid: userId, circuitName: circuit.name }
       }).catch(() => {});
@@ -5278,10 +5280,11 @@ class SwitchaApp {
       }
 
       // Log inspection in audit activity
+      const currentAdmin = firebaseService.adminContext?.currentUser || firebaseService.adminUser;
       await firebaseService.logActivity({
         type: 'admin_inspect_circuit',
-        actorUid: firebaseService.currentUser?.uid || 'admin',
-        actorEmail: firebaseService.currentUser?.email || '',
+        actorUid: currentAdmin?.uid || 'admin',
+        actorEmail: currentAdmin?.email || '',
         targetId: circuitId,
         metadata: {
           circuitName: circuit.name || '',
@@ -5340,11 +5343,12 @@ class SwitchaApp {
 
   saveAdminCircuit() {
     const name = document.getElementById('adminCircuitNameInput')?.value.trim() || 'Admin Template Circuit';
+    const currentAdmin = firebaseService.adminContext?.currentUser || firebaseService.adminUser;
     const circuitDoc = {
       id: `admin_circuit_${Date.now()}`,
       name,
       description: 'Platform Administrator Master Circuit Template.',
-      author: firebaseService.currentUser?.displayName || 'Administrator',
+      author: currentAdmin?.displayName || currentAdmin?.email || 'Administrator',
       updatedAt: Date.now(),
       components: this.adminCanvas?.components || [],
       wires: this.adminCanvas?.wires || [],

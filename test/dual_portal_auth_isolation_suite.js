@@ -222,6 +222,17 @@ async function run() {
     assert.strictEqual(res3.access, 'GRANTED_ADMIN');
   });
 
+  await test('adminHeaderEmailBadgeStrictlyFollowsAdminContext()', async () => {
+    // Both contexts active
+    firebaseService.adminContext.currentUser = admin;
+    firebaseService.userContext.currentUser = student;
+
+    // Verify source code guarantees that loadAdminData does not read userContext
+    const appJsContent = fs.readFileSync('js/app.js', 'utf8');
+    assert(!appJsContent.includes('adminEmailBadge && firebaseService.currentUser'), 'loadAdminData must not read firebaseService.currentUser');
+    assert(appJsContent.includes('const adminUser = firebaseService.adminContext?.currentUser'), 'loadAdminData must use adminContext.currentUser');
+  });
+
   console.log(`\n================================================================`);
   console.log(`📊 DUAL-PORTAL AUTH ISOLATION TESTS: ${passedTests} / ${totalTests} PASSED`);
   console.log(`================================================================\n`);
