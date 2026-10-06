@@ -462,6 +462,12 @@ disp('✅ Simulation finished successfully!');
     }
 
     async saveScript() {
+        const fb = window.firebaseService || window.app?.firebaseService;
+        if (fb && !fb.currentUser) {
+            window.app?.showToast?.('🔒 Please sign in first to save scripts to your account.', 'warning');
+            document.getElementById('loginModal')?.classList.add('active');
+            return;
+        }
         const textarea = this.container.querySelector('#codeTextarea');
         const content = textarea ? textarea.value : '';
         const name = prompt('Enter script name:', this.activeScript.name) || this.activeScript.name;

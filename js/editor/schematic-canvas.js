@@ -2077,7 +2077,6 @@ export class SchematicCanvas {
       }
 
       case ComponentTypes.POWER_VCC:
-      case ComponentTypes.POWER_VDD:
       case ComponentTypes.POWER_5V:
       case ComponentTypes.POWER_12V:
       case ComponentTypes.POWER_15V: {
@@ -2089,14 +2088,11 @@ export class SchematicCanvas {
         ctx.fillStyle = '#e11d48';
         ctx.font = 'bold 9px sans-serif';
         ctx.textAlign = 'center';
-        let label = 'VCC';
-        if (comp.type === ComponentTypes.POWER_VDD) label = 'VDD';
-        else if (comp.type !== ComponentTypes.POWER_VCC) label = comp.type.replace('POWER_', '+');
+        const label = comp.type === ComponentTypes.POWER_VCC ? 'VCC' : comp.type.replace('POWER_', '+');
         ctx.fillText(label, 0, -12);
         break;
       }
 
-      case ComponentTypes.POWER_VSS:
       case ComponentTypes.POWER_NEG12V:
       case ComponentTypes.POWER_NEG15V: {
         ctx.beginPath();
@@ -2106,8 +2102,7 @@ export class SchematicCanvas {
         ctx.fillStyle = '#0284c7';
         ctx.font = 'bold 9px sans-serif';
         ctx.textAlign = 'center';
-        const label = comp.type === ComponentTypes.POWER_VSS ? 'VSS' : comp.type.replace('POWER_NEG', '-');
-        ctx.fillText(label, 0, 12);
+        ctx.fillText(comp.type.replace('POWER_NEG', '-'), 0, 12);
         break;
       }
 
@@ -3312,16 +3307,9 @@ export class SchematicCanvas {
       }
 
       case ComponentTypes.LM7805:
-      case ComponentTypes.LM7809:
       case ComponentTypes.LM7812:
-      case ComponentTypes.LM7815:
-      case ComponentTypes.LM7905:
       case ComponentTypes.LM7912:
-      case ComponentTypes.LM7915:
-      case ComponentTypes.LM317:
-      case ComponentTypes.LM337:
-      case ComponentTypes.LM1117_33:
-      case ComponentTypes.TL431: {
+      case ComponentTypes.LM317: {
         ctx.beginPath();
         ctx.rect(-30, -20, 60, 40);
         ctx.fillStyle = '#ffffff';
@@ -3634,20 +3622,18 @@ export class SchematicCanvas {
       }
 
       case ComponentTypes.PROBE_V:
-      case ComponentTypes.PROBE_I:
-      case ComponentTypes.PROBE_DIFF: {
+      case ComponentTypes.PROBE_I: {
         ctx.beginPath();
         ctx.moveTo(0, 20); ctx.lineTo(-12, 0); ctx.lineTo(-12, -18); ctx.lineTo(12, -18); ctx.lineTo(12, 0);
         ctx.closePath();
-        const probeColor = p.color || (comp.type === ComponentTypes.PROBE_V ? '#03b585' : (comp.type === ComponentTypes.PROBE_DIFF ? '#8b5cf6' : '#ff9500'));
+        const probeColor = p.color || (comp.type === ComponentTypes.PROBE_V ? '#03b585' : '#ff9500');
         ctx.fillStyle = probeColor;
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
-        const label = comp.type === ComponentTypes.PROBE_V ? 'V' : (comp.type === ComponentTypes.PROBE_DIFF ? 'ΔV' : 'I');
-        ctx.fillText(label, 0, -5);
+        ctx.fillText(comp.type === ComponentTypes.PROBE_V ? 'V' : 'I', 0, -5);
 
         // Live Voltage / Current reading badge next to probe
         if (this.engine && this.engine.nodeVoltages && this.engine.getNode) {

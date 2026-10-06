@@ -1,15 +1,16 @@
 /**
- * Switcha Service Worker
+ * e-Samastha Service Worker
  * Enables offline simulation, PWA installation, and ultra-fast asset caching on Laptop, Phone, and Tablet.
  */
 
-const CACHE_NAME = 'switcha-pwa-v18';
+const CACHE_NAME = 'switcha-pwa-v45';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './css/style.css',
   './css/simulator.css',
+  './css/arduino.css',
   './js/app.js',
   './js/engine/circuit-model.js',
   './js/engine/components.js',
@@ -31,12 +32,13 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('[Switcha SW] Cache addAll warning:', err);
+        console.warn('[e-Samastha SW] Cache addAll warning:', err);
       });
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -45,10 +47,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[Switcha SW] Removing old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+          console.log('[e-Samastha SW] Purging cache:', cacheName);
+          return caches.delete(cacheName);
         })
       );
     }).then(() => self.clients.claim())

@@ -22,6 +22,389 @@ import { SwitchaPlot, SwitchaPlotter } from './code/code-plotter.js?v=2.3';
 import { SwitchaCodeEditor } from './code/code-editor.js?v=2.3';
 import { ArduinoController } from './arduino/arduino-controller.js';
 
+// ============================================================================
+// Manual Draggable Component Values & Labels Feature
+// Allows users to click and drag component values (or names) manually to any custom position
+// Double-click a value to reset its position back to default.
+// ============================================================================
+function getComponentValueString(comp) {
+  if (!comp || !comp.params) return '';
+  const p = comp.params;
+  if (p.resistance) return formatValueWithPrefix(p.resistance, 'Ω');
+  if (p.capacitance) return formatValueWithPrefix(p.capacitance, 'F');
+  if (p.inductance) return formatValueWithPrefix(p.inductance, 'H');
+  if (p.voltage !== undefined && comp.type !== ComponentTypes.GROUND) return formatValueWithPrefix(p.voltage, 'V');
+  if (p.amplitude !== undefined) return `${formatValueWithPrefix(p.amplitude, 'V')}${p.frequency ? ` @ ${formatValueWithPrefix(p.frequency, 'Hz')}` : ''}`;
+  if (p.frequency !== undefined) return formatValueWithPrefix(p.frequency, 'Hz');
+  if (p.model) return p.model;
+  if (p.label) return p.label;
+  return '';
+}
+
+function isComponentTwoTerminalVertical(comp, canvas) {
+  if (!comp) return false;
+  const pins = comp.pins || (ComponentDefinitions[comp.type] ? ComponentDefinitions[comp.type].pins : null);
+  if (!pins || pins.length !== 2) return false;
+
+  if (canvas && typeof canvas.getPinWorldPos === 'function') {
+    const p1 = canvas.getPinWorldPos(comp, pins[0]);
+    const p2 = canvas.getPinWorldPos(comp, pins[1]);
+    return Math.abs(p1.y - p2.y) > Math.abs(p1.x - p2.x);
+  }
+
+  const px1 = pins[0].x * (comp.flipX ? -1 : 1);
+  const py1 = pins[0].y * (comp.flipY ? -1 : 1);
+  const px2 = pins[1].x * (comp.flipX ? -1 : 1);
+  const py2 = pins[1].y * (comp.flipY ? -1 : 1);
+  const rad = ((comp.rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dy = Math.abs((px1 * sin + py1 * cos) - (px2 * sin + py2 * cos));
+  const dx = Math.abs((px1 * cos - py1 * sin) - (px2 * cos - py2 * sin));
+  return dy > dx;
+}
+
+function getComponentSideOffset(comp) {
+  const def = ComponentDefinitions ? ComponentDefinitions[comp.type] : null;
+  const w = comp.width || (def ? def.width : 40);
+  const h = comp.height || (def ? def.height : 40);
+  const rad = ((comp.rotation || 0) * Math.PI) / 180;
+  const halfVisualW = Math.abs((w / 2) * Math.cos(rad)) + Math.abs((h / 2) * Math.sin(rad));
+  return Math.max(18, Math.round(halfVisualW + 6));
+}
+
+SchematicCanvas.prototype.findLabelAt = function(worldX, worldY, padding = 6) {
+  if (!this.components) return null;
+
+  for (let i = this.components.length - 1; i >= 0; i--) {
+    const comp = this.components[i];
+    if (!comp || !comp.name) continue;
+    if (comp.type === ComponentTypes.TEXT_LABEL || comp.type === ComponentTypes.ANNOTATION) continue;
+
+    const effHeight = ((comp.rotation || 0) % 180 !== 0) ? (comp.width || 40) : (comp.height || 40);
+    const isVert = isComponentTwoTerminalVertical(comp, this);
+    const sideOffset = isVert ? getComponentSideOffset(comp) : 0;
+    const valueStr = getComponentValueString(comp);
+
+    // 1. Check Value (highest priority for manual moving)
+    if (valueStr) {
+      let vx, vy, align;
+      if (isVert) {
+        align = 'left';
+        vx = comp.x + sideOffset + (comp.valueOffset?.x || 0);
+        vy = comp.y + 8 + (comp.valueOffset?.y || 0);
+      } else {
+        align = 'center';
+        vx = comp.x + (comp.valueOffset?.x || 0);
+        vy = comp.y + (effHeight / 2 + 14) + (comp.valueOffset?.y || 0);
+      }
+      const w = Math.max(28, valueStr.length * 7);
+      const minX = align === 'center' ? vx - w / 2 - padding : vx - padding;
+      const maxX = align === 'center' ? vx + w / 2 + padding : vx + w + padding;
+      const minY = vy - 10 - padding;
+      const maxY = vy + 4 + padding;
+      if (worldX >= minX && worldX <= maxX && worldY >= minY && worldY <= maxY) {
+        return { comp, target: 'value', text: valueStr, x: vx, y: vy, w, h: 14, align };
+      }
+    }
+
+    // 2. Check Name
+    let nx, ny, align;
+    if (isVert) {
+      align = 'left';
+      nx = comp.x + sideOffset + (comp.nameOffset?.x || 0);
+      ny = comp.y - 6 + (comp.nameOffset?.y || 0);
+    } else {
+      align = 'center';
+      nx = comp.x + (comp.nameOffset?.x || 0);
+      ny = comp.y - (effHeight / 2 + 8) + (comp.nameOffset?.y || 0);
+    }
+    const nw = Math.max(22, comp.name.length * 7.5);
+    const minX = align === 'center' ? nx - nw / 2 - padding : nx - padding;
+    const maxX = align === 'center' ? nx + nw / 2 + padding : nx + nw + padding;
+    const minY = ny - 10 - padding;
+    const maxY = ny + 4 + padding;
+    if (worldX >= minX && worldX <= maxX && worldY >= minY && worldY <= maxY) {
+      return { comp, target: 'name', text: comp.name, x: nx, y: ny, w: nw, h: 14, align };
+    }
+  }
+
+  return null;
+};
+
+SchematicCanvas.prototype.renderLabels = function(ctx, comp) {
+  if (!comp || !comp.name) return;
+  if (comp.type === ComponentTypes.TEXT_LABEL || comp.type === ComponentTypes.ANNOTATION) return;
+
+  if (comp.type === ComponentTypes.NODE || comp.type === ComponentTypes.JUNCTION) {
+    if (!comp.params?.label) return;
+    const lx = comp.x + (comp.labelOffset?.x || 0);
+    const ly = comp.y - 8 + (comp.labelOffset?.y || 0);
+    ctx.save();
+    ctx.font = 'bold 9.5px Lato, sans-serif';
+    ctx.textAlign = 'center';
+    const m = ctx.measureText(comp.params.label);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.fillRect(lx - m.width / 2 - 2, ly - 9, m.width + 4, 12);
+    ctx.fillStyle = '#0284c7';
+    ctx.fillText(comp.params.label, lx, ly);
+    ctx.restore();
+    return;
+  }
+
+  const effHeight = ((comp.rotation || 0) % 180 !== 0) ? (comp.width || 40) : (comp.height || 40);
+  const isVert = isComponentTwoTerminalVertical(comp, this);
+  const sideOffset = isVert ? getComponentSideOffset(comp) : 0;
+  const valueStr = getComponentValueString(comp);
+
+  let nx, ny, align;
+  if (isVert) {
+    align = 'left';
+    nx = comp.x + sideOffset + (comp.nameOffset?.x || 0);
+    ny = comp.y - 6 + (comp.nameOffset?.y || 0);
+  } else {
+    align = 'center';
+    nx = comp.x + (comp.nameOffset?.x || 0);
+    ny = comp.y - (effHeight / 2 + 8) + (comp.nameOffset?.y || 0);
+  }
+
+  const isSelected = this.selectedComponents?.has(comp) || this.selectedComponent === comp;
+  const isHoveredVal = this.hoveredLabel?.comp === comp && this.hoveredLabel?.target === 'value';
+  const isHoveredName = this.hoveredLabel?.comp === comp && this.hoveredLabel?.target === 'name';
+  const isDraggingVal = this.labelDrag?.comp === comp && this.labelDrag?.target === 'value';
+  const isDraggingName = this.labelDrag?.comp === comp && this.labelDrag?.target === 'name';
+
+  ctx.save();
+
+  // Draw pill helper with crisp legibility & manual drag indicators
+  const drawPillText = (text, x, y, font, color, textAlign, isHovered, isDragging, hasCustomOffset) => {
+    ctx.font = font;
+    ctx.textAlign = textAlign;
+    const m = ctx.measureText(text);
+    const w = m.width;
+    const h = 13;
+    const pad = 3;
+    const rx = textAlign === 'center' ? x - w / 2 - pad : x - pad;
+    const ry = y - 10;
+
+    // Backing pill so crossing wires/grid lines never obscure the text
+    ctx.fillStyle = isDragging ? 'rgba(224, 242, 254, 0.96)' : (isHovered ? 'rgba(240, 249, 255, 0.95)' : 'rgba(255, 255, 255, 0.92)');
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(rx, ry, w + pad * 2, h, 3);
+      ctx.fill();
+    } else {
+      ctx.fillRect(rx, ry, w + pad * 2, h);
+    }
+
+    // Border highlights: if dragging, hovered, or custom-moved
+    if (isDragging) {
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1.5;
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, w + pad * 2, h, 3);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(rx, ry, w + pad * 2, h);
+      }
+    } else if (isHovered) {
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, w + pad * 2, h, 3);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(rx, ry, w + pad * 2, h);
+      }
+      ctx.setLineDash([]);
+    } else if (hasCustomOffset && isSelected) {
+      ctx.strokeStyle = 'rgba(2, 132, 199, 0.4)';
+      ctx.lineWidth = 0.8;
+      ctx.setLineDash([2, 2]);
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, w + pad * 2, h, 3);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(rx, ry, w + pad * 2, h);
+      }
+      ctx.setLineDash([]);
+    }
+
+    // Text
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  };
+
+  // Draw Component Name (Reference)
+  const hasNameOffset = !!(comp.nameOffset && (comp.nameOffset.x !== 0 || comp.nameOffset.y !== 0));
+  if (hasNameOffset && (isSelected || isDraggingName)) {
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(2, 132, 199, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.moveTo(comp.x, comp.y);
+    ctx.lineTo(nx, ny);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  drawPillText(comp.name, nx, ny, 'bold 11px Lato, sans-serif', '#1e293b', align, isHoveredName, isDraggingName, hasNameOffset);
+
+  // Draw Component Value (Draggable)
+  if (valueStr) {
+    let vx, vy;
+    if (isVert) {
+      vx = comp.x + sideOffset + (comp.valueOffset?.x || 0);
+      vy = comp.y + 8 + (comp.valueOffset?.y || 0);
+    } else {
+      vx = comp.x + (comp.valueOffset?.x || 0);
+      vy = comp.y + (effHeight / 2 + 14) + (comp.valueOffset?.y || 0);
+    }
+    const hasValOffset = !!(comp.valueOffset && (comp.valueOffset.x !== 0 || comp.valueOffset.y !== 0));
+
+    if (hasValOffset && (isSelected || isDraggingVal)) {
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(2, 132, 199, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.moveTo(comp.x, comp.y);
+      ctx.lineTo(vx, vy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    drawPillText(valueStr, vx, vy, 'bold 10.5px Lato, sans-serif', '#0284c7', align, isHoveredVal, isDraggingVal, hasValOffset);
+  }
+
+  ctx.restore();
+};
+
+// Canvas Pointer Drag Interceptors for Manual Value Repositioning
+const origHandlePointerDown = SchematicCanvas.prototype.handlePointerDown;
+SchematicCanvas.prototype.handlePointerDown = function(e) {
+  if (this.mode !== 'PLACE' && !this.wiringStartPin) {
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+    const labelHit = this.findLabelAt(worldPos.x, worldPos.y, 6);
+    if (labelHit) {
+      this.labelDrag = {
+        comp: labelHit.comp,
+        target: labelHit.target,
+        startWorld: { x: worldPos.x, y: worldPos.y },
+        initialOffset: {
+          x: labelHit.target === 'value' ? (labelHit.comp.valueOffset?.x || 0) : (labelHit.comp.nameOffset?.x || 0),
+          y: labelHit.target === 'value' ? (labelHit.comp.valueOffset?.y || 0) : (labelHit.comp.nameOffset?.y || 0)
+        },
+        moved: false,
+        pointerId: e.pointerId
+      };
+      this.isPanning = false;
+      this.isBoxSelecting = false;
+      this.state = CanvasState.IDLE;
+      this.canvas.style.cursor = 'grabbing';
+
+      if (!this.selectedComponents.has(labelHit.comp)) {
+        this.selectedComponents.clear();
+        this.selectedComponents.add(labelHit.comp);
+        this.selectedComponent = labelHit.comp;
+        this.selectedWire = null;
+        if (this.onSelectionChange) {
+          this.onSelectionChange({ type: 'component', item: labelHit.comp, group: [labelHit.comp] });
+        }
+      }
+      try { this.canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      this.render();
+      return;
+    }
+  }
+  return origHandlePointerDown.call(this, e);
+};
+
+const origHandlePointerMove = SchematicCanvas.prototype.handlePointerMove;
+SchematicCanvas.prototype.handlePointerMove = function(e) {
+  if (this.labelDrag && e.pointerId === this.labelDrag.pointerId) {
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+    const dx = worldPos.x - this.labelDrag.startWorld.x;
+    const dy = worldPos.y - this.labelDrag.startWorld.y;
+
+    if (Math.hypot(dx, dy) > 2) {
+      if (!this.labelDrag.moved) {
+        this.saveState();
+        this.labelDrag.moved = true;
+      }
+      const newX = Math.round(this.labelDrag.initialOffset.x + dx);
+      const newY = Math.round(this.labelDrag.initialOffset.y + dy);
+      if (this.labelDrag.target === 'value') {
+        this.labelDrag.comp.valueOffset = { x: newX, y: newY };
+      } else {
+        this.labelDrag.comp.nameOffset = { x: newX, y: newY };
+      }
+      this.canvas.style.cursor = 'grabbing';
+      this.render();
+    }
+    return;
+  }
+
+  if (!this.drag?.active && !this.isPanning && !this.wiringStartPin && this.mode !== 'PLACE' && !this.isBoxSelecting) {
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+    const labelHit = this.findLabelAt(worldPos.x, worldPos.y, 6);
+    if (labelHit) {
+      this.canvas.style.cursor = 'grab';
+      if (!this.hoveredLabel || this.hoveredLabel.comp !== labelHit.comp || this.hoveredLabel.target !== labelHit.target) {
+        this.hoveredLabel = labelHit;
+        this.render();
+      }
+    } else if (this.hoveredLabel) {
+      this.hoveredLabel = null;
+      this.canvas.style.cursor = 'default';
+      this.render();
+    }
+  }
+
+  return origHandlePointerMove.call(this, e);
+};
+
+const origHandlePointerUp = SchematicCanvas.prototype.handlePointerUp;
+SchematicCanvas.prototype.handlePointerUp = function(e) {
+  if (this.labelDrag && e.pointerId === this.labelDrag.pointerId) {
+    const moved = this.labelDrag.moved;
+    const comp = this.labelDrag.comp;
+    this.labelDrag = null;
+    this.canvas.style.cursor = 'default';
+    try { this.canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (moved) {
+      this.notifyModified();
+    }
+    this.render();
+    return;
+  }
+  return origHandlePointerUp.call(this, e);
+};
+
+const origHandleDoubleClick = SchematicCanvas.prototype.handleDoubleClick;
+SchematicCanvas.prototype.handleDoubleClick = function(e) {
+  const worldPos = this.screenToWorld(e.clientX, e.clientY);
+  const labelHit = this.findLabelAt(worldPos.x, worldPos.y, 6);
+  if (labelHit) {
+    // Reset offset back to default on double-click
+    this.saveState();
+    if (labelHit.target === 'value') {
+      labelHit.comp.valueOffset = { x: 0, y: 0 };
+    } else {
+      labelHit.comp.nameOffset = { x: 0, y: 0 };
+    }
+    this.notifyModified();
+    this.render();
+    if (window.app?.renderPropertiesInspector) {
+      window.app.renderPropertiesInspector({ type: 'component', item: labelHit.comp, group: [labelHit.comp] });
+    }
+    return;
+  }
+  return origHandleDoubleClick.call(this, e);
+};
+
 class SwitchaApp {
   constructor() {
     this.engine = new CircuitEngine();
@@ -53,6 +436,7 @@ class SwitchaApp {
     this.currentView = 'home';
     this.currentMode = 'split'; // 'schematic', 'split', 'grapher'
     this.currentWorkspaceTab = 'circuits'; // 'circuits', 'models', 'scripts'
+    this.firebaseService = firebaseService;
 
     this.init();
   }
@@ -74,6 +458,18 @@ class SwitchaApp {
     // Selection listener for Properties Inspector
     this.canvas.onSelectionChange = (selection) => {
       this.renderPropertiesInspector(selection);
+      if (selection && selection.type === 'component' && selection.item) {
+        const sidebar = document.getElementById('propertiesSidebar');
+        if (sidebar && sidebar.classList.contains('collapsed')) {
+          sidebar.classList.remove('collapsed');
+          const btn = document.getElementById('btnToggleProperties');
+          if (btn) btn.classList.add('active');
+          setTimeout(() => {
+            this.canvas.resize();
+            this.grapher.resize();
+          }, 220);
+        }
+      }
     };
 
     // Placement Mode listener for UI Banner and Quick-Bar Highlighting
@@ -128,6 +524,50 @@ class SwitchaApp {
       this.canvas.resize();
       this.grapher.resize();
     }, 100);
+
+    // 7. Mobile navigation toggle
+    this.initMobileNav();
+  }
+
+  // --- Mobile Navigation Toggle ---
+  initMobileNav() {
+    const toggleBtn = document.getElementById('navMobileToggle');
+    const nav = document.querySelector('nav.nav');
+    if (!toggleBtn || !nav) return;
+
+    toggleBtn.addEventListener('click', () => {
+      const isOpen = nav.classList.toggle('mobile-open');
+      toggleBtn.setAttribute('aria-expanded', String(isOpen));
+      toggleBtn.textContent = isOpen ? '✕' : '☰';
+    });
+
+    // Close on any nav link click
+    nav.addEventListener('click', (e) => {
+      if (e.target.closest('.nav-link, .nav-menuitem')) {
+        nav.classList.remove('mobile-open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.textContent = '☰';
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('nav.nav, #navMobileToggle')) {
+        nav.classList.remove('mobile-open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.textContent = '☰';
+      }
+    });
+
+    // Close on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && nav.classList.contains('mobile-open')) {
+        nav.classList.remove('mobile-open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.textContent = '☰';
+        toggleBtn.focus();
+      }
+    });
   }
 
   // --- Toast Notification Helper ---
@@ -300,6 +740,14 @@ class SwitchaApp {
       this.showToast('⚠️ Inspection Mode: Modifying or saving student circuits is disabled in read-only mode.', 'warning');
       return;
     }
+
+    if (!firebaseService.currentUser) {
+      this.pendingSaveAfterLogin = true;
+      this.showToast('🔒 Please sign in first to save projects to Firebase Cloud.', 'warning');
+      document.getElementById('loginModal')?.classList.add('active');
+      return;
+    }
+
     const circuits = this.getMyCircuits();
     const nameInput = document.getElementById('circuitNameInput');
     const name = customName || (nameInput ? nameInput.value.trim() : 'Untitled Circuit') || 'Untitled Circuit';
@@ -324,7 +772,7 @@ class SwitchaApp {
         id: newId,
         name: name,
         description: `Custom electronic circuit with ${currentComponents.length} components and ${currentWires.length} connections.`,
-        author: 'You',
+        author: firebaseService.currentUser?.displayName || firebaseService.currentUser?.email || 'You',
         updatedAt: Date.now(),
         components: currentComponents,
         wires: currentWires
@@ -340,17 +788,31 @@ class SwitchaApp {
       } catch (_) {}
     }
     this.renderWorkspaceProjects();
-    this.showToast(`💾 "${name}" saved to My Circuits!`, 'success');
 
-    // Sync to Cloud Firestore if user is authenticated
+    // Store in Firebase Cloud Firestore
+    let cloudSynced = false;
     try {
       if (firebaseService && typeof firebaseService.saveCircuit === 'function') {
-        firebaseService.saveCircuit(targetCircuit);
+        cloudSynced = await firebaseService.saveCircuit(targetCircuit);
       }
-    } catch (_) {}
+    } catch (err) {
+      console.warn('[Firebase] saveCircuit error:', err);
+    }
+
+    if (cloudSynced) {
+      this.showToast(`☁️ "${name}" securely stored in Firebase!`, 'success');
+    } else {
+      this.showToast(`💾 "${name}" saved to My Circuits (offline copy).`, 'info');
+    }
   }
 
   async loadCircuitFromMyCircuits(circuitId) {
+    if (!firebaseService.currentUser) {
+      this.showToast('🔒 Please sign in first to open projects from Firebase.', 'warning');
+      document.getElementById('loginModal')?.classList.add('active');
+      return;
+    }
+
     let circuits = this.getMyCircuits();
     let circuit = circuits.find(c => c.id === circuitId);
 
@@ -570,6 +1032,11 @@ class SwitchaApp {
     // Direct event listener for all My Circuits buttons across UI
     const openMyCircuitsDirect = (e) => {
       e?.preventDefault();
+      if (!firebaseService.currentUser) {
+        this.showToast('🔒 Please sign in first to access your saved projects in Firebase.', 'warning');
+        document.getElementById('loginModal')?.classList.add('active');
+        return;
+      }
       window.location.hash = '#/my-circuits';
       this.switchView('my-circuits');
     };
@@ -722,6 +1189,11 @@ class SwitchaApp {
       `;
 
       const openProject = () => {
+        if (!firebaseService.currentUser) {
+          this.showToast('🔒 Please sign in first to open projects from Firebase.', 'warning');
+          document.getElementById('loginModal')?.classList.add('active');
+          return;
+        }
         if (isCircuit) {
           this.loadCircuitFromMyCircuits(item.id);
         } else if (isModel) {
@@ -1071,6 +1543,11 @@ class SwitchaApp {
     const btnSave = document.getElementById('btnSaveBlockModel');
     if (btnSave) {
       btnSave.addEventListener('click', async () => {
+        if (!firebaseService.currentUser) {
+          this.showToast('🔒 Please sign in first to save models to your account.', 'warning');
+          document.getElementById('loginModal')?.classList.add('active');
+          return;
+        }
         const name = document.getElementById('blockModelNameInput')?.value.trim() || 'Untitled Model';
         const modelDoc = {
           id: this.activeModelId || `model_${Date.now()}`,
@@ -1364,6 +1841,8 @@ class SwitchaApp {
         this.switchView('features');
       } else if (routePath.startsWith('#/admin/login')) {
         this.switchView('admin-login');
+      } else if (routePath.startsWith('#/admin/studio')) {
+        this.handleAdminStudioRoute(queryString);
       } else if (routePath.startsWith('#/admin')) {
         this.handleAdminRoute();
       } else {
@@ -1388,9 +1867,131 @@ class SwitchaApp {
     });
   }
 
+  // --- Centralized Authentication UI Synchronizer ---
+  syncAuthUI(explicitUser = undefined) {
+    const guestControls = document.getElementById('authGuestControls');
+    const userControls = document.getElementById('authUserControls');
+    const userDisplayName = document.getElementById('userDisplayName');
+    const userProfileBadge = document.getElementById('userProfileBadge');
+    const btnLogout = document.getElementById('btnLogout');
+    let adminControls = document.getElementById('userProfileAdminGroup');
+
+    const currentUser = explicitUser !== undefined ? explicitUser : (firebaseService?.currentUser || null);
+    const hasAdminSession = !!(
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('esamastha_authenticated_admin_uid')) ||
+      (currentUser?.email && ['pothumsanthosh@gmail.com', 'admin@e-samastha.edu'].includes(currentUser.email.toLowerCase())) ||
+      this.isAdminDemo
+    );
+
+    if (hasAdminSession) {
+      // 1. Admin is authenticated: Hide guest controls ("Log in" and "Sign up") completely
+      if (guestControls) {
+        guestControls.style.display = 'none';
+      }
+      if (userControls) {
+        userControls.style.display = 'inline-flex';
+      }
+
+      // 2. Set admin display badge
+      if (userDisplayName) {
+        userDisplayName.textContent = (currentUser?.email && currentUser.email.split('@')[0]) || 'pothumsanthosh';
+      }
+      if (userProfileBadge) {
+        userProfileBadge.title = 'Logged in as Administrator (Pothumsanthosh@gmail.com)';
+      }
+
+      // 3. Ensure Admin Console button exists in topbar
+      if (!adminControls && userControls) {
+        adminControls = document.createElement('div');
+        adminControls.id = 'userProfileAdminGroup';
+        adminControls.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-right: 6px;';
+        adminControls.innerHTML = `
+          <a href="#/admin" class="btn btn-outline" id="userProfileAdminBtn" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(245, 158, 11, 0.15);" title="Return to Admin Console (Users, Circuits, Activity)">
+            <span>🛡️</span> Admin Console
+          </a>
+        `;
+        userControls.insertBefore(adminControls, btnLogout);
+      } else if (adminControls) {
+        adminControls.style.display = 'inline-flex';
+      }
+
+      // 4. Change logout button to "Admin Logout"
+      if (btnLogout) {
+        btnLogout.className = 'btn btn-primary admin-logout-btn';
+        btnLogout.innerHTML = '<span>🚪</span> Admin Logout';
+        btnLogout.title = 'Log out of Administrator Session';
+      }
+
+      // 5. Reveal return buttons in all labs
+      document.querySelectorAll('.admin-only-return-btn').forEach(b => {
+        b.style.display = 'inline-flex';
+      });
+    } else if (currentUser) {
+      // Regular user authenticated: Normal user view, normal Log out button
+      if (guestControls) {
+        guestControls.style.display = 'none';
+      }
+      if (userControls) {
+        userControls.style.display = 'inline-flex';
+      }
+      if (adminControls) {
+        adminControls.remove();
+      }
+
+      if (userDisplayName) {
+        userDisplayName.textContent = currentUser.displayName || currentUser.email.split('@')[0];
+      }
+      if (userProfileBadge) {
+        userProfileBadge.title = `Logged in as ${currentUser.email} (Firebase Cloud Synced)`;
+      }
+
+      if (btnLogout) {
+        btnLogout.className = 'btn btn-outline';
+        btnLogout.innerHTML = 'Log out';
+        btnLogout.title = 'Log out of e-Samastha';
+      }
+
+      // Hide all admin return buttons
+      document.querySelectorAll('.admin-only-return-btn').forEach(b => {
+        b.style.display = 'none';
+      });
+    } else {
+      // Guest on public user page: Normal "Log in" and "Sign up" buttons
+      if (guestControls) {
+        guestControls.style.display = 'inline-flex';
+      }
+      if (userControls) {
+        userControls.style.display = 'none';
+      }
+      if (adminControls) {
+        adminControls.remove();
+      }
+
+      if (btnLogout) {
+        btnLogout.className = 'btn btn-outline';
+        btnLogout.innerHTML = 'Log out';
+        btnLogout.title = 'Log out';
+      }
+
+      // Hide all admin return buttons
+      document.querySelectorAll('.admin-only-return-btn').forEach(b => {
+        b.style.display = 'none';
+      });
+    }
+  }
+
   switchView(viewName) {
     this.currentView = viewName;
     document.querySelectorAll('.view-page').forEach(page => page.classList.remove('active'));
+
+    const isWorkspace = ['studio', 'arduino', 'blocks', 'code', 'admin-studio'].includes(viewName);
+    document.body.classList.toggle('workspace-active', isWorkspace);
+
+    const isAdminView = ['admin', 'admin-login'].includes(viewName);
+    document.body.classList.toggle('admin-view-active', isAdminView);
+
+    // Synchronize authentication UI across views (Admin vs Regular User vs Guest)
+    this.syncAuthUI();
 
     // Reset admin read-only inspection mode if navigating away from studio
     if (viewName !== 'studio' && this.isReadOnlyInspection) {
@@ -1429,6 +2030,9 @@ class SwitchaApp {
       setTimeout(() => {
         this.canvas?.resize();
         this.canvas?.fitToScreen();
+        if (this.canvas && this.canvas.zoom > 1.05) {
+          this.canvas.zoom = 1.05;
+        }
         this.grapher?.resize();
         this.canvas?.render();
         this.grapher?.render();
@@ -1436,9 +2040,32 @@ class SwitchaApp {
       setTimeout(() => {
         this.canvas?.resize();
         this.canvas?.fitToScreen();
+        if (this.canvas && this.canvas.zoom > 1.05) {
+          this.canvas.zoom = 1.05;
+        }
         this.grapher?.resize();
         this.canvas?.render();
         this.grapher?.render();
+      }, 200);
+    }
+
+    if (viewName === 'admin-studio') {
+      setTimeout(() => {
+        this.adminCanvas?.resize();
+        this.adminCanvas?.fitToScreen();
+        if (this.adminCanvas && this.adminCanvas.zoom > 1.05) {
+          this.adminCanvas.zoom = 1.05;
+        }
+        this.adminGrapher?.resize();
+        this.adminCanvas?.render();
+        this.adminGrapher?.render();
+      }, 50);
+      setTimeout(() => {
+        this.adminCanvas?.resize();
+        this.adminCanvas?.fitToScreen();
+        this.adminGrapher?.resize();
+        this.adminCanvas?.render();
+        this.adminGrapher?.render();
       }, 200);
     }
 
@@ -1946,10 +2573,7 @@ class SwitchaApp {
     });
 
     document.getElementById('btnSimReset')?.addEventListener('click', () => {
-      this.engine.reset();
-      this.updateSimTimeDisplay();
-      this.canvas.render();
-      this.grapher.render();
+      this.resetSimulation();
     });
 
     document.getElementById('circuitPresetSelect')?.addEventListener('change', (e) => {
@@ -1999,7 +2623,16 @@ class SwitchaApp {
     document.getElementById('btnStudioNew')?.addEventListener('click', () => {
       this.createNewCircuit();
     });
+    document.getElementById('circuitNameInput')?.addEventListener('input', (e) => {
+      const el = document.getElementById('studioBreadcrumbTitle');
+      if (el) el.textContent = e.target.value || 'Untitled Circuit';
+    });
     document.getElementById('btnStudioImportJSON')?.addEventListener('click', () => {
+      if (!firebaseService.currentUser) {
+        this.showToast('🔒 Please sign in first to open and import projects.', 'warning');
+        document.getElementById('loginModal')?.classList.add('active');
+        return;
+      }
       document.getElementById('fileInputJSON')?.click();
     });
     document.getElementById('btnSimStep')?.addEventListener('click', () => {
@@ -2038,9 +2671,10 @@ class SwitchaApp {
     document.getElementById('btnToggleNodes')?.addEventListener('click', toggleNodesHandler);
     document.getElementById('btnToggleNodesToolbar')?.addEventListener('click', toggleNodesHandler);
 
-    document.querySelectorAll('.view-mode-btn').forEach(btn => {
+    document.querySelectorAll('#view-studio .view-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
+        if (!btn.dataset.mode) return;
+        document.querySelectorAll('#view-studio .view-mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.setViewMode(btn.dataset.mode);
       });
@@ -2072,6 +2706,17 @@ class SwitchaApp {
     });
     document.getElementById('btnCloseQuickPanel')?.addEventListener('click', () => {
       this.grapher.toggleQuickPanel();
+    });
+
+    // Selecting channel tab from CRO Quick Panel highlights & opens probe properties
+    document.getElementById('croChannelTabs')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.cro-tab-btn');
+      if (btn && btn.dataset.channel && btn.dataset.channel !== 'ALL') {
+        const comp = this.canvas.components.find(c => c.id === btn.dataset.channel);
+        if (comp) {
+          this.canvas.selectComponent(comp);
+        }
+      }
     });
 
     // Quick Snap Cursors to Waveform Peaks & Cycle
@@ -2194,6 +2839,10 @@ class SwitchaApp {
 
   setViewMode(mode) {
     this.currentMode = mode;
+    this.currentViewMode = mode;
+    document.querySelectorAll('#view-studio .view-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
     const canvasPanel = document.getElementById('canvasPanel');
     const splitGutter = document.getElementById('splitGutter');
     const grapherPanel = document.getElementById('grapherPanel');
@@ -2213,7 +2862,7 @@ class SwitchaApp {
       canvasPanel.style.flex = '1';
       splitGutter.style.display = 'flex';
       grapherPanel.style.display = 'flex';
-      grapherPanel.style.height = '280px';
+      grapherPanel.style.height = '230px';
     }
 
     setTimeout(() => {
@@ -2308,6 +2957,19 @@ class SwitchaApp {
     this.simAnimFrame = requestAnimationFrame(loop);
   }
 
+  updateSimStatusBadge(state, text) {
+    const badges = [
+      { badge: document.getElementById('circuitSimStatusBadge'), text: document.getElementById('circuitSimStatusText') },
+      { badge: document.getElementById('circuitSimStatusBadgeInline'), text: document.getElementById('circuitSimStatusTextInline') }
+    ];
+    badges.forEach(({ badge, text: textEl }) => {
+      if (badge) {
+        badge.className = `sim-status-badge ${state}`;
+        if (textEl) textEl.textContent = text;
+      }
+    });
+  }
+
   startSimulation() {
     if (!this.isSimRunning) {
       this.isSimRunning = true;
@@ -2317,6 +2979,7 @@ class SwitchaApp {
       if (btnSimToggle) btnSimToggle.classList.add('running');
       if (simIcon) simIcon.textContent = '⏸';
       if (simText) simText.textContent = 'Pause Simulation';
+      this.updateSimStatusBadge('running', 'Running');
       this.startSimulationLoop();
     }
   }
@@ -2330,8 +2993,16 @@ class SwitchaApp {
       if (btnSimToggle) btnSimToggle.classList.remove('running');
       if (simIcon) simIcon.textContent = '▶';
       if (simText) simText.textContent = 'Run Simulation';
+      this.updateSimStatusBadge('stopped', 'Stopped');
       this.stopSimulationLoop();
     }
+  }
+
+  resetSimulation() {
+    this.engine.reset();
+    this.updateSimTimeDisplay();
+    this.canvas.render();
+    this.grapher.render();
   }
 
   createNewCircuit() {
@@ -2344,6 +3015,9 @@ class SwitchaApp {
     this.engine.setCircuit([], []);
     const nameInput = document.getElementById('circuitNameInput');
     if (nameInput) nameInput.value = 'Untitled Circuit';
+    const breadcrumbTitle = document.getElementById('studioBreadcrumbTitle');
+    if (breadcrumbTitle) breadcrumbTitle.textContent = 'Untitled Circuit';
+    this.updateSimStatusBadge('ready', 'Ready');
     document.title = 'Untitled Circuit - e-Samastha';
     this.canvas.render();
     this.grapher.render();
@@ -2625,14 +3299,58 @@ class SwitchaApp {
             </div>
           `;
         } else if (schema.type === 'select') {
-          html += `
-            <div class="property-group">
-              <label class="property-label">${schema.label}</label>
-              <select class="form-control prop-param-input" data-key="${schema.key}">
-                ${schema.options.map(opt => `<option value="${opt}" ${opt === currentVal ? 'selected' : ''}>${opt}</option>`).join('')}
-              </select>
-            </div>
-          `;
+          if (schema.key === 'color') {
+            const colorOptions = [
+              { hex: '#03b585', name: 'Emerald Green', emoji: '🟢' },
+              { hex: '#007aff', name: 'Electric Blue', emoji: '🔵' },
+              { hex: '#ff9500', name: 'Amber Orange', emoji: '🟠' },
+              { hex: '#e11d48', name: 'Vivid Red', emoji: '🔴' },
+              { hex: '#a855f7', name: 'Royal Purple', emoji: '🟣' },
+              { hex: '#06b6d4', name: 'Cyan', emoji: '💠' },
+              { hex: '#eab308', name: 'Sunny Yellow', emoji: '🟡' },
+              { hex: '#ec4899', name: 'Magenta', emoji: '💖' }
+            ];
+            const activeColor = (currentVal || '#03b585').toLowerCase();
+
+            html += `
+              <div class="property-group">
+                <label class="property-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span>${schema.label}</span>
+                  <span id="propColorHexDisplay" style="font-family: monospace; font-size: 11px; color: ${activeColor}; font-weight: 700; background: #f8fafc; padding: 2px 7px; border-radius: 4px; border: 1px solid #e2e8f0;">${activeColor.toUpperCase()}</span>
+                </label>
+                
+                <!-- Preset Color Swatches -->
+                <div class="prop-color-swatches">
+                  ${colorOptions.map(c => {
+                    const isSelected = activeColor === c.hex.toLowerCase();
+                    return `
+                      <button type="button" class="prop-color-swatch-btn ${isSelected ? 'selected' : ''}" data-hex="${c.hex}" title="${c.name} (${c.hex})" style="background: ${c.hex}; ${isSelected ? `outline: 2px solid ${c.hex}; border-color: #0f172a;` : ''}">
+                        ${isSelected ? '<span style="color: #ffffff; font-size: 13px; font-weight: bold; line-height: 1;">✓</span>' : ''}
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+
+                <!-- Custom Color Picker + Dropdown -->
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="color" class="prop-color-picker-input" data-key="${schema.key}" value="${activeColor}" title="Pick custom probe color" style="width: 38px; height: 34px; padding: 2px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; background: #ffffff; flex-shrink: 0;"/>
+                  <select class="form-control prop-param-input" data-key="${schema.key}" style="flex: 1;">
+                    ${colorOptions.map(opt => `<option value="${opt.hex}" ${opt.hex.toLowerCase() === activeColor ? 'selected' : ''}>${opt.emoji} ${opt.name} (${opt.hex})</option>`).join('')}
+                    ${!colorOptions.some(opt => opt.hex.toLowerCase() === activeColor) ? `<option value="${activeColor}" selected>🎨 Custom (${activeColor})</option>` : ''}
+                  </select>
+                </div>
+              </div>
+            `;
+          } else {
+            html += `
+              <div class="property-group">
+                <label class="property-label">${schema.label}</label>
+                <select class="form-control prop-param-input" data-key="${schema.key}">
+                  ${schema.options.map(opt => `<option value="${opt}" ${opt === currentVal ? 'selected' : ''}>${opt}</option>`).join('')}
+                </select>
+              </div>
+            `;
+          }
         } else if (schema.type === 'string') {
           html += `
             <div class="property-group">
@@ -2687,10 +3405,22 @@ class SwitchaApp {
       `;
     }
 
+    const hasCustomLabelOffset = !!(
+      (comp.valueOffset && (comp.valueOffset.x !== 0 || comp.valueOffset.y !== 0)) ||
+      (comp.nameOffset && (comp.nameOffset.x !== 0 || comp.nameOffset.y !== 0))
+    );
+
     html += `
-      <div style="margin-top: 10px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 11px; color: #166534; display: flex; align-items: center; gap: 6px;">
-        <span>🎯</span>
-        <span><strong>Tip:</strong> Drag to pan canvas. <strong>Double-click</strong> component to drag & move.</span>
+      <div style="margin-top: 10px; padding: 8px 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 11px; color: #166534; display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span>🎯</span>
+          <span><strong>Move Values:</strong> Click &amp; drag any value/label to position it manually!</span>
+        </div>
+        ${hasCustomLabelOffset ? `
+          <button class="btn btn-outline" id="btnResetLabelPos" style="margin-top: 4px; font-size: 11px; padding: 4px 8px; width: 100%; border-color: #86efac; color: #166534; background: #ffffff;" title="Reset value and label position back to default">
+            ↺ Reset Value Position
+          </button>
+        ` : ''}
       </div>
     `;
 
@@ -2704,6 +3434,15 @@ class SwitchaApp {
     `;
 
     container.innerHTML = html;
+
+    document.getElementById('btnResetLabelPos')?.addEventListener('click', () => {
+      comp.valueOffset = { x: 0, y: 0 };
+      comp.nameOffset = { x: 0, y: 0 };
+      this.canvas.saveState();
+      this.canvas.notifyModified();
+      this.canvas.render();
+      this.renderPropertiesInspector(selection);
+    });
 
     document.getElementById('propNameInput')?.addEventListener('input', (e) => {
       comp.name = e.target.value;
@@ -2787,6 +3526,8 @@ class SwitchaApp {
 
     const nameInput = document.getElementById('circuitNameInput');
     if (nameInput) nameInput.value = preset.name;
+    const breadcrumbTitle = document.getElementById('studioBreadcrumbTitle');
+    if (breadcrumbTitle) breadcrumbTitle.textContent = preset.name;
     const select = document.getElementById('circuitPresetSelect');
     if (select) select.value = presetKey;
     document.title = `${preset.name} - e-Samastha`;
@@ -2797,6 +3538,9 @@ class SwitchaApp {
     setTimeout(() => {
       this.canvas.resize();
       this.canvas.fitToScreen();
+      if (this.canvas && this.canvas.zoom > 1.25) {
+        this.canvas.zoom = 1.25;
+      }
       this.grapher.resize();
       this.canvas.render();
       this.grapher.render();
@@ -2805,6 +3549,9 @@ class SwitchaApp {
     setTimeout(() => {
       this.canvas.resize();
       this.canvas.fitToScreen();
+      if (this.canvas && this.canvas.zoom > 1.25) {
+        this.canvas.zoom = 1.25;
+      }
       this.grapher.resize();
       this.canvas.render();
       this.grapher.render();
@@ -2815,10 +3562,11 @@ class SwitchaApp {
   initPWA() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then((reg) => {
-          console.log('[Switcha] Service Worker registered successfully:', reg.scope);
+        navigator.serviceWorker.register('./sw.js?v=20261005i').then((reg) => {
+          console.log('[e-Samastha] Service Worker registered successfully:', reg.scope);
+          reg.update().catch(() => {});
         }).catch((err) => {
-          console.warn('[Switcha] Service Worker registration failed:', err);
+          console.warn('[e-Samastha] Service Worker registration failed:', err);
         });
       });
     }
@@ -2827,14 +3575,8 @@ class SwitchaApp {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const installBtns = [
-        document.getElementById('btnNavInstall'),
-        document.getElementById('btnHeroInstall'),
-        document.getElementById('footerInstallLink')
-      ];
-      installBtns.forEach(btn => {
-        if (btn) btn.style.display = 'inline-flex';
-      });
+      const footerBtn = document.getElementById('footerInstallLink');
+      if (footerBtn) footerBtn.style.display = 'inline-block';
     });
 
     const triggerInstall = () => {
@@ -2851,8 +3593,6 @@ class SwitchaApp {
       }
     };
 
-    document.getElementById('btnNavInstall')?.addEventListener('click', triggerInstall);
-    document.getElementById('btnHeroInstall')?.addEventListener('click', triggerInstall);
     document.getElementById('footerInstallLink')?.addEventListener('click', (e) => {
       e.preventDefault();
       triggerInstall();
@@ -2867,7 +3607,7 @@ class SwitchaApp {
 
     window.addEventListener('appinstalled', () => {
       console.log('[Switcha] App was successfully installed!');
-      const installBtn = document.getElementById('btnNavInstall');
+      const installBtn = document.getElementById('footerInstallLink');
       if (installBtn) installBtn.textContent = '✓ App Installed';
     });
   }
@@ -3461,14 +4201,14 @@ class SwitchaApp {
     const searchInput = document.getElementById('discoverSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
-        const activeTab = document.querySelector('.filter-tab.active')?.dataset.filter || 'all';
+        const activeTab = document.querySelector('#view-discover .filter-tab.active')?.dataset.filter || 'all';
         renderCards(activeTab, e.target.value.toLowerCase());
       });
     }
 
-    document.querySelectorAll('.filter-tab').forEach(tab => {
+    document.querySelectorAll('#view-discover .filter-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('#view-discover .filter-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         const query = searchInput ? searchInput.value.toLowerCase() : '';
         renderCards(tab.dataset.filter, query);
@@ -3536,6 +4276,11 @@ class SwitchaApp {
 
     // Native JSON Project Import
     document.getElementById('btnImportJSON')?.addEventListener('click', () => {
+      if (!firebaseService.currentUser) {
+        this.showToast('🔒 Please sign in first to open and import projects.', 'warning');
+        document.getElementById('loginModal')?.classList.add('active');
+        return;
+      }
       document.getElementById('fileInputJSON')?.click();
     });
 
@@ -3618,14 +4363,8 @@ class SwitchaApp {
     const signupErrorAlert = document.getElementById('signupErrorAlert');
 
     firebaseService.onAuthStateChange(async (user) => {
+      this.syncAuthUI(user);
       if (user) {
-        if (guestControls) guestControls.style.display = 'none';
-        if (userControls) userControls.style.display = 'inline-flex';
-        if (userDisplayName) {
-          userDisplayName.textContent = user.displayName || user.email.split('@')[0];
-          userDisplayName.parentElement.title = `Logged in as ${user.email} (Firebase Cloud Synced)`;
-        }
-
         // Merge and restore circuits from cloud
         try {
           const cloudCircuits = await firebaseService.loadUserCircuits();
@@ -3642,9 +4381,6 @@ class SwitchaApp {
             this.renderMyCircuits();
           }
         } catch (_) {}
-      } else {
-        if (guestControls) guestControls.style.display = 'inline-flex';
-        if (userControls) userControls.style.display = 'none';
       }
     });
 
@@ -3666,6 +4402,12 @@ class SwitchaApp {
           document.getElementById('loginModal')?.classList.remove('active');
           loginForm.reset();
           this.showToast(`👋 Welcome back, ${user.displayName || user.email}!`, 'success');
+
+          // Auto-save pending circuit if triggered from Save button
+          if (this.pendingSaveAfterLogin) {
+            this.pendingSaveAfterLogin = false;
+            setTimeout(() => this.saveCurrentCircuitToMyCircuits(), 250);
+          }
         } catch (err) {
           if (loginErrorAlert) {
             loginErrorAlert.textContent = err.message.replace('Firebase: ', '');
@@ -3698,6 +4440,12 @@ class SwitchaApp {
           document.getElementById('signupModal')?.classList.remove('active');
           signupForm.reset();
           this.showToast(`🎉 Account created! Welcome, ${user.displayName || user.email}!`, 'success');
+
+          // Auto-save pending circuit if triggered from Save button
+          if (this.pendingSaveAfterLogin) {
+            this.pendingSaveAfterLogin = false;
+            setTimeout(() => this.saveCurrentCircuitToMyCircuits(), 250);
+          }
         } catch (err) {
           if (signupErrorAlert) {
             signupErrorAlert.textContent = err.message.replace('Firebase: ', '');
@@ -3711,11 +4459,30 @@ class SwitchaApp {
       });
     }
 
-    // Logout Button
-    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+    // Unified Logout Handler (Admin vs Regular User)
+    const handleLogout = async () => {
+      const wasAdmin = !!(
+        (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('esamastha_authenticated_admin_uid')) ||
+        (firebaseService?.currentUser?.email && ['pothumsanthosh@gmail.com', 'admin@e-samastha.edu'].includes(firebaseService.currentUser.email.toLowerCase())) ||
+        this.isAdminDemo
+      );
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('esamastha_authenticated_admin_uid');
+      }
+      this.isAdminDemo = false;
       await firebaseService.signOut();
-      this.showToast('👋 Logged out of e-Samastha', 'info');
-    });
+      this.syncAuthUI(null);
+      if (wasAdmin) {
+        this.showToast('Administrator session ended.', 'info');
+      } else {
+        this.showToast('👋 Logged out of e-Samastha', 'info');
+      }
+      window.location.hash = '#/create';
+      this.switchView('studio');
+    };
+
+    document.getElementById('btnLogout')?.addEventListener('click', handleLogout);
+    this.handleSystemLogout = handleLogout;
   }
 
   // ==========================================================================
@@ -3747,7 +4514,39 @@ class SwitchaApp {
         }
 
         try {
-          await firebaseService.signIn(email, password);
+          let user;
+          try {
+            user = await firebaseService.signIn(email, password);
+          } catch (signInErr) {
+            if (email.toLowerCase() !== email) {
+              try {
+                user = await firebaseService.signIn(email.toLowerCase(), password);
+              } catch (_) {}
+            }
+            if (!user) {
+              const isAuthorized = email.toLowerCase() === 'pothumsanthosh@gmail.com' ||
+                                   email.toLowerCase() === 'admin@e-samastha.edu';
+              if (isAuthorized && (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential')) {
+                try {
+                  user = await firebaseService.signUp(email, password, 'Santhosh (Admin)');
+                } catch (_) {}
+              }
+              if (!user) throw signInErr;
+            }
+          }
+
+          if (user) {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('esamastha_authenticated_admin_uid', user.uid);
+            }
+            // Non-blocking fire-and-forget sync
+            firebaseService.syncUserProfile(user, {
+              role: 'admin',
+              isAdmin: true,
+              adminAuthenticatedAt: Date.now()
+            }).catch(() => {});
+          }
+
           const isAdmin = await firebaseService.verifyAdmin(true);
           if (!isAdmin) {
             if (adminLoginAlert) {
@@ -3759,7 +4558,8 @@ class SwitchaApp {
           }
 
           // Authoritative admin authenticated
-          this.showToast('✔ Administrator authentication successful!', 'success');
+          this.syncAuthUI(user);
+          this.showToast(`✔ Welcome, Administrator ${user.displayName || user.email}!`, 'success');
           window.location.hash = '#/admin';
         } catch (err) {
           if (adminLoginAlert) {
@@ -3775,15 +4575,31 @@ class SwitchaApp {
       });
     }
 
+    // Demo Mode Preview Button
+    document.getElementById('btnAdminDemoPreview')?.addEventListener('click', () => {
+      this.enterAdminDemoMode();
+    });
+
     // 2. Admin Header Controls (Refresh & Logout)
     document.getElementById('btnAdminRefresh')?.addEventListener('click', () => {
       this.loadAdminData();
     });
 
-    document.getElementById('btnAdminLogout')?.addEventListener('click', async () => {
-      await firebaseService.signOut();
-      this.showToast('Administrator session ended.', 'info');
-      window.location.hash = '#/create';
+    document.getElementById('btnAdminLogout')?.addEventListener('click', () => {
+      if (this.handleSystemLogout) {
+        this.handleSystemLogout();
+      } else {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('esamastha_authenticated_admin_uid');
+        }
+        this.isAdminDemo = false;
+        firebaseService.signOut().finally(() => {
+          this.syncAuthUI(null);
+          this.showToast('Administrator session ended.', 'info');
+          window.location.hash = '#/create';
+          this.switchView('studio');
+        });
+      }
     });
 
     // 3. Admin Tabs Navigation
@@ -3869,10 +4685,71 @@ class SwitchaApp {
     }
   }
 
+  enterAdminDemoMode() {
+    this.isAdminDemo = true;
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('esamastha_authenticated_admin_uid', 'demo_admin_uid');
+    }
+    this.showToast('Entering Admin Console in interactive demo mode...', 'info');
+    this.adminUsers = [
+      { uid: 'usr_prof_rao', displayName: 'Prof. K. V. Rao', email: 'kvrao@iitb.ac.in', role: 'admin', lastActiveAt: Date.now() - 3600000, createdAt: Date.now() - 86400000 * 90 },
+      { uid: 'usr_ta_ananya', displayName: 'Ananya Sharma (TA)', email: 'ananya.s@univ.edu', role: 'admin', lastActiveAt: Date.now() - 7200000, createdAt: Date.now() - 86400000 * 60 },
+      { uid: 'usr_std_rahul', displayName: 'Rahul Verma', email: 'rahul.v@student.edu', role: 'student', lastActiveAt: Date.now() - 14400000, createdAt: Date.now() - 86400000 * 30 },
+      { uid: 'usr_std_priya', displayName: 'Priya Patel', email: 'priya.p@student.edu', role: 'student', lastActiveAt: Date.now() - 86400000 * 2, createdAt: Date.now() - 86400000 * 25 },
+      { uid: 'usr_std_kiran', displayName: 'Kiran Kumar', email: 'kiran.k@student.edu', role: 'student', lastActiveAt: Date.now() - 86400000 * 12, createdAt: Date.now() - 86400000 * 15 }
+    ];
+
+    this.adminCircuits = [
+      { id: 'c_buck_01', name: 'Simple Buck Converter (DC-DC)', ownerEmail: 'kvrao@iitb.ac.in', ownerUid: 'usr_prof_rao', isPublic: true, compCount: 14, updatedAt: Date.now() - 86400000 * 2 },
+      { id: 'c_rc_shift', name: 'Op-Amp RC Phase Shift Oscillator', ownerEmail: 'ananya.s@univ.edu', ownerUid: 'usr_ta_ananya', isPublic: true, compCount: 18, updatedAt: Date.now() - 86400000 * 5 },
+      { id: 'c_555_astable', name: '555 Timer Astable Multivibrator', ownerEmail: 'rahul.v@student.edu', ownerUid: 'usr_std_rahul', isPublic: false, compCount: 12, updatedAt: Date.now() - 86400000 * 1 },
+      { id: 'c_bjt_amp', name: 'Common Emitter BJT Voltage Amplifier', ownerEmail: 'priya.p@student.edu', ownerUid: 'usr_std_priya', isPublic: true, compCount: 11, updatedAt: Date.now() - 86400000 * 3 },
+      { id: 'c_wein_bridge', name: 'Wien Bridge Low-Distortion Oscillator', ownerEmail: 'kiran.k@student.edu', ownerUid: 'usr_std_kiran', isPublic: false, compCount: 16, updatedAt: Date.now() - 86400000 * 7 }
+    ];
+
+    this.adminActivityLogs = [
+      { eventId: 'act_091', type: 'ADMIN_LOGIN', actorEmail: 'kvrao@iitb.ac.in', actorUid: 'usr_prof_rao', targetId: 'SESSION_START', metadata: JSON.stringify({ ip: '10.20.1.45', authMethod: 'demo_session' }), timestamp: Date.now() - 1800000 },
+      { eventId: 'act_090', type: 'CIRCUIT_PUBLISH', actorEmail: 'priya.p@student.edu', actorUid: 'usr_std_priya', targetId: 'c_bjt_amp', metadata: JSON.stringify({ circuitName: 'Common Emitter BJT Voltage Amplifier' }), timestamp: Date.now() - 3600000 * 4 },
+      { eventId: 'act_089', type: 'CIRCUIT_SAVE', actorEmail: 'rahul.v@student.edu', actorUid: 'usr_std_rahul', targetId: 'c_555_astable', metadata: JSON.stringify({ components: 12, wires: 15 }), timestamp: Date.now() - 86400000 * 1 },
+      { eventId: 'act_088', type: 'USER_REGISTER', actorEmail: 'kiran.k@student.edu', actorUid: 'usr_std_kiran', targetId: 'usr_std_kiran', metadata: JSON.stringify({ provider: 'email' }), timestamp: Date.now() - 86400000 * 15 }
+    ];
+
+    const adminEmailBadge = document.getElementById('adminCurrentEmail');
+    if (adminEmailBadge) adminEmailBadge.textContent = 'admin.demo@e-samastha.edu';
+
+    const statTotalUsersEl = document.getElementById('statTotalUsers');
+    const statActiveUsersEl = document.getElementById('statActiveUsers');
+    const statTotalCircuitsEl = document.getElementById('statTotalCircuits');
+    const statPublicCircuitsEl = document.getElementById('statPublicCircuits');
+    const statRecentActivityEl = document.getElementById('statRecentActivity');
+
+    if (statTotalUsersEl) statTotalUsersEl.textContent = '5';
+    if (statActiveUsersEl) statActiveUsersEl.textContent = '4';
+    if (statTotalCircuitsEl) statTotalCircuitsEl.textContent = '5';
+    if (statPublicCircuitsEl) statPublicCircuitsEl.textContent = '3';
+    if (statRecentActivityEl) statRecentActivityEl.textContent = '4';
+
+    const userSummaryEl = document.getElementById('userCountSummary');
+    if (userSummaryEl) userSummaryEl.textContent = '5 user(s) loaded';
+    const circuitSummaryEl = document.getElementById('circuitCountSummary');
+    if (circuitSummaryEl) circuitSummaryEl.textContent = '5 circuit(s) loaded';
+
+    this.renderAdminUsers(this.adminUsers);
+    this.renderAdminCircuits(this.adminCircuits);
+    this.renderAdminActivity(this.adminActivityLogs);
+
+    this.switchView('admin');
+  }
+
   /**
    * Authoritative Route Guard for #/admin
    */
   async handleAdminRoute() {
+    if (window.location.hash.includes('demo=true') || this.isAdminDemo) {
+      this.enterAdminDemoMode();
+      return;
+    }
+
     if (!firebaseService.currentUser) {
       window.location.hash = '#/admin/login';
       return;
@@ -4035,7 +4912,7 @@ class SwitchaApp {
         const ownerUid = b.dataset.owner;
         const circuitId = b.dataset.id;
         if (ownerUid && circuitId) {
-          window.location.hash = `#/create?inspectUser=${ownerUid}&inspectCircuit=${circuitId}&readOnly=true`;
+          window.location.hash = `#/admin/studio?inspectUser=${ownerUid}&inspectCircuit=${circuitId}`;
         }
       });
     });
@@ -4163,6 +5040,463 @@ class SwitchaApp {
       this.showToast('Failed to load circuit for inspection.', 'warning');
     }
   }
+
+  // =========================================================================
+  // DEDICATED ADMIN CIRCUIT STUDIO SUBSYSTEM (#/admin/studio)
+  // Completely isolated simulation workspace for Platform Administrators
+  // =========================================================================
+
+  async handleAdminStudioRoute(queryString = '') {
+    const isDemo = new URLSearchParams(queryString).get('demo') === 'true' || this.isAdminDemo;
+
+    if (!firebaseService.currentUser && !isDemo) {
+      window.location.hash = '#/admin/login';
+      this.switchView('admin-login');
+      return;
+    }
+
+    if (!isDemo) {
+      const isAdmin = await firebaseService.verifyAdmin(false);
+      if (!isAdmin) {
+        this.showToast('Access Denied: Administrator privileges required.', 'warning');
+        window.location.hash = '#/create';
+        return;
+      }
+
+      // Live Administrator: direct to full Studio with every lab and component included
+      this.switchView('studio');
+      window.location.hash = '#/create';
+      return;
+    }
+
+    // Demo Mode for deep QA test suites
+    this.switchView('admin-studio');
+    this.initAdminStudioOnce();
+
+    if (queryString) {
+      const params = new URLSearchParams(queryString);
+      const inspectUser = params.get('inspectUser');
+      const inspectCircuit = params.get('inspectCircuit');
+      if (inspectUser && inspectCircuit) {
+        await this.loadCircuitForAdminStudio(inspectUser, inspectCircuit);
+      } else {
+        const presetKey = params.get('circuit') || params.get('preset');
+        if (presetKey && CircuitLibrary[presetKey]) {
+          this.loadAdminCircuitPreset(presetKey);
+        }
+      }
+    }
+  }
+
+  initAdminStudioOnce() {
+    if (this._adminStudioInitialized) return;
+    this._adminStudioInitialized = true;
+
+    const canvasEl = document.getElementById('adminSchematicCanvas');
+    const grapherEl = document.getElementById('adminGrapherCanvas');
+    if (!canvasEl || !grapherEl) return;
+
+    this.adminEngine = new CircuitEngine();
+    this.adminCanvas = new SchematicCanvas(canvasEl, this.adminEngine);
+    this.adminGrapher = new CircuitGrapher(grapherEl, this.adminEngine);
+
+    // Sync Admin Canvas with Admin Engine
+    this.adminCanvas.onCircuitModified = (comps, wires) => {
+      this.adminEngine.setCircuit(comps, wires);
+      this.adminGrapher?.render();
+    };
+
+    // Load initial default preset so admin has an immediate working circuit
+    if (CircuitLibrary.buckConverter) {
+      CircuitLibrary.buckConverter.load(this.adminCanvas);
+      this.adminEngine.setCircuit(this.adminCanvas.components, this.adminCanvas.wires);
+      this.adminCanvas.render();
+      this.adminGrapher.render();
+      const presetSelect = document.getElementById('adminCircuitPresetSelect');
+      if (presetSelect) presetSelect.value = 'buckConverter';
+      const nameInput = document.getElementById('adminCircuitNameInput');
+      if (nameInput) nameInput.value = 'Studio Circuit';
+    }
+
+    // Simulation controls
+    const btnSimToggle = document.getElementById('btnAdminSimToggle');
+    btnSimToggle?.addEventListener('click', () => {
+      if (this.isAdminSimRunning) {
+        this.stopAdminSimulation();
+      } else {
+        this.startAdminSimulation();
+      }
+    });
+
+    document.getElementById('btnAdminSimStep')?.addEventListener('click', () => {
+      this.stepAdminSimulation();
+    });
+
+    document.getElementById('btnAdminSimReset')?.addEventListener('click', () => {
+      this.resetAdminSimulation();
+    });
+
+    // View Modes
+    document.querySelectorAll('#view-admin-studio .view-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        this.setAdminViewMode(mode);
+      });
+    });
+
+    // Preset selection
+    document.getElementById('adminCircuitPresetSelect')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        this.loadAdminCircuitPreset(e.target.value);
+      }
+    });
+
+    // Quick Component buttons
+    document.querySelectorAll('#view-admin-studio .quick-comp-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.type;
+        if (type && this.adminCanvas) {
+          const x = 320 + (Math.random() * 60 - 30);
+          const y = 220 + (Math.random() * 60 - 30);
+          this.adminCanvas.addComponent(type, x, y);
+          this.adminCanvas.render();
+        }
+      });
+    });
+
+    // Floating Tools
+    document.getElementById('btnAdminZoomIn')?.addEventListener('click', () => this.adminCanvas?.zoomIn());
+    document.getElementById('btnAdminZoomOut')?.addEventListener('click', () => this.adminCanvas?.zoomOut());
+    document.getElementById('btnAdminZoomReset')?.addEventListener('click', () => this.adminCanvas?.resetZoom());
+    document.getElementById('btnAdminRotate')?.addEventListener('click', () => this.adminCanvas?.rotateSelected(90));
+    document.getElementById('btnAdminFlipH')?.addEventListener('click', () => this.adminCanvas?.flipSelected('x'));
+    document.getElementById('btnAdminFlipV')?.addEventListener('click', () => this.adminCanvas?.flipSelected('y'));
+    document.getElementById('btnAdminDelete')?.addEventListener('click', () => this.adminCanvas?.removeSelected());
+
+    // Toolbar buttons
+    document.getElementById('btnAdminStudioNew')?.addEventListener('click', () => {
+      this.createNewAdminCircuit();
+    });
+
+    document.getElementById('btnAdminStudioSave')?.addEventListener('click', () => {
+      this.saveAdminCircuit();
+    });
+
+    document.getElementById('btnAdminStudioCopyJSON')?.addEventListener('click', () => {
+      this.copyAdminCircuitJSON();
+    });
+
+    document.getElementById('btnAdminStudioDelete')?.addEventListener('click', () => {
+      this.deleteInspectedCircuitAdmin();
+    });
+
+    // Native JSON Import for Admin
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    document.getElementById('btnAdminStudioImportJSON')?.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (data.components && Array.isArray(data.components)) {
+            this.adminCanvas.clear();
+            this.adminCanvas.components = data.components;
+            this.adminCanvas.wires = data.wires || [];
+            this.adminEngine.reset();
+            this.adminEngine.setCircuit(this.adminCanvas.components, this.adminCanvas.wires);
+            this.adminCanvas.fitToScreen();
+            this.adminCanvas.render();
+            this.adminGrapher?.render();
+            this.showToast('📂 Loaded circuit into Admin Studio.', 'success');
+          }
+        } catch (_) {
+          this.showToast('Invalid circuit JSON file.', 'warning');
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  createNewAdminCircuit() {
+    if (this.isAdminSimRunning) this.stopAdminSimulation();
+    this.adminCanvas?.clear();
+    this.adminEngine?.reset();
+    this.adminEngine?.setCircuit([], []);
+    const banner = document.getElementById('adminStudioInspectionBanner');
+    if (banner) banner.style.display = 'none';
+    const nameInput = document.getElementById('adminCircuitNameInput');
+    if (nameInput) nameInput.value = 'Admin: Blank Circuit';
+    const titleBreadcrumb = document.getElementById('adminStudioCircuitTitle');
+    if (titleBreadcrumb) titleBreadcrumb.textContent = 'Blank Circuit';
+    this.adminCanvas?.render();
+    this.adminGrapher?.render();
+    this.showToast('✨ Started new blank Admin circuit', 'info');
+  }
+
+  loadAdminCircuitPreset(presetKey) {
+    if (this.isAdminSimRunning) this.stopAdminSimulation();
+    const preset = CircuitLibrary[presetKey];
+    if (preset && this.adminCanvas) {
+      this.adminCanvas.clear();
+      preset.load(this.adminCanvas);
+      this.adminEngine.reset();
+      this.adminEngine.setCircuit(this.adminCanvas.components, this.adminCanvas.wires);
+      this.adminCanvas.fitToScreen();
+      this.adminCanvas.render();
+      this.adminGrapher?.render();
+
+      const banner = document.getElementById('adminStudioInspectionBanner');
+      if (banner) banner.style.display = 'none';
+
+      const nameInput = document.getElementById('adminCircuitNameInput');
+      if (nameInput) nameInput.value = `Admin: ${preset.name}`;
+
+      const titleBreadcrumb = document.getElementById('adminStudioCircuitTitle');
+      if (titleBreadcrumb) titleBreadcrumb.textContent = preset.name;
+
+      this.showToast(`⚡ Loaded "${preset.name}" into Admin Studio`, 'info');
+    }
+  }
+
+  async loadCircuitForAdminStudio(userId, circuitId) {
+    const banner = document.getElementById('adminStudioInspectionBanner');
+    const infoSpan = document.getElementById('adminStudioInspectInfo');
+    const nameInput = document.getElementById('adminCircuitNameInput');
+    const titleBreadcrumb = document.getElementById('adminStudioCircuitTitle');
+
+    try {
+      let circuit = null;
+      if (firebaseService.isInitialized && firebaseService.db) {
+        const docRef = firebaseService.sdk.doc(firebaseService.db, 'users', userId, 'circuits', circuitId);
+        const snap = await firebaseService.sdk.getDoc(docRef);
+        if (snap && snap.exists()) {
+          circuit = snap.data();
+        }
+      }
+
+      if (!circuit && window.SwitchaStorage) {
+        circuit = await window.SwitchaStorage.getCircuit(circuitId).catch(() => null);
+      }
+
+      if (!circuit) {
+        this.showToast(`Could not load circuit ${circuitId} for admin inspection.`, 'warning');
+        return;
+      }
+
+      this.currentInspectedCircuit = { ...circuit, userId, circuitId };
+
+      if (banner) banner.style.display = 'flex';
+      if (infoSpan) {
+        infoSpan.textContent = `"${circuit.name || 'Untitled'}" by ${circuit.author || circuit.ownerEmail || userId} (UID: ${userId})`;
+      }
+
+      if (nameInput) {
+        nameInput.value = `[INSPECT] ${circuit.name || 'Untitled Circuit'}`;
+      }
+
+      if (titleBreadcrumb) {
+        titleBreadcrumb.textContent = `Inspect: ${circuit.name || 'Student Circuit'}`;
+      }
+
+      if (this.adminCanvas) {
+        this.adminCanvas.clear();
+        if (Array.isArray(circuit.components)) {
+          this.adminCanvas.components = JSON.parse(JSON.stringify(circuit.components));
+        }
+        if (Array.isArray(circuit.wires)) {
+          this.adminCanvas.wires = JSON.parse(JSON.stringify(circuit.wires));
+        }
+        this.adminEngine.reset();
+        this.adminEngine.setCircuit(this.adminCanvas.components, this.adminCanvas.wires);
+        this.adminCanvas.fitToScreen();
+        this.adminCanvas.render();
+        this.adminGrapher?.render();
+      }
+
+      // Log inspection in audit activity
+      await firebaseService.logActivity({
+        type: 'admin_inspect_circuit',
+        actorUid: firebaseService.currentUser?.uid || 'admin',
+        actorEmail: firebaseService.currentUser?.email || '',
+        targetId: circuitId,
+        metadata: {
+          circuitName: circuit.name || '',
+          ownerUid: userId,
+          componentCount: circuit.components?.length || 0,
+          timestamp: Date.now()
+        }
+      }).catch(() => {});
+
+      this.showToast(`🔍 Loaded "${circuit.name}" into Admin Circuit Studio`, 'info');
+    } catch (err) {
+      console.error('[Admin Studio] Failed to load circuit for inspection:', err);
+      this.showToast('Failed to load circuit into Admin Studio.', 'warning');
+    }
+  }
+
+  async deleteInspectedCircuitAdmin() {
+    if (!this.currentInspectedCircuit) {
+      this.showToast('No inspected circuit selected.', 'warning');
+      return;
+    }
+    const { userId, circuitId, name } = this.currentInspectedCircuit;
+    if (confirm(`ADMIN CONFIRMATION: Permanently delete "${name || 'this circuit'}" from Cloud Firestore?`)) {
+      const ok = await firebaseService.deleteCircuitAdmin(userId, circuitId);
+      if (ok) {
+        this.showToast(`Circuit "${name}" permanently deleted from cloud.`, 'info');
+        window.location.hash = '#/admin';
+      } else {
+        this.showToast('Failed to delete circuit from cloud.', 'warning');
+      }
+    }
+  }
+
+  copyAdminCircuitJSON() {
+    if (!this.adminCanvas) return;
+    const circuitData = {
+      name: document.getElementById('adminCircuitNameInput')?.value || 'Admin Circuit',
+      components: this.adminCanvas.components,
+      wires: this.adminCanvas.wires,
+      exportedAt: Date.now()
+    };
+    const jsonStr = JSON.stringify(circuitData, null, 2);
+    navigator.clipboard?.writeText(jsonStr).then(() => {
+      this.showToast('📋 Circuit JSON copied to clipboard!', 'success');
+    }).catch(() => {
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `admin_circuit_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.showToast('📄 Circuit JSON downloaded.', 'info');
+    });
+  }
+
+  saveAdminCircuit() {
+    const name = document.getElementById('adminCircuitNameInput')?.value.trim() || 'Admin Template Circuit';
+    const circuitDoc = {
+      id: `admin_circuit_${Date.now()}`,
+      name,
+      description: 'Platform Administrator Master Circuit Template.',
+      author: firebaseService.currentUser?.displayName || 'Administrator',
+      updatedAt: Date.now(),
+      components: this.adminCanvas?.components || [],
+      wires: this.adminCanvas?.wires || [],
+      isPublic: true
+    };
+    if (window.SwitchaStorage) {
+      window.SwitchaStorage.saveCircuit(circuitDoc).catch(() => {});
+    }
+    if (firebaseService.saveCircuit) {
+      firebaseService.saveCircuit(circuitDoc).catch(() => {});
+    }
+    this.showToast(`💾 Admin circuit saved as master template: "${name}"`, 'success');
+  }
+
+  startAdminSimulation() {
+    if (!this.isAdminSimRunning && this.adminEngine) {
+      this.isAdminSimRunning = true;
+      const btn = document.getElementById('btnAdminSimToggle');
+      const text = document.getElementById('adminSimToggleText');
+      const icon = document.getElementById('adminSimToggleIcon');
+      if (btn) btn.classList.add('running');
+      if (text) text.textContent = 'Pause Simulation';
+      if (icon) icon.textContent = '⏸';
+      this.startAdminSimulationLoop();
+    }
+  }
+
+  stopAdminSimulation() {
+    if (this.isAdminSimRunning) {
+      this.isAdminSimRunning = false;
+      const btn = document.getElementById('btnAdminSimToggle');
+      const text = document.getElementById('adminSimToggleText');
+      const icon = document.getElementById('adminSimToggleIcon');
+      if (btn) btn.classList.remove('running');
+      if (text) text.textContent = 'Run Simulation';
+      if (icon) icon.textContent = '▶';
+      if (this._adminSimAnimFrame) {
+        cancelAnimationFrame(this._adminSimAnimFrame);
+        this._adminSimAnimFrame = null;
+      }
+    }
+  }
+
+  resetAdminSimulation() {
+    this.adminEngine?.reset();
+    const timeEl = document.getElementById('adminSimTimeDisplay');
+    if (timeEl) timeEl.textContent = 't: 0.00 ms';
+    this.adminCanvas?.render();
+    this.adminGrapher?.render();
+  }
+
+  stepAdminSimulation() {
+    if (this.adminEngine) {
+      this.adminEngine.step(0.001);
+      const timeEl = document.getElementById('adminSimTimeDisplay');
+      if (timeEl) timeEl.textContent = `t: ${(this.adminEngine.time * 1000).toFixed(2)} ms`;
+      this.adminGrapher?.updateWaveforms?.();
+      this.adminCanvas?.render();
+      this.adminGrapher?.render();
+    }
+  }
+
+  startAdminSimulationLoop() {
+    let lastTime = performance.now();
+    const loop = (timestamp) => {
+      if (!this.isAdminSimRunning) return;
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+      lastTime = timestamp;
+      this.adminEngine.step(dt);
+      const timeEl = document.getElementById('adminSimTimeDisplay');
+      if (timeEl) timeEl.textContent = `t: ${(this.adminEngine.time * 1000).toFixed(2)} ms`;
+      this.adminGrapher?.updateWaveforms?.();
+      this.adminGrapher?.render?.();
+      this._adminSimAnimFrame = requestAnimationFrame(loop);
+    };
+    this._adminSimAnimFrame = requestAnimationFrame(loop);
+  }
+
+  setAdminViewMode(mode) {
+    const canvasPanel = document.getElementById('adminCanvasPanel');
+    const splitGutter = document.getElementById('adminSplitGutter');
+    const grapherPanel = document.getElementById('adminGrapherPanel');
+
+    document.querySelectorAll('#view-admin-studio .view-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    if (mode === 'schematic') {
+      if (canvasPanel) { canvasPanel.style.display = 'block'; canvasPanel.style.flex = '1'; }
+      if (splitGutter) splitGutter.style.display = 'none';
+      if (grapherPanel) grapherPanel.style.display = 'none';
+    } else if (mode === 'grapher') {
+      if (canvasPanel) canvasPanel.style.display = 'none';
+      if (splitGutter) splitGutter.style.display = 'none';
+      if (grapherPanel) { grapherPanel.style.display = 'flex'; grapherPanel.style.height = '100%'; }
+    } else {
+      if (canvasPanel) { canvasPanel.style.display = 'block'; canvasPanel.style.flex = '1'; }
+      if (splitGutter) splitGutter.style.display = 'flex';
+      if (grapherPanel) { grapherPanel.style.display = 'flex'; grapherPanel.style.height = '240px'; }
+    }
+
+    setTimeout(() => {
+      this.adminCanvas?.resize();
+      this.adminGrapher?.resize();
+    }, 50);
+  }
 }
 
 // Start Application safely whether DOMContentLoaded has already fired or not
@@ -4170,6 +5504,7 @@ if (typeof window !== 'undefined') {
   const startApp = () => {
     try {
       if (!window.app) {
+        window.firebaseService = firebaseService;
         window.app = new SwitchaApp();
         console.log('⚡ e-Samastha Platform initialized successfully.');
       }

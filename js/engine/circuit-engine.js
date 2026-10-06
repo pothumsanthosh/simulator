@@ -85,8 +85,6 @@ export class CircuitEngine {
       else if (comp.type === ComponentTypes.POWER_NEG12V) netTag = '-12V';
       else if (comp.type === ComponentTypes.POWER_15V) netTag = '+15V';
       else if (comp.type === ComponentTypes.POWER_NEG15V) netTag = '-15V';
-      else if (comp.type === ComponentTypes.POWER_VDD) netTag = 'VDD';
-      else if (comp.type === ComponentTypes.POWER_VSS) netTag = 'VSS';
       else if (comp.type === ComponentTypes.NET_LABEL && comp.params?.label) {
         netTag = comp.params.label.trim().toUpperCase();
       }
@@ -346,24 +344,15 @@ export class CircuitEngine {
         case ComponentTypes.POWER_NEG12V:
         case ComponentTypes.POWER_15V:
         case ComponentTypes.POWER_NEG15V:
-        case ComponentTypes.POWER_VDD:
-        case ComponentTypes.POWER_VSS:
         case ComponentTypes.OPAMP:
         case ComponentTypes.COMPARATOR:
         case ComponentTypes.SCHMITT_TRIGGER:
         case ComponentTypes.ANALOG_MULTIPLIER:
         case ComponentTypes.SAMPLE_AND_HOLD:
         case ComponentTypes.LM7805:
-        case ComponentTypes.LM7809:
         case ComponentTypes.LM7812:
-        case ComponentTypes.LM7815:
-        case ComponentTypes.LM7905:
         case ComponentTypes.LM7912:
-        case ComponentTypes.LM7915:
         case ComponentTypes.LM317:
-        case ComponentTypes.LM337:
-        case ComponentTypes.LM1117_33:
-        case ComponentTypes.TL431:
         case ComponentTypes.AND_GATE:
         case ComponentTypes.OR_GATE:
         case ComponentTypes.NOT_GATE:
@@ -596,32 +585,8 @@ export class CircuitEngine {
             const n2b = this.getNode(comp, 'l2_p2');
             const l1 = Math.max(p.l1 || 1e-3, 1e-12);
             const l2 = Math.max(p.l2 || 1e-3, 1e-12);
-            const k = Math.min(Math.max(p.coupling ?? 0.95, -0.999), 0.999);
-            const m = k * Math.sqrt(l1 * l2);
-            const detL = Math.max(l1 * l2 - m * m, 1e-24);
-
-            const gamma11 = l2 / detL;
-            const gamma12 = -m / detL;
-            const gamma22 = l1 / detL;
-
-            const g11 = gamma11 * dt;
-            const g12 = gamma12 * dt;
-            const g22 = gamma22 * dt;
-
-            let state = this.internalStates.get(comp.id);
-            if (!state) {
-              state = { i1: 0, i2: 0 };
-              this.internalStates.set(comp.id, state);
-            }
-
-            stampConductance(n1a, n1b, g11);
-            stampConductance(n2a, n2b, g22);
-
-            const v1 = (n1a > 0 && n1a < numNodes ? getNodeV(n1a) : 0) - (n1b > 0 && n1b < numNodes ? getNodeV(n1b) : 0);
-            const v2 = (n2a > 0 && n2a < numNodes ? getNodeV(n2a) : 0) - (n2b > 0 && n2b < numNodes ? getNodeV(n2b) : 0);
-
-            stampCurrentSource(n1a, n1b, state.i1 + g12 * v2);
-            stampCurrentSource(n2a, n2b, state.i2 + g12 * v1);
+            stampConductance(n1a, n1b, dt / l1);
+            stampConductance(n2a, n2b, dt / l2);
             break;
           }
 
@@ -681,8 +646,6 @@ export class CircuitEngine {
           }
 
           case ComponentTypes.POWER_VCC:
-          case ComponentTypes.POWER_VDD:
-          case ComponentTypes.POWER_VSS:
           case ComponentTypes.POWER_5V:
           case ComponentTypes.POWER_12V:
           case ComponentTypes.POWER_NEG12V:
@@ -690,8 +653,7 @@ export class CircuitEngine {
           case ComponentTypes.POWER_NEG15V: {
             const nPos = this.getNode(comp, 'p1');
             let v = p.voltage ?? 5;
-            if (comp.type === ComponentTypes.POWER_VSS) v = p.voltage ?? 0;
-            else if (comp.type === ComponentTypes.POWER_12V) v = 12;
+            if (comp.type === ComponentTypes.POWER_12V) v = 12;
             else if (comp.type === ComponentTypes.POWER_NEG12V) v = -12;
             else if (comp.type === ComponentTypes.POWER_15V) v = 15;
             else if (comp.type === ComponentTypes.POWER_NEG15V) v = -15;
@@ -1549,31 +1511,19 @@ export class CircuitEngine {
 
           // --- VOLTAGE REGULATORS ---
           case ComponentTypes.LM7805:
-          case ComponentTypes.LM7809:
           case ComponentTypes.LM7812:
-          case ComponentTypes.LM7815:
-          case ComponentTypes.LM7905:
-          case ComponentTypes.LM7912:
-          case ComponentTypes.LM7915:
-          case ComponentTypes.LM1117_33: {
+          case ComponentTypes.LM7912: {
             const nIn = this.getNode(comp, 'in');
             const nGnd = this.getNode(comp, 'gnd');
             const nOut = this.getNode(comp, 'out');
             let vNom = p.vOut || 5.0;
-            let vDrop = p.vDropMin ?? 1.5;
-
-            if (comp.type === ComponentTypes.LM7809) vNom = 9.0;
-            else if (comp.type === ComponentTypes.LM7812) vNom = 12.0;
-            else if (comp.type === ComponentTypes.LM7815) vNom = 15.0;
-            else if (comp.type === ComponentTypes.LM7905) vNom = -5.0;
-            else if (comp.type === ComponentTypes.LM7912) vNom = -12.0;
-            else if (comp.type === ComponentTypes.LM7915) vNom = -15.0;
-            else if (comp.type === ComponentTypes.LM1117_33) { vNom = 3.3; vDrop = 1.1; }
+            if (comp.type === ComponentTypes.LM7812) vNom = 12.0;
+            if (comp.type === ComponentTypes.LM7912) vNom = -12.0;
 
             const vIn = getNodeV(nIn) - getNodeV(nGnd);
             let outV = vNom;
-            if (vNom > 0 && vIn < vNom + vDrop) outV = Math.max(vIn - vDrop, 0);
-            if (vNom < 0 && vIn > vNom - vDrop) outV = Math.min(vIn + vDrop, 0);
+            if (vNom > 0 && vIn < vNom + 1.5) outV = Math.max(vIn - 1.5, 0);
+            if (vNom < 0 && vIn > vNom - 1.5) outV = Math.min(vIn + 1.5, 0);
 
             stampVSourceEquation(vSrcEquationIdx++, nOut, nGnd, outV);
             break;
@@ -1588,26 +1538,6 @@ export class CircuitEngine {
             let targetV = getNodeV(nAdj) + vRef;
             if (vIn < vRef + 1.5) targetV = Math.max(getNodeV(nIn) - 1.5, 0);
             stampVSourceEquation(vSrcEquationIdx++, nOut, 0, targetV);
-            break;
-          }
-
-          case ComponentTypes.LM337: {
-            const nIn = this.getNode(comp, 'in');
-            const nAdj = this.getNode(comp, 'adj');
-            const nOut = this.getNode(comp, 'out');
-            const vRef = p.vRef || -1.25;
-            const vIn = getNodeV(nIn) - getNodeV(nAdj);
-            let targetV = getNodeV(nAdj) + vRef;
-            if (vIn > vRef - 1.5) targetV = Math.min(getNodeV(nIn) + 1.5, 0);
-            stampVSourceEquation(vSrcEquationIdx++, nOut, 0, targetV);
-            break;
-          }
-
-          case ComponentTypes.TL431: {
-            const nA = this.getNode(comp, 'anode');
-            const nK = this.getNode(comp, 'cathode');
-            const vRefNom = p.vRef || 2.495;
-            stampVSourceEquation(vSrcEquationIdx++, nK, nA, vRefNom);
             break;
           }
 
@@ -2159,46 +2089,9 @@ export class CircuitEngine {
         const n1 = this.getNode(comp, 'p1');
         const n2 = this.getNode(comp, 'p2');
         const l = Math.max(comp.params?.inductance || 1e-3, 1e-12);
-        const v1 = (n1 > 0 && n1 < numNodes) ? (this.nodeVoltages[n1] || 0) : 0;
-        const v2 = (n2 > 0 && n2 < numNodes) ? (this.nodeVoltages[n2] || 0) : 0;
-        const vL = v1 - v2;
+        const vL = this.nodeVoltages[n1] - this.nodeVoltages[n2];
         const state = this.internalStates.get(comp.id) || { current: 0 };
-        if (isFinite(vL) && isFinite(dt) && isFinite(l)) {
-          state.current += (vL * dt) / l;
-        }
-        this.internalStates.set(comp.id, state);
-      } else if (comp.type === ComponentTypes.COUPLED_INDUCTOR) {
-        const n1a = this.getNode(comp, 'l1_p1');
-        const n1b = this.getNode(comp, 'l1_p2');
-        const n2a = this.getNode(comp, 'l2_p1');
-        const n2b = this.getNode(comp, 'l2_p2');
-        const l1 = Math.max(comp.params?.l1 || 1e-3, 1e-12);
-        const l2 = Math.max(comp.params?.l2 || 1e-3, 1e-12);
-        const k = Math.min(Math.max(comp.params?.coupling ?? 0.95, -0.999), 0.999);
-        const m = k * Math.sqrt(l1 * l2);
-        const detL = Math.max(l1 * l2 - m * m, 1e-24);
-        const gamma11 = l2 / detL;
-        const gamma12 = -m / detL;
-        const gamma22 = l1 / detL;
-
-        const v1 = ((n1a > 0 && n1a < numNodes ? this.nodeVoltages[n1a] : 0) || 0) - ((n1b > 0 && n1b < numNodes ? this.nodeVoltages[n1b] : 0) || 0);
-        const v2 = ((n2a > 0 && n2a < numNodes ? this.nodeVoltages[n2a] : 0) || 0) - ((n2b > 0 && n2b < numNodes ? this.nodeVoltages[n2b] : 0) || 0);
-
-        const state = this.internalStates.get(comp.id) || { i1: 0, i2: 0 };
-        if (isFinite(v1) && isFinite(v2) && isFinite(dt)) {
-          state.i1 += (gamma11 * v1 + gamma12 * v2) * dt;
-          state.i2 += (gamma12 * v1 + gamma22 * v2) * dt;
-        }
-        this.internalStates.set(comp.id, state);
-      } else if (comp.type === ComponentTypes.TRANSFORMER || comp.type === ComponentTypes.TRANSFORMER_CENTER_TAP) {
-        const nP1 = this.getNode(comp, 'pri_1');
-        const nP2 = this.getNode(comp, 'pri_2');
-        const lPri = Math.max(comp.params?.primaryL || 0.01, 1e-6);
-        const v1 = ((nP1 > 0 && nP1 < numNodes ? this.nodeVoltages[nP1] : 0) || 0) - ((nP2 > 0 && nP2 < numNodes ? this.nodeVoltages[nP2] : 0) || 0);
-        const state = this.internalStates.get(comp.id) || { iPri: 0 };
-        if (isFinite(v1) && isFinite(dt) && isFinite(lPri)) {
-          state.iPri += (v1 * dt) / lPri;
-        }
+        state.current += (vL * dt) / l;
         this.internalStates.set(comp.id, state);
       }
     });
@@ -2221,19 +2114,6 @@ export class CircuitEngine {
           name: comp.params?.label || 'V Probe',
           color: comp.params?.color || '#03b585',
           value: v,
-          unit: 'V'
-        };
-      } else if (comp.type === ComponentTypes.PROBE_DIFF) {
-        probeCount++;
-        const nPos = this.getNode(comp, 'p_pos');
-        const nNeg = this.getNode(comp, 'p_neg');
-        const v1 = nPos !== -1 ? (this.nodeVoltages[nPos] || 0) : 0;
-        const v2 = nNeg !== -1 ? (this.nodeVoltages[nNeg] || 0) : 0;
-        dataPoint.probes[comp.id] = {
-          id: comp.id,
-          name: comp.params?.label || 'V_diff',
-          color: comp.params?.color || '#8b5cf6',
-          value: v1 - v2,
           unit: 'V'
         };
       } else if (comp.type === ComponentTypes.PROBE_I) {

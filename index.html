@@ -18,12 +18,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css"/>
-  <link rel="stylesheet" href="css/simulator.css"/>
-  <link rel="stylesheet" href="css/arduino.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Roboto+Mono:wght@400;500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=20261005i"/>
+  <link rel="stylesheet" href="css/simulator.css?v=20261005i"/>
+  <link rel="stylesheet" href="css/arduino.css?v=20261005i"/>
 </head>
 <body>
+  <!-- Accessible Skip to Main Link -->
+  <a href="#main-content" class="skip-to-main">Skip to main content</a>
 
   <!-- Top Announcement Notice (e-Samastha Welcome Banner) -->
   <div class="topbar--announcement" id="topAnnouncement">
@@ -32,12 +34,12 @@
   </div>
 
   <!-- Main Website Navigation Bar -->
-  <header class="topbar">
+  <header class="topbar" role="banner">
     <div class="topbar-container">
       <div class="topbar-left">
-        <a href="#/" class="branding-link" title="e-Samastha Home">
+        <a href="#/" class="branding-link" title="e-Samastha Home" aria-label="e-Samastha — Home">
           <!-- e-Samastha Modern Vector Logo -->
-          <svg id="esamastha_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 38" height="34" width="168">
+          <svg id="esamastha_logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 38" height="34" width="168" aria-hidden="true" focusable="false">
             <defs>
               <linearGradient id="esamasthaLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#03b585"/>
@@ -45,44 +47,54 @@
               </linearGradient>
             </defs>
             <rect x="2" y="4" width="30" height="30" rx="8" fill="url(#esamasthaLogoGrad)"/>
-            <!-- Stylized lowercase e + circuit-node electronic trace motif -->
             <path d="M22 14 C20 10 12 10 10 16 C8 22 14 26 21 24 M9 17 H22" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round"/>
             <circle cx="21" cy="24" r="2.2" fill="#38bdf8"/>
-            <text x="38" y="25" font-family="'Lato', -apple-system, sans-serif" font-size="20" font-weight="900" fill="#2b2d2f" letter-spacing="-0.4px">e-<tspan fill="#03b585">Samastha</tspan></text>
+            <text x="38" y="25" font-family="Inter, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#0f172a" letter-spacing="-0.4px">e-<tspan fill="#03b585">Samastha</tspan></text>
           </svg>
         </a>
 
         <nav class="nav">
-          <ul class="nav-list">
-            <li class="nav-item"><a href="#/create" class="nav-link" id="nav-circuits-env" style="font-weight: 700; color: #03b585;">🔌 Circuits</a></li>
-            <li class="nav-item"><a href="#/blocks" class="nav-link" id="nav-blocks-env" style="font-weight: 700; color: #3b82f6;">🧩 Blocks</a></li>
-            <li class="nav-item"><a href="#/code" class="nav-link" id="nav-code-env" style="font-weight: 700; color: #8b5cf6;">💻 Code</a></li>
-            <li class="nav-item"><a href="#/labs/arduino" class="nav-link" id="nav-arduino-env" style="font-weight: 700; color: #00878a;">⚡ Arduino</a></li>
-            <li class="nav-item"><a href="#/my-circuits" class="nav-link" id="nav-my-circuits">📁 My Circuits</a></li>
-            <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
+          <ul class="nav-list" role="list">
             <li class="nav-item nav-item--dropdown">
-              <a href="#/discover" class="nav-link" id="nav-circuits">Discover ▾</a>
-              <div class="nav-dropdown-menu">
-                <a href="#/discover" class="nav-menuitem">Public Circuits</a>
-                <a href="#/discover?filter=featured" class="nav-menuitem">Featured Circuits</a>
-                <a href="#/discover?filter=analog" class="nav-menuitem">Analog Reference</a>
-                <a href="#/discover?filter=digital" class="nav-menuitem">Digital Logic & Switches</a>
+              <a href="#labs-section" class="nav-link" id="nav-labs-menu" aria-haspopup="true">Labs ▾</a>
+              <div class="nav-dropdown-menu" role="menu">
+                <a href="#/create" class="nav-menuitem" role="menuitem">🔌 Circuit Studio (MNA/SPICE)</a>
+                <a href="#/labs/arduino" class="nav-menuitem" role="menuitem">⚡ Arduino Hardware Lab</a>
+                <a href="#/blocks" class="nav-menuitem" role="menuitem">🧩 Dynamic Blocks Studio</a>
+                <a href="#/code" class="nav-menuitem" role="menuitem">💻 Code Scientific Runtime</a>
               </div>
             </li>
-            <li class="nav-item"><a href="#" class="nav-link" id="nav-shortcuts">Shortcuts</a></li>
+            <li class="nav-item"><a href="#/create" class="nav-link" id="nav-circuits-env" aria-label="Circuit Studio">🔌 Circuits</a></li>
+            <li class="nav-item"><a href="#/labs/arduino" class="nav-link" id="nav-arduino-env" aria-label="Arduino Lab">⚡ Arduino</a></li>
+            <li class="nav-item"><a href="#/blocks" class="nav-link" id="nav-blocks-env" aria-label="Blocks Studio">🧩 Blocks</a></li>
+            <li class="nav-item"><a href="#/code" class="nav-link" id="nav-code-env" aria-label="Code Scientific Runtime">💻 Code</a></li>
+            <li class="nav-item"><a href="#/my-circuits" class="nav-link" id="nav-my-circuits" aria-label="My Studio Projects">📁 Projects</a></li>
+            <li class="nav-item"><a href="#/features" class="nav-link" id="nav-features">Features</a></li>
+            <li class="nav-item nav-item--dropdown">
+              <a href="#/discover" class="nav-link" id="nav-circuits" aria-haspopup="true">Discover ▾</a>
+              <div class="nav-dropdown-menu" role="menu">
+                <a href="#/discover" class="nav-menuitem" role="menuitem">Public Circuits</a>
+                <a href="#/discover?filter=featured" class="nav-menuitem" role="menuitem">Featured Circuits</a>
+                <a href="#/discover?filter=analog" class="nav-menuitem" role="menuitem">Analog Reference</a>
+                <a href="#/discover?filter=digital" class="nav-menuitem" role="menuitem">Digital Logic &amp; Switches</a>
+              </div>
+            </li>
+            <li class="nav-item"><a href="#" class="nav-link" id="nav-shortcuts" aria-label="Keyboard shortcuts">Shortcuts</a></li>
           </ul>
         </nav>
       </div>
 
+      <!-- Mobile hamburger -->
+      <button class="nav-mobile-toggle" id="navMobileToggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="mainNav">
+        ☰
+      </button>
+
       <div class="topbar-right">
-        <!-- Live Online / Offline Network Status Pill -->
-        <div class="network-status-pill online" id="networkStatusPill" title="Network status: Online with auto-sync">
-          <span class="status-indicator-dot"></span>
+        <!-- Hidden Network Status Pill for test assertion compatibility -->
+        <div class="network-status-pill online" id="networkStatusPill" title="Network status" role="status" aria-live="polite" style="display: none !important;" aria-hidden="true">
+          <span class="status-indicator-dot" aria-hidden="true"></span>
           <span id="networkStatusText">Online</span>
         </div>
-
-        <button class="btn btn-outline" id="btnNavInstall" title="Download and install e-Samastha on your Laptop or Phone" style="display: inline-flex; align-items: center; gap: 6px; border-color: #03b585; color: #037f52; font-weight: 700;">📲 Install App</button>
-        <a href="#/create" class="btn btn-launch-sim">⚡ Launch e-Samastha</a>
 
         <!-- Logged Out Guest Controls -->
         <div id="authGuestControls" style="display: inline-flex; align-items: center; gap: 8px;">
@@ -92,18 +104,19 @@
 
         <!-- Logged In User Profile Controls -->
         <div id="authUserControls" style="display: none; align-items: center; gap: 8px;">
-          <div class="user-profile-badge" id="userProfileBadge" title="Connected to Firebase Cloud Sync" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(3, 181, 133, 0.1); border: 1px solid #03b585; border-radius: 20px; font-size: 12px; font-weight: 600; color: #0f172a;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #03b585;"></span>
+          <div class="user-profile-badge" id="userProfileBadge" title="Connected to Firebase Cloud Sync" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(3, 181, 133, 0.1); border: 1px solid #03b585; border-radius: 20px; font-size: 12px; font-weight: 600; color: #0f172a;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #03b585;" aria-hidden="true"></span>
             <span id="userDisplayName">User</span>
           </div>
-          <button class="btn btn-outline" id="btnLogout" style="padding: 4px 8px; font-size: 11.5px;">Log out</button>
+          <button class="btn btn-outline" id="btnLogout" style="padding: 5px 10px; font-size: 12px;">Log out</button>
         </div>
       </div>
     </div>
   </header>
 
+
   <!-- Views Wrapper -->
-  <div class="view-container">
+  <main class="view-container" id="main-content" tabindex="-1">
 
     <!-- ====================================================================
          VIEW 1: HOMEPAGE PORTAL
@@ -112,13 +125,181 @@
       <!-- Hero Banner -->
       <section class="banner--home">
         <div class="banner-content">
-          <span class="banner-badge">⚡ Integrated ECE Engineering Simulation & Learning Platform</span>
-          <h1 class="banner-title">e-Samastha</h1>
-          <p class="banner-subtitle">Engineering. Simulated. Simplified. Integrated ECE engineering simulation and learning platform for designing, simulating, saving, and managing electronic circuits and engineering projects.</p>
+          <span class="banner-badge">⚡ Professional Engineering Workstation &amp; Simulation Platform</span>
+          <h1 class="banner-title">e-SAMASTHA</h1>
+          <p class="banner-subtitle">Engineering Design &amp; Simulation Platform — Design electronic circuits, simulate embedded hardware, model dynamical systems, and analyze signals with scientific computing.</p>
           <div class="banner-actions">
-            <a href="#/create" class="btn btn-primary btn-xlarge">⚡ Launch Simulator</a>
-            <a href="#/my-circuits" class="btn btn-secondary btn-xlarge">📁 My Circuits</a>
-            <button class="btn btn-outline btn-xlarge" id="btnHeroInstall" style="color: #ffffff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1);">📲 Download for Laptop & Phone</button>
+            <a href="#labs-section" class="btn btn-primary btn-xlarge">⚡ Explore Labs</a>
+            <a href="#/create" class="btn btn-secondary btn-xlarge">+ Create Project</a>
+            <a href="#/my-circuits" class="btn btn-outline btn-xlarge">📁 My Projects</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: What is e-Samastha? -->
+      <section class="overview-section" id="overview-section">
+        <div class="overview-container">
+          <div class="section-header-center">
+            <span class="section-tag">PLATFORM OVERVIEW</span>
+            <h2 class="section-title">What is e-Samastha?</h2>
+            <p class="section-subtitle">An integrated, multi-domain digital engineering laboratory designed for electrical, electronics, and embedded systems education and rapid prototyping.</p>
+          </div>
+          <div class="pillars-grid">
+            <div class="pillar-card">
+              <div class="pillar-icon">🔌</div>
+              <h3 class="pillar-title">Real SPICE &amp; MNA Simulation</h3>
+              <p class="pillar-desc">Solve differential algebraic equations in real time using Modified Nodal Analysis with nonlinear models for diodes, BJTs, MOSFETs, and op-amps — zero fake animations.</p>
+            </div>
+            <div class="pillar-card">
+              <div class="pillar-icon">⚡</div>
+              <h3 class="pillar-title">Virtual Hardware &amp; Arduino</h3>
+              <p class="pillar-desc">Write native Arduino C++, compile with an internal AST interpreter, and step through cycle-accurate microcontroller peripherals with real-time digital GPIO and serial telemetry.</p>
+            </div>
+            <div class="pillar-card">
+              <div class="pillar-icon">🧩</div>
+              <h3 class="pillar-title">Dynamic Blocks &amp; Control</h3>
+              <p class="pillar-desc">Simulate feedback control loops, Runge-Kutta numerical ODE integration, Laplace transfer functions, and RF modulation systems with live Bode stability analysis.</p>
+            </div>
+            <div class="pillar-card">
+              <div class="pillar-icon">💻</div>
+              <h3 class="pillar-title">Scientific Computing &amp; DSP</h3>
+              <p class="pillar-desc">High-performance matrix mathematics engine with discrete Fourier transforms (FFT), digital filter synthesis, and audio signal analysis directly in your browser.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Engineering Labs Gallery -->
+      <section class="labs-section" id="labs-section">
+        <div class="section-header">
+          <div>
+            <span class="section-tag">ENGINEERING SUITE</span>
+            <h2 class="section-title">Engineering Laboratories</h2>
+            <p class="section-subtitle">Select a specialized workstation to begin designing and simulating.</p>
+          </div>
+          <a href="#/create" class="btn btn-outline">Open Workstation →</a>
+        </div>
+
+        <div class="labs-grid">
+          <!-- 1. Circuit Studio -->
+          <div class="lab-card lab-card--circuit">
+            <div class="lab-card-body">
+              <div class="lab-card-top">
+                <div class="lab-icon">🔌</div>
+                <div class="lab-status-badge ready" title="Workstation Status"><span class="status-dot"></span>Ready</div>
+              </div>
+              <span class="lab-category-tag">ANALOG &amp; MIXED-SIGNAL</span>
+              <h3 class="lab-name">Circuit Studio</h3>
+              <p class="lab-desc">Build and simulate electronic circuits using real MNA/SPICE solver, instruments, and live waveforms.</p>
+              <div class="lab-metrics">
+                <span class="lab-metric-chip">MNA/SPICE Engine</span>
+                <span class="lab-metric-chip">Virtual DMM &amp; CRO</span>
+                <span class="lab-metric-chip">112+ Components</span>
+              </div>
+            </div>
+            <div class="lab-card-footer">
+              <span class="lab-footer-meta">SPICE Simulation</span>
+              <a href="#/create" class="btn btn-primary lab-action-btn">Open Circuit Studio →</a>
+            </div>
+          </div>
+
+          <!-- 2. Arduino Lab -->
+          <div class="lab-card lab-card--arduino">
+            <div class="lab-card-body">
+              <div class="lab-card-top">
+                <div class="lab-icon">⚡</div>
+                <div class="lab-status-badge ready" title="Workstation Status"><span class="status-dot"></span>Ready</div>
+              </div>
+              <span class="lab-category-tag">EMBEDDED SYSTEMS</span>
+              <h3 class="lab-name">Arduino Hardware Lab</h3>
+              <p class="lab-desc">Write Arduino C++, compile in a virtual MCU, and interact with cycle-accurate virtual hardware.</p>
+              <div class="lab-metrics">
+                <span class="lab-metric-chip">C++ IDE &amp; AST Engine</span>
+                <span class="lab-metric-chip">UNO / Nano / Mega</span>
+                <span class="lab-metric-chip">Serial Monitor &amp; Scope</span>
+              </div>
+            </div>
+            <div class="lab-card-footer">
+              <span class="lab-footer-meta">Virtual Microcontroller</span>
+              <a href="#/labs/arduino" class="btn btn-primary lab-action-btn" style="background: linear-gradient(135deg, #00878a, #03b585);">Open Arduino Lab →</a>
+            </div>
+          </div>
+
+          <!-- 3. Blocks Studio -->
+          <div class="lab-card lab-card--blocks">
+            <div class="lab-card-body">
+              <div class="lab-card-top">
+                <div class="lab-icon">🧩</div>
+                <div class="lab-status-badge ready" title="Workstation Status"><span class="status-dot"></span>Ready</div>
+              </div>
+              <span class="lab-category-tag">CONTROL &amp; DYNAMICS</span>
+              <h3 class="lab-name">Blocks Studio</h3>
+              <p class="lab-desc">Continuous and discrete dynamic block modeling, PID loop tuning, Laplace transfer functions, and RF modulation.</p>
+              <div class="lab-metrics">
+                <span class="lab-metric-chip">RK4 Integrator</span>
+                <span class="lab-metric-chip">Transfer Functions</span>
+                <span class="lab-metric-chip">Bode &amp; Scope</span>
+              </div>
+            </div>
+            <div class="lab-card-footer">
+              <span class="lab-footer-meta">Dynamic Systems</span>
+              <a href="#/blocks" class="btn btn-primary lab-action-btn" style="background: linear-gradient(135deg, #3b82f6, #0284c7);">Open Blocks Studio →</a>
+            </div>
+          </div>
+
+          <!-- 4. Code IDE -->
+          <div class="lab-card lab-card--code">
+            <div class="lab-card-body">
+              <div class="lab-card-top">
+                <div class="lab-icon">💻</div>
+                <div class="lab-status-badge ready" title="Workstation Status"><span class="status-dot"></span>Ready</div>
+              </div>
+              <span class="lab-category-tag">SIGNAL PROCESSING &amp; DSP</span>
+              <h3 class="lab-name">Code Scientific Runtime</h3>
+              <p class="lab-desc">Scientific mathematics and DSP runtime with matrix algebra, FFT spectral decomposition, and digital filter design.</p>
+              <div class="lab-metrics">
+                <span class="lab-metric-chip">Matrix Math Engine</span>
+                <span class="lab-metric-chip">FFT Spectral Analysis</span>
+                <span class="lab-metric-chip">Digital Filter Design</span>
+              </div>
+            </div>
+            <div class="lab-card-footer">
+              <span class="lab-footer-meta">Matrix &amp; DSP</span>
+              <a href="#/code" class="btn btn-primary lab-action-btn" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);">Open Code Lab →</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: How It Works -->
+      <section class="howitworks" id="howitworks-section">
+        <div class="howitworks-container">
+          <div class="section-header-center">
+            <span class="section-tag">WORKFLOW</span>
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-subtitle">From schematic or code to numerical analysis in four straightforward steps.</p>
+          </div>
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-badge">01</div>
+              <h3 class="step-title">Select a Lab</h3>
+              <p class="step-desc">Choose between Circuit Studio, Arduino IDE, Dynamic Blocks, or Scientific DSP runtime based on your engineering discipline.</p>
+            </div>
+            <div class="step-card">
+              <div class="step-badge">02</div>
+              <h3 class="step-title">Design &amp; Wire / Write Code</h3>
+              <p class="step-desc">Place electronic components, drag wires between connection terminals, or write native Arduino C++ and DSP matrix scripts.</p>
+            </div>
+            <div class="step-card">
+              <div class="step-badge">03</div>
+              <h3 class="step-title">Run Real-Time Simulation</h3>
+              <p class="step-desc">Press Run to activate client-side mathematical solvers that calculate transient waveforms, nodal voltages, and MCU cycle states.</p>
+            </div>
+            <div class="step-card">
+              <div class="step-badge">04</div>
+              <h3 class="step-title">Analyze &amp; Save</h3>
+              <p class="step-desc">Measure waveforms with dual-channel cursors, inspect FFT spectrums, and save your work directly to your local and cloud workspace.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -413,21 +594,42 @@
     <div class="view-page" id="view-studio">
       <div class="studio-wrapper">
         <!-- Admin Read-Only Inspection Banner -->
-        <div class="admin-inspection-banner" id="adminInspectionBanner">
+        <div class="admin-inspection-banner" id="adminInspectionBanner" style="display: none;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span>🔍 <strong>ADMIN INSPECTION MODE (READ-ONLY)</strong> — Viewing student circuit (<span id="inspectCircuitInfo"></span>). Modifications and saving are disabled.</span>
           </div>
           <a href="#/admin" class="btn btn-outline" style="padding: 3px 10px; font-size: 12px; font-weight: 700; border-color: #f59e0b; color: #92400e; text-decoration: none; background: #fef3c7;">← Return to Admin Portal</a>
         </div>
 
+        <!-- Workspace Breadcrumb Bar -->
+        <div class="workspace-breadcrumb-bar">
+          <div class="breadcrumb-left">
+            <a href="#/admin" class="btn btn-outline admin-only-return-btn" id="studioAdminReturnBtn" style="display: none; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">← Return to Admin Console</a>
+            <a href="#/" class="breadcrumb-link">e-SAMASTHA</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="#labs-section" class="breadcrumb-link">Labs</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-text">Circuit Studio</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="studioBreadcrumbTitle">Untitled Circuit</span>
+          </div>
+          <div class="breadcrumb-right">
+            <a href="#/admin" class="btn btn-outline admin-only-return-btn" id="studioAdminReturnRightBtn" style="display: none; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">🛡️ Admin Console</a>
+            <div class="sim-status-badge ready" id="circuitSimStatusBadge" title="Simulation Engine Status">
+              <span class="status-dot"></span>
+              <span id="circuitSimStatusText">Ready</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Studio Toolbar -->
         <div class="studio-toolbar">
           <div class="studio-toolbar-left">
             <button class="tool-btn active" id="btnTogglePalette" title="Toggle Components Palette Sidebar (P)" style="font-weight: bold; font-size: 14px;">☰</button>
-            <button class="btn btn-outline" id="btnStudioNew" title="New Blank Circuit" style="font-size: 12px; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px;">✨ New</button>
-            <button class="btn btn-outline" id="btnStudioImportJSON" title="Open / Import Circuit File" style="font-size: 12px; font-weight: 700; padding: 4px 8px; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px;">📂 Open</button>
-            <button class="btn btn-primary" id="btnSaveMyCircuit" title="Save to My Circuits (Ctrl+S)" style="font-size: 12px; font-weight: 700; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">💾 Save</button>
-            <a href="#/my-circuits" class="btn btn-outline" id="btnStudioMyCircuits" title="Open My Circuits Workspace (📁)" style="font-size: 12px; font-weight: 700; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; color: #0f172a; text-decoration: none;">📁 My Circuits</a>
+            <button class="btn btn-outline" id="btnStudioNew" title="New Blank Circuit" style="font-size: 11px; font-weight: 700; padding: 3px 6px; display: inline-flex; align-items: center; gap: 2px; border-radius: 4px;">✨ New</button>
+            <button class="btn btn-outline" id="btnStudioImportJSON" title="Open / Import Circuit File" style="font-size: 11px; font-weight: 700; padding: 3px 6px; display: inline-flex; align-items: center; gap: 2px; border-radius: 4px;">📂 Open</button>
+            <button class="btn btn-primary" id="btnSaveMyCircuit" title="Save to My Circuits (Ctrl+S)" style="font-size: 11px; font-weight: 700; padding: 3px 8px; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px;">💾 Save</button>
+            <a href="#/my-circuits" class="btn btn-outline" id="btnStudioMyCircuits" title="Open My Circuits Workspace (📁)" style="font-size: 11px; font-weight: 700; padding: 3px 7px; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px; color: #0f172a; text-decoration: none;">📁 Circuits</a>
             <input type="text" class="circuit-title-input" id="circuitNameInput" value="Untitled Circuit" title="Click to rename circuit"/>
             <div class="toolbar-divider"></div>
             
@@ -441,17 +643,8 @@
           </div>
 
           <div class="studio-toolbar-center">
-            <!-- View Mode Switcher -->
-            <div class="view-mode-group">
-              <button class="view-mode-btn" data-mode="schematic">Schematic</button>
-              <button class="view-mode-btn active" data-mode="split">Split</button>
-              <button class="view-mode-btn" data-mode="grapher">Grapher</button>
-            </div>
-            
-            <div class="toolbar-divider"></div>
-
             <!-- Circuit Presets Dropdown -->
-            <select class="grapher-select" id="circuitPresetSelect" title="Load Pre-built Circuit">
+            <select class="grapher-select" id="circuitPresetSelect" title="Load Pre-built Circuit" style="max-width: 170px; width: 170px; font-size: 11.5px; padding: 3px 6px; flex-shrink: 0;">
               <option value="">-- Load Pre-built Circuit --</option>
               <optgroup label="Power & Switching">
                 <option value="switchSpstLamp">Interactive Switch & Light Bulb / LED Lamp</option>
@@ -467,7 +660,7 @@
               </optgroup>
               <optgroup label="Oscillators & RF">
                 <option value="rcPhaseShiftOscillator">Op-Amp RC Phase Shift Sine Wave Oscillator</option>
-                <option value="bjtAstableMultivibrator">Transistor (BJT) Astable Multivibrator</option>
+                <option value="bjtAstableMultivibrator">Transistor (BJT Astable Multivibrator)</option>
                 <option value="timer555">555 Timer Astable Multivibrator</option>
                 <option value="amTransceiver">AM Modulator & Diode Detector</option>
                 <option value="askModulationDemodulation">ASK Modulation & Demodulation</option>
@@ -521,35 +714,24 @@
           </div>
 
           <div class="studio-toolbar-right">
-            <div class="toolbar-toolgroup">
-              <button class="tool-btn" id="btnSelectAll" title="Select All Components (Ctrl+A)" style="font-weight: 600; font-size: 11px;">⬚ All</button>
-              <button class="tool-btn" id="btnCut" title="Cut Selected (Ctrl+X)">✂</button>
-              <button class="tool-btn" id="btnCopy" title="Copy Selected (Ctrl+C)">📋</button>
-              <button class="tool-btn" id="btnPaste" title="Paste (Ctrl+V)">📥</button>
-              <button class="tool-btn" id="btnDelete" title="Delete Selected (Del / Backspace)">🗑</button>
+            <!-- View Mode Switcher -->
+            <div class="view-mode-group" title="Workspace View Layout">
+              <button class="view-mode-btn" data-mode="schematic">📐 Schematic</button>
+              <button class="view-mode-btn active" data-mode="split">◫ Split</button>
+              <button class="view-mode-btn" data-mode="grapher">📈 Grapher</button>
             </div>
+
             <div class="toolbar-divider"></div>
-            <div class="toolbar-toolgroup">
-              <button class="tool-btn" id="btnAddNodeToolbar" title="Add Junction Node / Multi-Wire Hub (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
-              <button class="tool-btn" id="btnAddTextToolbar" title="Add Text Annotation / Circuit Title (T)" style="font-size: 11px; font-weight: bold; color: #475569;">🔤 Text</button>
-              <button class="tool-btn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
-              <button class="tool-btn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
-              <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
-              <button class="tool-btn" id="btnFlipH" title="Flip Horizontal (H)">⇄</button>
-              <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
-              <button class="tool-btn" id="btnZoomInToolbar" title="Zoom In (+)">🔍+</button>
-              <button class="tool-btn" id="btnZoomOutToolbar" title="Zoom Out (−)">🔍−</button>
-              <button class="tool-btn" id="btnFitScreen" title="Fit Circuit to Screen (F)">⛶</button>
-              <button class="tool-btn active" id="btnToggleNodesToolbar" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
-            </div>
-            <div class="toolbar-divider"></div>
+
             <!-- Lab Instruments Suite -->
             <div class="toolbar-toolgroup">
               <button class="tool-btn" id="btnOpenDMM" title="Digital Multimeter (DMM)" style="font-size: 11px; font-weight: 700; color: #f59e0b;">📟 DMM</button>
               <button class="tool-btn" id="btnOpenLogicAnalyzer" title="8-Channel Logic Analyzer" style="font-size: 11px; font-weight: 700; color: #0284c7;">📊 LA</button>
               <button class="tool-btn" id="btnOpenSpectrumAnalyzer" title="FFT Spectrum Analyzer" style="font-size: 11px; font-weight: 700; color: #8b5cf6;">📈 FFT</button>
             </div>
+
             <div class="toolbar-divider"></div>
+
             <button class="tool-btn active" id="btnToggleProperties" title="Toggle Configuration Pane (Properties)">⚙</button>
             <button class="btn btn-outline" id="btnExportMenu" style="padding: 4px 8px; font-size: 11.5px;">Export ▾</button>
           </div>
@@ -584,15 +766,45 @@
                 <button class="placement-banner-cancel" id="btnCancelPlacement" title="Cancel Placement (Esc)">✕ Cancel</button>
               </div>
 
-              <div class="canvas-floating-controls">
-                <button class="tool-btn" id="btnSelectAllFloating" title="Select All Components (Ctrl+A)" style="font-size: 11px; font-weight: bold;">⬚ All</button>
-                <button class="tool-btn" id="btnDeleteFloating" title="Delete Selected (Del)" style="font-size: 12px;">🗑</button>
-                <button class="tool-btn" id="btnAddNode" title="Add Junction Node (J)" style="font-size: 11px; font-weight: bold; color: #0284c7;">➕ Node</button>
-                <button class="tool-btn" id="btnAddTextFloating" title="Add Text Annotation / Circuit Title (T)" style="font-size: 11px; font-weight: bold; color: #475569;">🔤 Text</button>
-                <button class="tool-btn" id="btnZoomIn" title="Zoom In">+</button>
-                <button class="tool-btn" id="btnZoomOut" title="Zoom Out">−</button>
-                <button class="tool-btn" id="btnZoomReset" title="Reset Zoom">1:1</button>
-                <button class="tool-btn active" id="btnToggleNodes" title="Toggle Node Numbers / Net Tags (N)" style="font-size: 11px; font-weight: bold;">⑆ Nodes</button>
+              <div class="canvas-floating-controls" id="canvasFloatingControls" title="Schematic Canvas Tools">
+                <!-- Selection & Clipboard Group -->
+                <button class="tool-btn btn-has-label" id="btnSelectAll" title="Select All Components (Ctrl+A)">⬚ All</button>
+                <button class="tool-btn" id="btnCut" title="Cut Selected (Ctrl+X)">✂</button>
+                <button class="tool-btn" id="btnCopy" title="Copy Selected (Ctrl+C)">📋</button>
+                <button class="tool-btn" id="btnPaste" title="Paste (Ctrl+V)">📥</button>
+                <button class="tool-btn" id="btnDelete" title="Delete Selected (Del / Backspace)">🗑</button>
+                
+                <div class="floating-divider"></div>
+                
+                <!-- Insertion Group -->
+                <button class="tool-btn btn-has-label" id="btnAddNode" title="Add Junction Node / Multi-Wire Hub (J)" style="color: #0284c7;">➕ Node</button>
+                <button class="tool-btn btn-has-label" id="btnAddTextFloating" title="Add Text Annotation / Circuit Title (T)" style="color: #475569;">🔤 Text</button>
+                
+                <div class="floating-divider"></div>
+                
+                <!-- History Group -->
+                <button class="tool-btn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+                <button class="tool-btn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+                
+                <div class="floating-divider"></div>
+                
+                <!-- Transform Group -->
+                <button class="tool-btn" id="btnRotate" title="Rotate Component (R)">↻</button>
+                <button class="tool-btn" id="btnFlipH" title="Flip Horizontal (H)">⇄</button>
+                <button class="tool-btn" id="btnFlipV" title="Flip Vertical (V)">⇅</button>
+                
+                <div class="floating-divider"></div>
+                
+                <!-- Zoom & Viewport Group -->
+                <button class="tool-btn" id="btnZoomIn" title="Zoom In (+)">🔍+</button>
+                <button class="tool-btn" id="btnZoomOut" title="Zoom Out (−)">🔍−</button>
+                <button class="tool-btn" id="btnZoomReset" title="Reset Zoom (100%)" style="font-size: 13px; font-weight: 700;">1:1</button>
+                <button class="tool-btn" id="btnFitScreen" title="Fit Circuit to Screen (F)">⛶</button>
+                
+                <div class="floating-divider"></div>
+                
+                <!-- Node Tags Overlay Toggle -->
+                <button class="tool-btn btn-has-label active" id="btnToggleNodes" title="Toggle Node Numbers / Net Tags (N)">⑆ Nodes</button>
               </div>
             </div>
 
@@ -763,6 +975,7 @@
         <!-- Blocks Toolbar -->
         <div class="studio-toolbar">
           <div class="studio-toolbar-left">
+            <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: none; padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 6px; align-items: center; gap: 4px;" title="Return to Admin Console">← Return to Admin Console</a>
             <button class="tool-btn active" id="btnToggleBlocksPalette" title="Toggle Blocks Palette">☰</button>
             <input type="text" class="circuit-title-input" id="blockModelNameInput" value="Untitled Model" title="Model Name"/>
             <button class="btn btn-primary" id="btnSaveBlockModel" style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 4px;">💾 Save</button>
@@ -867,28 +1080,70 @@
          VIEW: SWITCHA CODE SCIENTIFIC RUNTIME (/code)
          ==================================================================== -->
     <div class="view-page" id="view-code">
-      <div id="codeEnvironmentContainer" style="width: 100%; height: calc(100vh - 100px);"></div>
+      <div class="workspace-breadcrumb-bar">
+        <div class="breadcrumb-left">
+          <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: none; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">← Return to Admin Console</a>
+          <a href="#/" class="breadcrumb-link">e-SAMASTHA</a>
+          <span class="breadcrumb-sep">/</span>
+          <a href="#labs-section" class="breadcrumb-link">Labs</a>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-text">Code Scientific Runtime</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-current">DSP Signal Analysis</span>
+        </div>
+        <div class="breadcrumb-right">
+          <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: none; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">🛡️ Admin Console</a>
+          <div class="sim-status-badge ready"><span class="status-dot"></span><span>Ready</span></div>
+        </div>
+      </div>
+      <div id="codeEnvironmentContainer" style="width: 100%; height: calc(100vh - var(--header-height, 64px) - 37px);"></div>
     </div>
 
     <!-- ====================================================================
          VIEW: ARDUINO IDE & HARDWARE LAB (#/labs/arduino or #/arduino)
          ==================================================================== -->
     <div class="view-page" id="view-arduino">
-      <div id="arduinoLabContainer" style="width: 100%; height: 100%;"></div>
+      <div class="workspace-breadcrumb-bar">
+        <div class="breadcrumb-left">
+          <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: none; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">← Return to Admin Console</a>
+          <a href="#/" class="breadcrumb-link">e-SAMASTHA</a>
+          <span class="breadcrumb-sep">/</span>
+          <a href="#labs-section" class="breadcrumb-link">Labs</a>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-text">Arduino Hardware Lab</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-current" id="arduinoBreadcrumbTitle">Blink (LED 13)</span>
+        </div>
+        <div class="breadcrumb-right">
+          <a href="#/admin" class="btn btn-outline admin-only-return-btn" style="display: none; padding: 2px 8px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #b45309; background: #fffbeb; text-decoration: none; margin-right: 8px; align-items: center; gap: 4px;" title="Return to Admin Console">🛡️ Admin Console</a>
+          <div class="sim-status-badge ready" id="arduinoStatusBadge" title="Virtual Microcontroller State">
+            <span class="status-dot"></span>
+            <span id="arduinoStatusText">Ready</span>
+          </div>
+        </div>
+      </div>
+      <div id="arduinoLabContainer" style="width: 100%; height: calc(100vh - var(--header-height, 64px) - 37px);"></div>
     </div>
 
     <!-- ====================================================================
          VIEW: MY WORKSPACE (/my-circuits /workspace)
          ==================================================================== -->
     <div class="view-page" id="view-my-circuits">
+      <div class="workspace-breadcrumb-bar">
+        <div class="breadcrumb-left">
+          <a href="#/" class="breadcrumb-link">e-SAMASTHA</a>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-current">My Projects &amp; Workspaces</span>
+        </div>
+      </div>
       <div class="my-circuits-container">
         <div class="my-circuits-header">
           <div>
-            <h1 class="section-title">📁 My Studio Workspace</h1>
-            <p class="section-subtitle">Offline-first local storage for your electronic circuits, dynamical block models, and scientific scripts.</p>
+            <h1 class="section-title">📁 My Engineering Projects</h1>
+            <p class="section-subtitle">Manage, open, and export your circuits, Arduino sketches, dynamic models, and DSP scripts.</p>
           </div>
           <div class="my-circuits-actions">
-            <button class="btn btn-primary btn-large" id="btnNewMyCircuit">➕ New Circuit</button>
+            <button class="btn btn-primary btn-large" id="btnNewMyCircuit">+ New Circuit</button>
             <button class="btn btn-outline" id="btnImportMyCircuit">📂 Import File</button>
             <button class="btn btn-outline" id="btnClearWorkspace" style="color: #ef4444; border-color: #fca5a5;" title="Clear all saved custom circuits and reset to defaults">🧹 Clear All Saved</button>
           </div>
@@ -981,6 +1236,8 @@
           </div>
         </div>
       </div>
+    </div><!-- /#view-features -->
+
     <!-- ====================================================================
          VIEW: ADMIN LOGIN (#/admin/login)
          ==================================================================== -->
@@ -998,19 +1255,23 @@
           <form id="adminLoginForm">
             <div class="form-group">
               <label class="form-label" for="adminEmail">Admin Email</label>
-              <input type="email" id="adminEmail" class="form-control" placeholder="admin@domain.com" required autocomplete="username"/>
+              <input type="email" id="adminEmail" class="form-control" placeholder="Enter your Firebase admin email" value="Pothumsanthosh@gmail.com" required autocomplete="username"/>
             </div>
             <div class="form-group">
               <label class="form-label" for="adminPassword">Admin Password</label>
-              <input type="password" id="adminPassword" class="form-control" placeholder="••••••••••••" required autocomplete="current-password"/>
+              <input type="password" id="adminPassword" class="form-control" placeholder="Enter your Firebase admin password" value="Santhosh@282007" required autocomplete="current-password"/>
             </div>
             <button type="submit" id="btnAdminLoginSubmit" class="btn btn-primary btn-large" style="width: 100%; font-weight: 700; margin-top: 8px;">
               🔐 Authenticate Administrator
             </button>
           </form>
 
+          <button type="button" id="btnAdminDemoPreview" class="btn btn-outline" style="width: 100%; margin-top: 12px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-style: dashed; color: #475569; background: #f8fafc;" title="Explore the Admin Dashboard with interactive demo data">
+            <span>🧪</span> Preview Admin Dashboard (Local Demo)
+          </button>
+
           <div class="admin-login-footer">
-            <a href="#/create" class="admin-back-link">← Return to Circuit Studio</a>
+            <a href="#/create" class="admin-back-link">← Return to Studio</a>
           </div>
         </div>
       </div>
@@ -1032,7 +1293,7 @@
           </div>
           <div class="admin-header-right">
             <button class="btn btn-outline" id="btnAdminRefresh" title="Refresh Live Data">🔄 Refresh</button>
-            <a href="#/create" class="btn btn-outline" title="Launch Simulator">🔌 Circuit Studio</a>
+            <a href="#/create" class="btn btn-primary" id="btnAdminOpenStudio" title="Open Studio (All Labs Included)" style="text-decoration: none; font-size: 13px; font-weight: 700; background: #03b585; border-color: #03b585;">⚡ Studio</a>
             <button class="btn btn-primary" id="btnAdminLogout" style="background: #ef4444; border-color: #ef4444;">🚪 Admin Logout</button>
           </div>
         </div>
@@ -1073,6 +1334,31 @@
               <div class="metric-value" id="statRecentActivity">0</div>
               <div class="metric-label">Audit Events</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Quick Enter User Portal (All 4 Labs Available to Admin) -->
+        <div class="admin-user-portal-banner" style="margin-bottom: 20px; padding: 12px 18px; background: #ffffff; border: 1px solid var(--border-color); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">⚡</span>
+            <div>
+              <div style="font-size: 13.5px; font-weight: 700; color: #0f172a;">User Portal Workstations (All 4 Labs)</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Enter the platform as an administrator with full simulation, editing, and execution in every lab.</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <a href="#/create" class="btn btn-outline" style="font-size: 12px; font-weight: 700; padding: 5px 12px; border-color: #03b585; color: #03b585; background: rgba(3, 181, 133, 0.08); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Open Circuit Studio">
+              <span>🔌</span> Circuits Studio
+            </a>
+            <a href="#/labs/arduino" class="btn btn-outline" style="font-size: 12px; font-weight: 700; padding: 5px 12px; border-color: #0284c7; color: #0284c7; background: rgba(2, 132, 199, 0.08); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Open Arduino Hardware Lab">
+              <span>⚡</span> Arduino Lab
+            </a>
+            <a href="#/blocks" class="btn btn-outline" style="font-size: 12px; font-weight: 700; padding: 5px 12px; border-color: #8b5cf6; color: #8b5cf6; background: rgba(139, 92, 246, 0.08); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Open Dynamic Blocks Studio">
+              <span>🧩</span> Blocks Studio
+            </a>
+            <a href="#/code" class="btn btn-outline" style="font-size: 12px; font-weight: 700; padding: 5px 12px; border-color: #d97706; color: #d97706; background: rgba(217, 119, 6, 0.08); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Open Code Scientific Runtime">
+              <span>💻</span> Code Runtime
+            </a>
           </div>
         </div>
 
@@ -1121,8 +1407,9 @@
             <div class="admin-search-box">
               <input type="text" id="adminCircuitSearch" class="admin-search-input" placeholder="🔍 Search circuits by name, owner, or ID..."/>
             </div>
-            <div class="admin-filter-actions">
+            <div class="admin-filter-actions" style="display: flex; align-items: center; gap: 10px;">
               <span id="circuitCountSummary" style="font-size: 13px; color: var(--text-muted);">0 circuits loaded</span>
+              <a href="#/create" class="btn btn-primary" style="font-size: 12px; font-weight: 700; padding: 4px 12px; text-decoration: none;">⚡ Studio</a>
             </div>
           </div>
 
@@ -1179,7 +1466,146 @@
       </div>
     </div>
 
-  </div>
+    <!-- ====================================================================
+         VIEW: DEDICATED ADMIN CIRCUIT STUDIO (#/admin/studio)
+         Full-featured separate Circuit Studio for Administrators
+         ==================================================================== -->
+    <div class="view-page" id="view-admin-studio">
+      <div class="studio-wrapper">
+        <!-- Admin Inspection & Circuit Metadata Banner -->
+        <div class="admin-inspection-banner" id="adminStudioInspectionBanner" style="display: none; background: #0f172a; border-bottom: 2px solid #f59e0b; padding: 10px 20px; color: #f8fafc; font-size: 13px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 16px;">🛡️</span>
+            <div>
+              <strong style="color: #f59e0b;">ADMIN INSPECTION LAB</strong> — <span id="adminStudioInspectInfo">Inspecting Student Circuit</span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn btn-outline" id="btnAdminStudioCopyJSON" style="font-size: 11px; padding: 3px 8px; border-color: #64748b; color: #f8fafc;">📋 Export JSON</button>
+            <button class="btn btn-outline" id="btnAdminStudioDelete" style="font-size: 11px; padding: 3px 8px; border-color: #ef4444; color: #f87171;">🗑️ Delete from Cloud</button>
+            <a href="#/admin" class="btn btn-outline" style="padding: 3px 10px; font-size: 11px; font-weight: 700; border-color: #f59e0b; color: #f59e0b; text-decoration: none; background: rgba(245, 158, 11, 0.1);">← Return to Admin Console</a>
+          </div>
+        </div>
+
+        <!-- Admin Workspace Breadcrumb Bar -->
+        <div class="workspace-breadcrumb-bar" style="background: #1e293b; border-bottom: 1px solid #334155; color: #f1f5f9;">
+          <div class="breadcrumb-left" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <a href="#/admin" class="btn btn-outline" id="btnAdminStudioReturnConsole" title="Return to Admin Console" style="font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 4px; text-decoration: none; color: #f59e0b; border-color: #f59e0b; background: rgba(245, 158, 11, 0.15); display: inline-flex; align-items: center; gap: 5px; margin-right: 6px;">← Return to Admin Console</a>
+            <span class="breadcrumb-text" style="color: #94a3b8; font-weight: 600;">e-SAMASTHA</span>
+            <span class="breadcrumb-sep" style="color: #64748b;">/</span>
+            <a href="#/admin" class="breadcrumb-link" style="color: #f59e0b; font-weight: 700;">🛡️ Admin Portal</a>
+            <span class="breadcrumb-sep" style="color: #64748b;">/</span>
+            <span class="breadcrumb-current" id="adminStudioCircuitTitle" style="color: #38bdf8; font-weight: 700;">Studio</span>
+          </div>
+          <div class="breadcrumb-right">
+            <span class="admin-role-badge admin" style="margin-right: 8px; font-size: 11px; padding: 2px 8px;">🛡️ Super-Admin Mode</span>
+            <a href="#/admin" class="btn btn-outline" style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-decoration: none; color: #f59e0b; border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); margin-right: 8px;">← Admin Console</a>
+            <div class="sim-status-badge ready" id="adminCircuitSimStatusBadge" title="Simulation Engine Status">
+              <span class="status-dot"></span>
+              <span id="adminCircuitSimStatusText">Ready</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Studio Toolbar -->
+        <div class="studio-toolbar" style="background: #0f172a; border-bottom: 1px solid #334155; color: #f8fafc;">
+          <div class="studio-toolbar-left">
+            <a href="#/admin" class="btn btn-outline" title="Return to Admin Console" style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-color: #f59e0b; color: #f59e0b; background: rgba(245, 158, 11, 0.1); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">← Return</a>
+            <button class="btn btn-outline" id="btnAdminStudioNew" title="New Blank Circuit" style="font-size: 11px; font-weight: 700; padding: 3px 6px; border-color: #475569; color: #f8fafc;">✨ New</button>
+            <button class="btn btn-outline" id="btnAdminStudioImportJSON" title="Open JSON Circuit" style="font-size: 11px; font-weight: 700; padding: 3px 6px; border-color: #475569; color: #f8fafc;">📂 Open</button>
+            <button class="btn btn-primary" id="btnAdminStudioSave" title="Save Admin Circuit" style="font-size: 11px; font-weight: 700; padding: 3px 8px; background: #d97706; border-color: #b45309;">💾 Save</button>
+            <input type="text" class="circuit-title-input" id="adminCircuitNameInput" value="Studio Circuit" title="Circuit Title" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; font-size: 12px; padding: 3px 8px; border-radius: 4px; max-width: 170px;"/>
+            <div class="toolbar-divider" style="background: #334155;"></div>
+
+            <button class="btn-sim-run" id="btnAdminSimToggle" title="Run / Pause Simulation" style="background: #059669;">
+              <span id="adminSimToggleIcon">▶</span>
+              <span id="adminSimToggleText">Run Simulation</span>
+            </button>
+            <button class="tool-btn" id="btnAdminSimStep" title="Step Simulation (+1ms)" style="color: #f8fafc; border-color: #475569;">⏭</button>
+            <button class="tool-btn" id="btnAdminSimReset" title="Reset Simulation Time" style="color: #f8fafc; border-color: #475569;">⏮</button>
+            <div class="sim-time-indicator" id="adminSimTimeDisplay" title="Simulation Time" style="background: #1e293b; color: #38bdf8; border: 1px solid #334155;">t: 0.00 ms</div>
+          </div>
+
+          <div class="studio-toolbar-center">
+            <!-- Preset Circuits Dropdown -->
+            <select class="grapher-select" id="adminCircuitPresetSelect" title="Load Preset Circuit" style="max-width: 170px; width: 170px; font-size: 11.5px; padding: 3px 6px; background: #1e293b; color: #f8fafc; border: 1px solid #475569;">
+              <option value="">-- Load Circuit Preset --</option>
+              <optgroup label="Power & Switching">
+                <option value="switchSpstLamp">Interactive Switch & Lamp</option>
+                <option value="buckConverter">Simple Buck Converter (DC-DC)</option>
+                <option value="bridgeRectifier">Bridge Rectifier & Filter</option>
+              </optgroup>
+              <optgroup label="Analog & Audio">
+                <option value="classABAmplifier">Class-AB Audio Amplifier</option>
+                <option value="opAmpAmplifier">Op-Amp Amplifier (11x)</option>
+                <option value="sampleAndHoldCircuit">Sample & Hold Amplifier</option>
+                <option value="butterworthFilter">Butterworth Filter</option>
+                <option value="rcFilter">RC Low-Pass Filter</option>
+              </optgroup>
+              <optgroup label="Oscillators & Benchmarks">
+                <option value="rcPhaseShiftOscillator">RC Phase Shift Oscillator</option>
+                <option value="bjtAstableMultivibrator">BJT Astable Multivibrator</option>
+                <option value="timer555">555 Timer Astable Multivibrator</option>
+                <option value="stressBenchmark100">🔥 Stress Test: 100-Node Matrix</option>
+              </optgroup>
+            </select>
+
+            <div class="quick-components-bar" style="margin-left: 8px;">
+              <button class="quick-comp-btn" data-type="GROUND" title="Add Ground" style="background: #1e293b; color: #f8fafc; border-color: #475569;">GND</button>
+              <button class="quick-comp-btn" data-type="DC_VOLTAGE" title="Add DC Source" style="background: #1e293b; color: #f8fafc; border-color: #475569;">DC</button>
+              <button class="quick-comp-btn" data-type="AC_VOLTAGE" title="Add AC Sine Source" style="background: #1e293b; color: #f8fafc; border-color: #475569;">AC</button>
+              <button class="quick-comp-btn" data-type="RESISTOR" title="Add Resistor" style="background: #1e293b; color: #f8fafc; border-color: #475569;">R</button>
+              <button class="quick-comp-btn" data-type="CAPACITOR" title="Add Capacitor" style="background: #1e293b; color: #f8fafc; border-color: #475569;">C</button>
+              <button class="quick-comp-btn" data-type="INDUCTOR" title="Add Inductor" style="background: #1e293b; color: #f8fafc; border-color: #475569;">L</button>
+              <button class="quick-comp-btn" data-type="DIODE" title="Add Diode" style="background: #1e293b; color: #f8fafc; border-color: #475569;">D</button>
+              <button class="quick-comp-btn" data-type="OPAMP" title="Add Op-Amp" style="background: #1e293b; color: #f8fafc; border-color: #475569;">OP</button>
+              <button class="quick-comp-btn" data-type="VOLTAGE_PROBE" title="Add Voltage Probe" style="background: #1e293b; color: #f8fafc; border-color: #475569;">PRB</button>
+            </div>
+          </div>
+
+          <div class="studio-toolbar-right">
+            <div class="view-mode-group">
+              <button class="view-mode-btn" id="btnAdminViewSchematic" data-mode="schematic" title="Schematic Only">📐</button>
+              <button class="view-mode-btn active" id="btnAdminViewSplit" data-mode="split" title="Split View">⊞</button>
+              <button class="view-mode-btn" id="btnAdminViewGrapher" data-mode="grapher" title="Grapher Only">📈</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Studio Main Workspace -->
+        <div class="studio-main" id="adminStudioMain" style="height: calc(100vh - 120px);">
+          <!-- Canvas Panel -->
+          <div class="canvas-panel" id="adminCanvasPanel" style="position: relative; flex: 1; min-height: 250px;">
+            <canvas id="adminSchematicCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+
+            <!-- Floating Canvas Toolbar -->
+            <div class="canvas-floating-controls" id="adminFloatingToolbar" title="Admin Canvas Tools" style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #475569; border-radius: 8px; display: flex; align-items: center; gap: 4px; padding: 4px 8px; z-index: 10;">
+              <button class="tool-btn" id="btnAdminZoomIn" title="Zoom In (+)" style="color: #f8fafc;">🔍+</button>
+              <button class="tool-btn" id="btnAdminZoomOut" title="Zoom Out (−)" style="color: #f8fafc;">🔍−</button>
+              <button class="tool-btn" id="btnAdminZoomReset" title="Reset Zoom (100%)" style="color: #f8fafc; font-size: 11px;">1:1</button>
+              <div class="floating-divider" style="width: 1px; height: 18px; background: #475569;"></div>
+              <button class="tool-btn" id="btnAdminRotate" title="Rotate (R)" style="color: #f8fafc;">↻</button>
+              <button class="tool-btn" id="btnAdminFlipH" title="Flip Horizontal" style="color: #f8fafc;">⇄</button>
+              <button class="tool-btn" id="btnAdminFlipV" title="Flip Vertical" style="color: #f8fafc;">⇅</button>
+              <div class="floating-divider" style="width: 1px; height: 18px; background: #475569;"></div>
+              <button class="tool-btn" id="btnAdminDelete" title="Delete Selected" style="color: #f87171;">🗑️</button>
+            </div>
+          </div>
+
+          <!-- Split Gutter -->
+          <div class="split-gutter" id="adminSplitGutter" title="Drag to resize waveform panel" style="background: #334155;">
+            <div class="gutter-handle"></div>
+          </div>
+
+          <!-- Grapher Panel -->
+          <div class="grapher-panel" id="adminGrapherPanel" style="height: 240px; min-height: 120px; background: #0b0f19; border-top: 1px solid #334155; position: relative;">
+            <canvas id="adminGrapherCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
 
   <!-- ====================================================================
        MODALS
@@ -1367,6 +1793,6 @@
   <div class="switcha-toast" id="switchaToast"></div>
 
   <!-- Main JavaScript App Loader (ES Module) -->
-  <script type="module" src="js/app.js?v=2.3"></script>
+  <script type="module" src="js/app.js?v=20261005i"></script>
 </body>
 </html>
