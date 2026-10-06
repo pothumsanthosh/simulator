@@ -73,6 +73,17 @@ function getComponentSideOffset(comp) {
   return Math.max(18, Math.round(halfVisualW + 6));
 }
 
+SchematicCanvas.prototype.clear = function() {
+  if (typeof this.saveState === 'function') this.saveState();
+  this.components = [];
+  this.wires = [];
+  this.selectedComponent = null;
+  this.selectedWire = null;
+  this.selectedComponents?.clear();
+  if (typeof this.notifyModified === 'function') this.notifyModified();
+  if (typeof this.render === 'function') this.render();
+};
+
 SchematicCanvas.prototype.findLabelAt = function(worldX, worldY, padding = 6) {
   if (!this.components) return null;
 
@@ -4915,6 +4926,31 @@ class SwitchaApp {
   }
 
   /**
+   * Normalize circuit wire descriptors to prevent malformed pin crashes
+   */
+  _normalizeWires(wires) {
+    if (!Array.isArray(wires)) return [];
+    return wires.map(w => {
+      if (!w) return null;
+      let fromPin = w.fromPin;
+      let toPin = w.toPin;
+      if (!fromPin && (w.from || w.fromCompId || w.source)) {
+        const comp = w.from || w.fromCompId || w.source;
+        const term = w.fromPinId || (w.fromTerm !== undefined ? `p${w.fromTerm}` : 'p1');
+        fromPin = `${comp}:${term}`;
+      }
+      if (!toPin && (w.to || w.toCompId || w.target)) {
+        const comp = w.to || w.toCompId || w.target;
+        const term = w.toPinId || (w.toTerm !== undefined ? `p${w.toTerm}` : 'p0');
+        toPin = `${comp}:${term}`;
+      }
+      if (typeof fromPin !== 'string' || typeof toPin !== 'string') return null;
+      if (!fromPin.includes(':') || !toPin.includes(':')) return null;
+      return { ...w, fromPin, toPin };
+    }).filter(Boolean);
+  }
+
+  /**
    * Load circuit for Admin Read-Only Inspection Mode
    */
   async loadCircuitForAdminInspection(userId, circuitId, readOnly = true) {
@@ -4931,16 +4967,26 @@ class SwitchaApp {
 
     try {
       let circuit = null;
-      if (firebaseService.isInitialized && firebaseService.db) {
-        const docRef = firebaseService.sdk.doc(firebaseService.db, 'users', userId, 'circuits', circuitId);
-        const snap = await firebaseService.sdk.getDoc(docRef);
-        if (snap && snap.exists()) {
-          circuit = snap.data();
+
+      // 1. Check in-memory admin circuits cache first
+      if (Array.isArray(this.adminCircuits) && this.adminCircuits.length > 0) {
+        circuit = this.adminCircuits.find(c => (c.id === circuitId || String(c.id) === String(circuitId)) && (!userId || c.ownerUid === userId));
+        if (!circuit) {
+          circuit = this.adminCircuits.find(c => c.id === circuitId || String(c.id) === String(circuitId));
         }
       }
 
-      if (!circuit && window.SwitchaStorage) {
-        circuit = await window.SwitchaStorage.getCircuit(circuitId).catch(() => null);
+      // 2. Query Firebase admin service (adminDb / collectionGroup / localStorage / IndexedDB)
+      if (!circuit && firebaseService.getCircuitAdmin) {
+        circuit = await firebaseService.getCircuitAdmin(userId, circuitId);
+      }
+
+      // 3. Fallback: reload all circuits if cache was empty
+      if (!circuit) {
+        const allCircuits = await firebaseService.loadAllCircuits().catch(() => []);
+        this.adminCircuits = allCircuits;
+        circuit = allCircuits.find(c => (c.id === circuitId || String(c.id) === String(circuitId)) && (!userId || c.ownerUid === userId)) ||
+                  allCircuits.find(c => c.id === circuitId || String(c.id) === String(circuitId));
       }
 
       if (!circuit) {
@@ -4949,7 +4995,7 @@ class SwitchaApp {
       }
 
       if (infoSpan) {
-        infoSpan.textContent = `"${circuit.name || 'Untitled'}" by ${circuit.author || circuit.ownerEmail || userId}`;
+        infoSpan.textContent = `"${circuit.name || 'Untitled'}" by ${circuit.author || circuit.ownerEmail || userId || 'User'} (UID: ${userId || circuit.ownerUid || '—'})`;
       }
 
       const titleInput = document.getElementById('circuitNameInput');
@@ -4958,18 +5004,40 @@ class SwitchaApp {
       }
 
       if (this.canvas) {
+        if (this.isSimRunning) {
+          this.stopSimulation();
+        }
         this.canvas.clear();
-        if (Array.isArray(circuit.components)) {
-          this.canvas.components = JSON.parse(JSON.stringify(circuit.components));
+
+        if (circuit.presetKey && CircuitLibrary[circuit.presetKey] && (!circuit.components || circuit.components.length === 0)) {
+          CircuitLibrary[circuit.presetKey].load(this.canvas);
+        } else {
+          if (Array.isArray(circuit.components)) {
+            this.canvas.components = JSON.parse(JSON.stringify(circuit.components));
+          }
+          const validWires = this._normalizeWires(circuit.wires);
+          this.canvas.wires = JSON.parse(JSON.stringify(validWires));
         }
-        if (Array.isArray(circuit.wires)) {
-          this.canvas.wires = JSON.parse(JSON.stringify(circuit.wires));
-        }
+
         this.engine.reset();
         this.engine.setCircuit(this.canvas.components, this.canvas.wires);
-        this.canvas.fitToScreen();
-        this.canvas.render();
-        this.grapher?.render();
+        try {
+          this.canvas.fitToScreen();
+          this.canvas.render();
+          this.grapher?.render();
+        } catch (rErr) {
+          console.warn('[Admin Inspection] render error:', rErr);
+        }
+
+        setTimeout(() => {
+          try {
+            this.canvas?.resize();
+            this.canvas?.fitToScreen();
+            this.grapher?.resize();
+            this.canvas?.render();
+            this.grapher?.render();
+          } catch (_) {}
+        }, 50);
       }
 
       // Log inspection in audit logs
@@ -5062,8 +5130,9 @@ class SwitchaApp {
       this.adminGrapher?.render();
     };
 
-    // Load initial default preset so admin has an immediate working circuit
-    if (CircuitLibrary.buckConverter) {
+    // Load initial default preset so admin has an immediate working circuit ONLY IF NOT inspecting
+    const hasInspectParams = typeof window !== 'undefined' && window.location.hash.includes('inspectCircuit');
+    if (!hasInspectParams && CircuitLibrary.buckConverter) {
       CircuitLibrary.buckConverter.load(this.adminCanvas);
       this.adminEngine.setCircuit(this.adminCanvas.components, this.adminCanvas.wires);
       this.adminCanvas.render();
@@ -5232,16 +5301,26 @@ class SwitchaApp {
 
     try {
       let circuit = null;
-      if (firebaseService.isInitialized && firebaseService.db) {
-        const docRef = firebaseService.sdk.doc(firebaseService.db, 'users', userId, 'circuits', circuitId);
-        const snap = await firebaseService.sdk.getDoc(docRef);
-        if (snap && snap.exists()) {
-          circuit = snap.data();
+
+      // 1. Check in-memory admin circuits cache first (fastest and directly matches table row)
+      if (Array.isArray(this.adminCircuits) && this.adminCircuits.length > 0) {
+        circuit = this.adminCircuits.find(c => (c.id === circuitId || String(c.id) === String(circuitId)) && (!userId || c.ownerUid === userId));
+        if (!circuit) {
+          circuit = this.adminCircuits.find(c => c.id === circuitId || String(c.id) === String(circuitId));
         }
       }
 
-      if (!circuit && window.SwitchaStorage) {
-        circuit = await window.SwitchaStorage.getCircuit(circuitId).catch(() => null);
+      // 2. Query Firebase admin service (adminDb / collectionGroup / localStorage / IndexedDB)
+      if (!circuit && firebaseService.getCircuitAdmin) {
+        circuit = await firebaseService.getCircuitAdmin(userId, circuitId);
+      }
+
+      // 3. Fallback: reload all circuits if cache was empty
+      if (!circuit) {
+        const allCircuits = await firebaseService.loadAllCircuits().catch(() => []);
+        this.adminCircuits = allCircuits;
+        circuit = allCircuits.find(c => (c.id === circuitId || String(c.id) === String(circuitId)) && (!userId || c.ownerUid === userId)) ||
+                  allCircuits.find(c => c.id === circuitId || String(c.id) === String(circuitId));
       }
 
       if (!circuit) {
@@ -5249,11 +5328,11 @@ class SwitchaApp {
         return;
       }
 
-      this.currentInspectedCircuit = { ...circuit, userId, circuitId };
+      this.currentInspectedCircuit = { ...circuit, userId: userId || circuit.ownerUid, circuitId };
 
       if (banner) banner.style.display = 'flex';
       if (infoSpan) {
-        infoSpan.textContent = `"${circuit.name || 'Untitled'}" by ${circuit.author || circuit.ownerEmail || userId} (UID: ${userId})`;
+        infoSpan.textContent = `"${circuit.name || 'Untitled'}" by ${circuit.author || circuit.ownerEmail || userId || 'User'} (UID: ${userId || circuit.ownerUid || '—'})`;
       }
 
       if (nameInput) {
@@ -5265,18 +5344,40 @@ class SwitchaApp {
       }
 
       if (this.adminCanvas) {
+        if (this.isAdminSimRunning) {
+          this.stopAdminSimulation();
+        }
         this.adminCanvas.clear();
-        if (Array.isArray(circuit.components)) {
-          this.adminCanvas.components = JSON.parse(JSON.stringify(circuit.components));
+
+        if (circuit.presetKey && CircuitLibrary[circuit.presetKey] && (!circuit.components || circuit.components.length === 0)) {
+          CircuitLibrary[circuit.presetKey].load(this.adminCanvas);
+        } else {
+          if (Array.isArray(circuit.components)) {
+            this.adminCanvas.components = JSON.parse(JSON.stringify(circuit.components));
+          }
+          const validWires = this._normalizeWires(circuit.wires);
+          this.adminCanvas.wires = JSON.parse(JSON.stringify(validWires));
         }
-        if (Array.isArray(circuit.wires)) {
-          this.adminCanvas.wires = JSON.parse(JSON.stringify(circuit.wires));
-        }
+
         this.adminEngine.reset();
         this.adminEngine.setCircuit(this.adminCanvas.components, this.adminCanvas.wires);
-        this.adminCanvas.fitToScreen();
-        this.adminCanvas.render();
-        this.adminGrapher?.render();
+        try {
+          this.adminCanvas.fitToScreen();
+          this.adminCanvas.render();
+          this.adminGrapher?.render();
+        } catch (rErr) {
+          console.warn('[Admin Studio] render error:', rErr);
+        }
+
+        setTimeout(() => {
+          try {
+            this.adminCanvas?.resize();
+            this.adminCanvas?.fitToScreen();
+            this.adminGrapher?.resize();
+            this.adminCanvas?.render();
+            this.adminGrapher?.render();
+          } catch (_) {}
+        }, 50);
       }
 
       // Log inspection in audit activity

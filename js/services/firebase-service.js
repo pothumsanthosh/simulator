@@ -416,7 +416,7 @@ class FirebaseService {
 
     try {
       // 1. Authoritative Firebase ID token custom claim verification
-      const tokenResult = await user.getIdTokenResult(forceRefresh).catch(() => null);
+      const tokenResult = typeof user.getIdTokenResult === 'function' ? await user.getIdTokenResult(forceRefresh).catch(() => null) : null;
       if (tokenResult?.claims?.admin === true) return true;
       if (tokenResult?.claims?.admin === false) return false;
 
@@ -806,6 +806,82 @@ class FirebaseService {
     }
 
     return allCircuits;
+  }
+
+  async getCircuitAdmin(ownerUid, circuitId) {
+    if (!circuitId) return null;
+
+    const db = this.adminDb || this.userDb || this.db;
+
+    // 1. Try Firestore direct doc lookup if ownerUid is available
+    if (this.isInitialized && db && ownerUid) {
+      try {
+        const docRef = this.sdk.doc(db, 'users', ownerUid, 'circuits', circuitId);
+        const snap = await this.sdk.getDoc(docRef);
+        if (snap && snap.exists()) {
+          return { id: circuitId, ...snap.data() };
+        }
+      } catch (err) {
+        console.warn('[Firebase] Direct getCircuitAdmin lookup failed:', err.message);
+      }
+    }
+
+    // 2. Try Firestore collectionGroup search if ownerUid was not provided or doc lookup failed
+    if (this.isInitialized && db && this.sdk.collectionGroup) {
+      try {
+        const groupRef = this.sdk.collectionGroup(db, 'circuits');
+        const snap = await this.sdk.getDocs(groupRef);
+        for (const docSnap of snap.docs) {
+          const data = docSnap.data();
+          if (data && (data.id === circuitId || docSnap.id === circuitId)) {
+            return { id: circuitId, ...data };
+          }
+        }
+      } catch (err) {
+        console.warn('[Firebase] collectionGroup getCircuitAdmin query failed:', err.message);
+      }
+    }
+
+    // 3. Try localStorage for ownerUid
+    if (typeof localStorage !== 'undefined') {
+      try {
+        if (ownerUid) {
+          const raw = localStorage.getItem(`switcha_circuits_${ownerUid}`);
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              const found = list.find(c => c && (c.id === circuitId || String(c.id) === String(circuitId)));
+              if (found) return found;
+            }
+          }
+        }
+
+        // 4. Try scanning all localStorage switcha_circuits_* keys
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('switcha_circuits_')) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const found = list.find(c => c && (c.id === circuitId || String(c.id) === String(circuitId)));
+                if (found) return found;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 5. Try SwitchaStorage (IndexedDB)
+    if (typeof window !== 'undefined' && window.SwitchaStorage && typeof window.SwitchaStorage.getCircuit === 'function') {
+      try {
+        const found = await window.SwitchaStorage.getCircuit(circuitId);
+        if (found) return found;
+      } catch (_) {}
+    }
+
+    return null;
   }
 
   async deleteCircuitAdmin(ownerUid, circuitId) {
